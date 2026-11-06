@@ -4,7 +4,7 @@ import { useUpdateCheck } from "./useUpdateCheck";
 import { useTelegramAccount } from "./useTelegramAccount";
 import "./App.css";
 import type { Card, Library, UserFields } from "./lib/types";
-import { effectiveTags, effectiveTopic, makeEdit, matchesFilter, NO_ALIASES, setAliases, type Aliases } from "./lib/library";
+import { effectiveTags, effectiveTopic, findTopic, getOwnTopics, makeEdit, matchesFilter, mergeAlias, NO_ALIASES, setAliases, setOwnTopics, topicName, type Aliases } from "./lib/library";
 import { aiAllowed, appendEdit, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadSettings, saveBoardState, saveLibrary, saveSettings, wipeAll, type Settings } from "./lib/store";
 import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type SendOptions } from "./lib/telegram";
 import { TelegramDialog } from "./components/TelegramDialog";
@@ -53,6 +53,7 @@ export default function App() {
   const [demo, setDemo] = useState(false);
   /** Merges tried out in the demo stay in memory, apart from the real ones in settings. */
   const [demoAliases, setDemoAliases] = useState<Aliases>(NO_ALIASES);
+  const [demoTopics, setDemoTopics] = useState<string[]>([]);
   const demoRef = useRef(demo);
   demoRef.current = demo;
   /** Loading from Telegram already started by itself after sign-in in this launch. */
@@ -440,11 +441,20 @@ export default function App() {
   // Card names are read through the merges (lib/library.ts); set them before anything renders cards.
   const aliases = demo ? demoAliases : (settings.aliases ?? NO_ALIASES);
   setAliases(aliases);
+  const ownTopics = demo ? demoTopics : (settings.topics ?? []);
+  setOwnTopics(ownTopics);
 
   async function onAliases(a: Aliases) {
-    if (demoRef.current) setDemoAliases(a);
-    else {
-      const s = { ...settingsRef.current, aliases: a };
+    await saveNames({ aliases: a });
+  }
+
+  /** Saves merges and the user's own topics: in settings, or only in memory in the demo. */
+  async function saveNames(p: { aliases?: Aliases; topics?: string[] }) {
+    if (demoRef.current) {
+      if (p.aliases) setDemoAliases(p.aliases);
+      if (p.topics) setDemoTopics(p.topics);
+    } else {
+      const s = { ...settingsRef.current, ...p };
       settingsRef.current = s;
       setSettings(s);
       try {
@@ -453,8 +463,67 @@ export default function App() {
         notify(T.app.saveFailed(String(e)));
       }
     }
+    if (p.aliases) setAliases(p.aliases);
+    if (p.topics) setOwnTopics(p.topics);
     setRev((r) => r + 1);
   }
+
+  /** Every topic shown now: the ones on cards and the user's own empty ones. */
+  function allTopics(): string[] {
+    const names = new Set(getOwnTopics());
+    for (const c of lib?.cards ?? []) {
+      const t = effectiveTopic(c);
+      if (t) names.add(t);
+    }
+    return [...names];
+  }
+
+  /** A new empty topic made by hand. Returns the name it's shown under (an existing one in another case wins). */
+  async function createTopic(raw: string): Promise<string> {
+    const name = raw.trim().slice(0, 40);
+    const same = findTopic(allTopics(), name);
+    if (same) return same;
+    // The name was merged away earlier: making it again by hand undoes that merge.
+    let a = aliasesNow();
+    if (Object.prototype.hasOwnProperty.call(a.topics, name)) {
+      const { [name]: _gone, ...rest } = a.topics;
+      a = { ...a, topics: rest };
+    }
+    await saveNames({ aliases: a, topics: [...ownTopicsNow(), name] });
+    return name;
+  }
+
+  /** Renames a topic for every card in it, now and later (the AI's own name points at the new one). */
+  async function renameTopic(from: string, raw: string): Promise<string> {
+    const to = findTopic(allTopics().filter((t) => t !== from), raw) ?? raw.trim().slice(0, 40);
+    if (!to || to === from) return from;
+    const a = aliasesNow();
+    const used = lib?.cards.some((c) => effectiveTopic(c) === from);
+    const own = ownTopicsNow().filter((t) => topicName(t) !== from && topicName(t) !== to);
+    if (lib?.subgroups?.[from]) {
+      const { [from]: groups, ...rest } = lib.subgroups;
+      lib.subgroups = rest[to] ? rest : { ...rest, [to]: groups };
+      void persist(lib);
+    }
+    await saveNames({ aliases: used ? { ...a, topics: mergeAlias(a.topics, [from], to) } : a, topics: [...own, to] });
+    return to;
+  }
+
+  /** Deletes a topic: its cards are left without one, and the AI won't be offered the name again. */
+  async function deleteTopic(name: string) {
+    if (!lib) return;
+    const ids = lib.cards.filter((c) => effectiveTopic(c) === name).map((c) => c.id);
+    if (ids.length) edit(ids, { topic: "" });
+    if (lib.subgroups?.[name]) {
+      const { [name]: _gone, ...rest } = lib.subgroups;
+      lib.subgroups = rest;
+      void persist(lib);
+    }
+    await saveNames({ topics: ownTopicsNow().filter((t) => topicName(t) !== name) });
+  }
+
+  const aliasesNow = () => (demoRef.current ? demoAliases : (settingsRef.current.aliases ?? NO_ALIASES));
+  const ownTopicsNow = () => (demoRef.current ? demoTopics : (settingsRef.current.topics ?? []));
 
   async function askSynonyms(kind: "topics" | "tags", counts: Map<string, number>) {
     if (!aiAllowed(settingsRef.current) || demoRef.current) return []; // nothing leaves without consent
@@ -568,6 +637,9 @@ export default function App() {
         onAliases={onAliases}
         askSynonyms={aiAllowed(settings) && !demo ? askSynonyms : undefined}
         onGroupTopic={aiAllowed(settings) && !demo ? groupTopic : undefined}
+        onCreateTopic={createTopic}
+        onRenameTopic={renameTopic}
+        onDeleteTopic={deleteTopic}
       />
       {settingsDialog}
       {consentDialog}

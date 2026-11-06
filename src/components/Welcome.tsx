@@ -434,8 +434,8 @@ function QrImage({ url }: { url: string }) {
   return (
     <div className="w-qr" role="img" aria-label={T.welcome.qrAlt}>
       <svg viewBox={`-1 -1 ${size + 2} ${size + 2}`} shapeRendering="crispEdges">
-        <rect x={-1} y={-1} width={size + 2} height={size + 2} fill="#fff" />
-        <path d={d} fill="#000" />
+        <rect x={-1} y={-1} width={size + 2} height={size + 2} style={{ fill: "var(--fixed-paper)" }} />
+        <path d={d} style={{ fill: "var(--fixed-qr)" }} />
       </svg>
       <img src={mascot} alt="" className="w-qr-logo" />
     </div>

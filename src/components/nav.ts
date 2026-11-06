@@ -44,6 +44,48 @@ export const VIEWS: Array<{ key: ViewKey; label: string; icon: string }> = [
   { key: "headlines", get label() { return T.nav.viewHeadlines; }, icon: "rows" },
 ];
 
+/** Parts of a card that the view menu can hide. The title is always shown in headlines. */
+export type CardField = "cover" | "title" | "excerpt" | "tags" | "info";
+
+/** Which fields each view offers to hide, in menu order. */
+export const VIEW_FIELDS: Record<ViewKey, CardField[]> = {
+  grid: ["cover", "title", "excerpt", "tags", "info"],
+  masonry: ["cover", "title", "excerpt", "tags", "info"],
+  list: ["cover", "title", "excerpt", "tags", "info"],
+  headlines: ["tags", "info"],
+};
+
+/** How cards look: hidden fields per view and which side the list cover sits on. */
+export type CardLook = { hidden: Record<ViewKey, CardField[]>; coverSide: "left" | "right" };
+
+export function loadLook(): CardLook {
+  const hidden = {} as Record<ViewKey, CardField[]>;
+  for (const v of Object.keys(VIEW_FIELDS) as ViewKey[]) {
+    let raw = "";
+    try {
+      raw = localStorage.getItem(`sb.hide.${v}`) ?? "";
+    } catch {
+      /* preferences are a convenience only */
+    }
+    const ok = raw.split(",").filter((f): f is CardField => (VIEW_FIELDS[v] as string[]).includes(f));
+    // Never both cover and title: the card would be blank.
+    hidden[v] = ok.includes("cover") && ok.includes("title") ? ok.filter((f) => f !== "title") : ok;
+  }
+  return { hidden, coverSide: loadPref("coverSide", ["left", "right"] as const, "left") };
+}
+
+export function saveLook(look: CardLook) {
+  for (const v of Object.keys(look.hidden) as ViewKey[]) savePref(`hide.${v}`, look.hidden[v].join(","));
+  savePref("coverSide", look.coverSide);
+}
+
+/** Whether a field may be switched off now (cover and title can't both be off). */
+export function canHide(hidden: CardField[], f: CardField): boolean {
+  if (f === "cover") return !hidden.includes("title");
+  if (f === "title") return !hidden.includes("cover");
+  return true;
+}
+
 /** Sort options for the sort menu; `short` is what the toolbar button shows. */
 export const SORTS: Array<{ key: SortKey; label: string; short: string; icon: string }> = [
   { key: "new", get label() { return T.nav.sortNew; }, get short() { return T.nav.sortNewShort; }, icon: "sortNew" },
@@ -145,5 +187,41 @@ export function savePref(key: string, value: string) {
     localStorage.setItem(`sb.${key}`, value);
   } catch {
     /* preferences are a convenience only */
+  }
+}
+
+/**
+ * Width of the card panel when it opens on the side. The user drags its left edge;
+ * these are the "safe zones" it can't cross so the board and the sidebar stay usable.
+ */
+export const PANEL_WIDTH = {
+  /** What the panel starts at, and what a double click on the edge brings it back to. */
+  default: 420,
+  /** Narrower than this and the header buttons and the fields wrap badly. */
+  min: 320,
+  /** Wider than this is better served by the "full window" mode. */
+  max: 960,
+  /** The board keeps at least this much: a card column and a toolbar that still reads. */
+  minBoard: 440,
+  /** Step for the arrow keys on the focused edge. */
+  step: 24,
+} as const;
+
+/**
+ * Clamps a wanted panel width to the safe zone. `room` is the width shared by the board
+ * and the panel (the window minus the sidebar). When there's too little room for both,
+ * the panel keeps its minimum and the board gives way.
+ */
+export function clampPanelWidth(wanted: number, room: number): number {
+  const max = Math.min(PANEL_WIDTH.max, room - PANEL_WIDTH.minBoard);
+  return Math.round(Math.max(PANEL_WIDTH.min, Math.min(wanted, max)));
+}
+
+export function loadPanelWidth(): number {
+  try {
+    const v = Number(localStorage.getItem("sb.panelWidth"));
+    return Number.isFinite(v) && v >= PANEL_WIDTH.min && v <= PANEL_WIDTH.max ? v : PANEL_WIDTH.default;
+  } catch {
+    return PANEL_WIDTH.default;
   }
 }

@@ -5,6 +5,7 @@ import { AI_MODELS, aiModelOf, builtinUsage, costEstimate } from "../lib/ai";
 import { getInstallId } from "../lib/secrets";
 import { setThemePref, THEME_ICONS, THEME_LABELS, THEME_PREFS, useThemePref } from "../lib/theme";
 import { Icon } from "./Icon";
+import { Select } from "./Select";
 import { AiConsentDialog } from "./AiConsent";
 import { Done, HoldToConfirm, Switch } from "./Motion";
 import "./Settings.css";
@@ -85,14 +86,12 @@ export function SettingsDialog(props: {
               <div className="s2-text">
                 <b id="s2-lang-label">{L.language}</b>
               </div>
-              <select aria-labelledby="s2-lang-label" value={s.language} onChange={(e) => setS({ ...s, language: e.target.value as LangPref })}>
-                <option value="auto">{L.languageAuto(systemName)}</option>
-                {LANGS.map((l) => (
-                  <option key={l.key} value={l.key}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
+              <Select<LangPref>
+                labelledBy="s2-lang-label"
+                value={s.language}
+                options={[{ value: "auto", label: L.languageAuto(systemName) }, ...LANGS.map((l) => ({ value: l.key as LangPref, label: l.name }))]}
+                onChange={(v) => setS({ ...s, language: v })}
+              />
             </div>
           </div>
 

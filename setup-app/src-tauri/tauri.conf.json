@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Kipple Setup",
+  "mainBinaryName": "Kipple-Setup",
+  "version": "0.1.0",
+  "identifier": "com.khainpain.kipple-setup",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Kipple Setup",
+        "width": 560,
+        "height": 400,
+        "resizable": false,
+        "maximizable": false,
+        "decorations": false,
+        "shadow": true,
+        "center": true,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": ["../../src-tauri/icons/icon.ico"],
+    "copyright": "© 2026 Kipple · Tame your kipple",
+    "windows": {
+      "webviewInstallMode": { "type": "skip" }
+    }
+  }
+}

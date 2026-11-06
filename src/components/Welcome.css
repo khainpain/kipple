@@ -126,25 +126,19 @@
   gap: 7px;
   padding: 5px 10px 5px 5px;
   border-radius: 999px;
-  background: rgba(27, 122, 67, 0.1);
+  background: var(--ok-soft);
   color: var(--ok);
   font-size: 12px;
   font-weight: 600;
-}
-:root[data-theme="dark"] .w-safe {
-  background: rgba(95, 207, 143, 0.12);
 }
 .w-safe-dot {
   width: 18px;
   height: 18px;
   border-radius: 50%;
   background: var(--ok);
-  color: #fff;
+  color: var(--on-ok);
   display: grid;
   place-items: center;
-}
-:root[data-theme="dark"] .w-safe-dot {
-  color: var(--bg);
 }
 
 /* Sign-in card */
@@ -210,7 +204,7 @@
   width: 164px;
   height: 164px;
   flex-shrink: 0;
-  background: #fff;
+  background: var(--fixed-paper);
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 8px;
@@ -235,12 +229,12 @@
   width: 40px;
   height: 40px;
   transform: translate(-50%, -50%);
-  background: #fff;
+  background: var(--fixed-paper);
   border-radius: 50%;
   padding: 2px;
 }
 .w-qr-wait {
-  color: #77726a;
+  color: var(--fixed-muted);
   font-size: 12.5px;
   text-align: center;
 }
@@ -250,9 +244,9 @@
   transform: translateY(50%);
   font-size: 12.5px;
   padding: 6px 8px;
-  background: #fff;
-  color: #23211e;
-  border-color: #e3dfd7;
+  background: var(--fixed-paper);
+  color: var(--fixed-ink);
+  border-color: var(--fixed-line);
 }
 .w-qr-steps,
 .w-steps {
@@ -567,7 +561,7 @@
 .w-collage .w-video {
   position: relative;
   height: 118px;
-  background: #23211e;
+  background: var(--fixed-ink);
   overflow: hidden;
 }
 .w-video-mascot {
@@ -592,8 +586,8 @@
   right: 10px;
   top: 12px;
   height: 64px;
-  background: #fbf3e6;
-  color: #23211e;
+  background: var(--fixed-cream);
+  color: var(--fixed-ink);
   border-radius: 12px;
   font-size: 11.5px;
   font-weight: 600;
@@ -606,7 +600,7 @@
   top: 26px;
   border: 6px solid transparent;
   border-left: 0;
-  border-right-color: #fbf3e6;
+  border-right-color: var(--fixed-cream);
 }
 .w-bubble .kp-cap {
   padding: 0 10px;
@@ -624,7 +618,7 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: #d9573b;
+  background: var(--fixed-accent);
   position: relative;
   flex-shrink: 0;
 }
@@ -635,19 +629,19 @@
   top: 5px;
   border: 4px solid transparent;
   border-right: 0;
-  border-left: 6px solid #fff;
+  border-left: 6px solid var(--fixed-paper);
 }
 .w-bar {
   flex: 1;
   height: 3px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--fixed-on-dark-track);
   overflow: hidden;
 }
 .w-bar i {
   display: block;
   height: 100%;
-  background: #d9573b;
+  background: var(--fixed-accent);
 }
 
 .kp-mascot {

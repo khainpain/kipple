@@ -1,0 +1,25 @@
+[package]
+name = "kipple-setup"
+version = "0.1.0"
+description = "Kipple Setup: the branded first-install window around the NSIS setup.exe"
+authors = ["khainpain"]
+edition = "2024"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"
+
+# Small exe: it is downloaded once and thrown away.
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
