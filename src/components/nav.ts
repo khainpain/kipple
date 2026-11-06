@@ -4,7 +4,7 @@ import { effectiveAction, effectiveTitle, effectiveTopic, matchesFilter } from "
 
 /** What the sidebar points at: a smart list, one topic, or cards without a topic. */
 export type Scope =
-  | { kind: "list"; key: "all" | "read_later" | "ideas" | "todo" | "junk" | "sensitive" }
+  | { kind: "list"; key: "all" | "read_later" | "ideas" | "reference" | "todo" | "junk" | "sensitive" }
   | { kind: "topic"; name: string }
   | { kind: "notopic" };
 
@@ -24,6 +24,7 @@ export const SMART_LISTS: Array<{ key: Extract<Scope, { kind: "list" }>["key"]; 
   { key: "all", get label() { return T.nav.all; }, icon: "all" },
   { key: "read_later", get label() { return T.nav.readLater; }, icon: "clock" },
   { key: "ideas", get label() { return T.nav.ideas; }, icon: "bulb" },
+  { key: "reference", get label() { return T.nav.reference; }, icon: "bookmark" },
   { key: "todo", get label() { return T.nav.todo; }, icon: "check" },
 ];
 

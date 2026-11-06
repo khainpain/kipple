@@ -5,6 +5,7 @@ const PATHS: Record<string, string> = {
   clock: "M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z",
   bulb: "M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z",
   check: "M5 12l4 4 10-10",
+  bookmark: "M6 3h12v18l-6-4-6 4z",
   trash: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
   lock: "M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3",
   folder: "M3 6h6l2 2h10v11H3z",

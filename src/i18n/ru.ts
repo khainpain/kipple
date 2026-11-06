@@ -168,6 +168,7 @@ export const ru = {
     all: "Все карточки",
     readLater: "Прочитать позже",
     ideas: "Идеи",
+    reference: "Справка",
     todo: "Сделать",
     junk: "Мусор",
     sensitive: "Чувствительное",

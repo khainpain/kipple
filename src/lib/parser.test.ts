@@ -102,4 +102,16 @@ describe("library", () => {
     expect(matchesFilter(sticker, "all")).toBe(false);
     expect(matchesFilter(sticker, "junk")).toBe(true);
   });
+
+  it("lists Reference cards in their own filter, not in Junk", () => {
+    const { cards } = parseExport(fixture);
+    const c = cards.find((x) => !x.autoJunk)!;
+    applyEdits(cards, [{ t: "t", id: c.id, patch: { action: "reference" } }]);
+    expect(matchesFilter(c, "reference")).toBe(true);
+    expect(matchesFilter(c, "all")).toBe(true);
+    expect(matchesFilter(c, "ideas")).toBe(false);
+    applyEdits(cards, [{ t: "t", id: c.id, patch: { action: "junk" } }]);
+    expect(matchesFilter(c, "reference")).toBe(false);
+    expect(matchesFilter(c, "all")).toBe(false);
+  });
 });
