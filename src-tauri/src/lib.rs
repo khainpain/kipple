@@ -2,11 +2,19 @@ mod telegram;
 
 const SERVICE: &str = "com.khainpain.savedboard";
 
+/// The only secrets the web view may touch. The Telegram session and api keys live in the same
+/// store but are read only by Rust (telegram.rs): if a page ever ran someone else's script,
+/// it still couldn't take the Telegram session, which is full access to the account.
+const WEBVIEW_SECRETS: &[&str] = &["anthropic_api_key", "kipple_install_id"];
+
 fn entry(name: &str) -> Result<keyring::Entry, String> {
+    if !WEBVIEW_SECRETS.contains(&name) {
+        return Err(format!("secret {name:?} is not available here"));
+    }
     keyring::Entry::new(SERVICE, name).map_err(|e| e.to_string())
 }
 
-/// Reads a secret (the Anthropic API key) from the OS credential store.
+/// Reads a secret (the Anthropic API key, the install id) from the OS credential store.
 #[tauri::command]
 fn get_secret(name: String) -> Result<Option<String>, String> {
     match entry(&name)?.get_password() {
