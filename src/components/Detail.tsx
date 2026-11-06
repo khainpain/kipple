@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { platform } from "@platform";
 import type { Action, Card, Library, UserFields } from "../lib/types";
 import { ACTIONS, actionLabel } from "../lib/types";
@@ -9,7 +9,7 @@ import { Icon } from "./Icon";
 import { coverOf, displayTitle, siteOf } from "./CardView";
 import { Preview } from "./Preview";
 import { isImportant } from "../lib/smart";
-import { OPEN_MODES, type OpenMode } from "./nav";
+import { OPEN_MODES, PANEL_WIDTH, clampPanelWidth, loadPanelWidth, savePref, type OpenMode } from "./nav";
 
 /**
  * The full card. Opens the way the user picked: centered over the board (default),
@@ -29,6 +29,10 @@ export function Detail(props: {
   onNext?: () => void;
 }) {
   const { card, lib } = props;
+  const side = props.mode === "side";
+  const panelRef = useRef<HTMLElement>(null);
+  const [width, setWidth] = useState(loadPanelWidth);
+  const [dragging, setDragging] = useState(false);
   const [title, setTitle] = useState(effectiveTitle(card));
   const [topic, setTopic] = useState(effectiveTopic(card) ?? "");
   const [tags, setTags] = useState(effectiveTags(card).join(", "));
@@ -51,8 +55,96 @@ export function Detail(props: {
     if (Object.keys(patch).length) props.onEdit(patch);
   }
 
+  /** Width shared by the board and the panel: the workspace minus the sidebar. */
+  function room(): number {
+    const el = panelRef.current;
+    const ws = el?.parentElement;
+    if (!el || !ws) return window.innerWidth;
+    const sidebar = ws.querySelector<HTMLElement>(":scope > .sidebar");
+    return ws.clientWidth - (sidebar?.offsetWidth ?? 0);
+  }
+
+  function resizeTo(w: number) {
+    const next = clampPanelWidth(w, room());
+    setWidth(next);
+    savePref("panelWidth", String(next));
+  }
+
+  // Keep the saved width inside the safe zone when the window or the sidebar changes.
+  useEffect(() => {
+    if (!side) return;
+    const fit = () => setWidth((w) => clampPanelWidth(w, room()));
+    fit();
+    const ws = panelRef.current?.parentElement;
+    const ro = ws && typeof ResizeObserver !== "undefined" ? new ResizeObserver(fit) : null;
+    if (ws) ro?.observe(ws);
+    return () => ro?.disconnect();
+  }, [side]);
+
+  function startDrag(e: React.PointerEvent<HTMLDivElement>) {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = width;
+    const space = room();
+    let last = startW;
+    setDragging(true);
+    document.documentElement.classList.add("col-resizing");
+    const move = (ev: PointerEvent) => {
+      // The handle is on the left edge: dragging left makes the panel wider.
+      last = clampPanelWidth(startW + (startX - ev.clientX), space);
+      setWidth(last);
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      setDragging(false);
+      document.documentElement.classList.remove("col-resizing");
+      savePref("panelWidth", String(last));
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+  }
+
+  function onHandleKey(e: React.KeyboardEvent) {
+    const step = e.shiftKey ? PANEL_WIDTH.step * 4 : PANEL_WIDTH.step;
+    if (e.key === "ArrowLeft") resizeTo(width + step);
+    else if (e.key === "ArrowRight") resizeTo(width - step);
+    else if (e.key === "Home") resizeTo(PANEL_WIDTH.min);
+    else if (e.key === "End") resizeTo(PANEL_WIDTH.max);
+    else if (e.key === "Enter") resizeTo(PANEL_WIDTH.default);
+    else return;
+    // Don't let the arrows also step to the previous/next card.
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
   const panel = (
-    <aside className={`detail-panel mode-${props.mode}`} aria-label={T.detail.label} onClick={(e) => e.stopPropagation()}>
+    <aside
+      ref={panelRef}
+      className={`detail-panel mode-${props.mode}${dragging ? " resizing" : ""}`}
+      style={side ? { width } : undefined}
+      aria-label={T.detail.label}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {side && (
+        <div
+          className="panel-resizer"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={T.detail.resize}
+          aria-valuenow={width}
+          aria-valuemin={PANEL_WIDTH.min}
+          aria-valuemax={PANEL_WIDTH.max}
+          title={T.detail.resize}
+          tabIndex={0}
+          onPointerDown={startDrag}
+          onDoubleClick={() => resizeTo(PANEL_WIDTH.default)}
+          onKeyDown={onHandleKey}
+        />
+      )}
       <header className="detail-head">
         <button className="icon-btn" onClick={props.onPrev} disabled={!props.onPrev} title={T.detail.prev}>
           <Icon name="up" />
