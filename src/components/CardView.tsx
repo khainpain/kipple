@@ -9,7 +9,7 @@ import { instantImage } from "../lib/embeds";
 import { isImportant } from "../lib/smart";
 import { TopicMenu } from "./TopicMenu";
 import { Icon } from "./Icon";
-import { hueOf, type ViewKey } from "./nav";
+import { hueOf, type CardField, type CardLook, type ViewKey } from "./nav";
 
 const KIND_ICON: Record<string, string> = {
   document: "file",
@@ -141,6 +141,8 @@ export function CardView(props: {
   lib: Library;
   card: Card;
   view: ViewKey;
+  /** Hidden fields and list cover side; the overview leaves it out and shows everything. */
+  look?: CardLook;
   selected: boolean;
   active: boolean;
   selecting: boolean;
@@ -157,13 +159,15 @@ export function CardView(props: {
   const [moveAt, setMoveAt] = useState<HTMLElement | null>(null);
   const action = effectiveAction(card);
   const important = isImportant(card);
-  const tags = effectiveTags(card).slice(0, view === "headlines" ? 3 : 4);
+  const hidden = props.look?.hidden[view] ?? [];
+  const show = (f: CardField) => !hidden.includes(f);
+  const tags = (show("tags") ? effectiveTags(card) : []).slice(0, view === "headlines" ? 3 : 4);
   const title = displayTitle(card);
-  const excerpt = view === "headlines" ? "" : excerptOf(card);
+  const excerpt = view === "headlines" || !show("excerpt") ? "" : excerptOf(card);
   const site = siteOf(card);
   const fileMeta = [formatSize(card.media?.size), card.kind === "video" ? "" : formatDuration(card.media?.duration)].filter(Boolean).join(" · ");
 
-  const cls = ["card", `view-${view}`, `kind-${card.kind}`, props.selected && "selected", props.active && "active", action === "junk" && "junk", props.selecting && "selecting", moveAt && "menu-open"]
+  const cls = ["card", `view-${view}`, `kind-${card.kind}`, props.selected && "selected", props.active && "active", action === "junk" && "junk", props.selecting && "selecting", moveAt && "menu-open", !show("cover") && "no-cover", view === "list" && props.look?.coverSide === "right" && "cover-right"]
     .filter(Boolean)
     .join(" ");
 
@@ -175,16 +179,16 @@ export function CardView(props: {
         else props.onOpen();
       }}
     >
-      {view !== "headlines" && <Cover lib={lib} card={card} view={view} />}
+      {view !== "headlines" && show("cover") && <Cover lib={lib} card={card} view={view} />}
       {view === "headlines" && (
         <span className="kind-dot">
           <Icon name={KIND_ICON[card.kind] ?? "file"} size={15} />
         </span>
       )}
       <div className="card-body">
-        <h3 title={title}>{title}</h3>
+        {show("title") && <h3 title={title}>{title}</h3>}
         {excerpt && <p className="excerpt">{excerpt}</p>}
-        {(tags.length > 0 || action || card.sensitive || important) && view !== "headlines" && (
+        {show("tags") && (tags.length > 0 || action || card.sensitive || important) && view !== "headlines" && (
           <div className="tags">
             {important && (
               <span className="pill important" title={T.card.important}>
@@ -204,19 +208,25 @@ export function CardView(props: {
             ))}
           </div>
         )}
-        <div className="meta-row">
-          {site && card.link?.favicon && <img src={card.link.favicon} alt="" className="favicon" onError={(e) => (e.currentTarget.style.display = "none")} />}
-          {site && <span className="site">{site}</span>}
-          {!site && fileMeta && <span>{fileMeta}</span>}
-          {!site && !fileMeta && card.forwardedFrom && <span className="site">{card.forwardedFrom}</span>}
-          {view === "headlines" &&
-            tags.map((t) => (
-              <span key={t} className="tag">
-                #{t}
-              </span>
-            ))}
-          <span className="date">{formatDate(card.date)}</span>
-        </div>
+        {(show("info") || (view === "headlines" && tags.length > 0)) && (
+          <div className="meta-row">
+            {show("info") && (
+              <>
+                {site && card.link?.favicon && <img src={card.link.favicon} alt="" className="favicon" onError={(e) => (e.currentTarget.style.display = "none")} />}
+                {site && <span className="site">{site}</span>}
+                {!site && fileMeta && <span>{fileMeta}</span>}
+                {!site && !fileMeta && card.forwardedFrom && <span className="site">{card.forwardedFrom}</span>}
+              </>
+            )}
+            {view === "headlines" &&
+              tags.map((t) => (
+                <span key={t} className="tag">
+                  #{t}
+                </span>
+              ))}
+            {show("info") && <span className="date">{formatDate(card.date)}</span>}
+          </div>
+        )}
       </div>
       <div className="hover-actions" onClick={(e) => e.stopPropagation()}>
         <button className={`ha sel${props.selected ? " on" : ""}`} title={T.card.select} onClick={() => props.onToggleSelect(false)}>

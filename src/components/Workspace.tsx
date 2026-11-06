@@ -14,6 +14,7 @@ import { Detail } from "./Detail";
 import { Sidebar } from "./Sidebar";
 import { Icon } from "./Icon";
 import { SortMenu } from "./SortMenu";
+import { ViewMenu } from "./ViewMenu";
 import { nextThemePref, setThemePref, THEME_ICONS, THEME_LABELS, useThemePref } from "../lib/theme";
 import { T, compareText, formatNumber } from "../i18n";
 import { BOARD_TITLE } from "../lib/telegram";
@@ -24,7 +25,6 @@ import {
   SMART_LISTS,
   SORTS,
   TYPES,
-  VIEWS,
   loadPref,
   matchesScope,
   matchesType,
@@ -37,6 +37,9 @@ import {
   type SortKey,
   type TypeKey,
   type ViewKey,
+  loadLook,
+  saveLook,
+  type CardLook,
 } from "./nav";
 
 /** Topics smaller than this aren't worth splitting into subgroups. */
@@ -108,6 +111,8 @@ export function Workspace(props: {
 
   useEffect(() => savePref("sort", sort), [sort]);
   useEffect(() => savePref("layout", view), [view]);
+  const [look, setLook] = useState<CardLook>(loadLook);
+  useEffect(() => saveLook(look), [look]);
   useEffect(() => savePref("sidebar", sideOpen ? "open" : "closed"), [sideOpen]);
   useEffect(() => savePref("open", openMode), [openMode]);
 
@@ -482,13 +487,7 @@ export function Workspace(props: {
           )}
           <div className="spacer" />
           <SortMenu value={sort} onChange={setSort} />
-          <div className="segmented" role="radiogroup" aria-label={T.toolbar.view}>
-            {VIEWS.map((v) => (
-              <button key={v.key} role="radio" aria-checked={view === v.key} className={view === v.key ? "on" : ""} onClick={() => setView(v.key)} title={v.label}>
-                <Icon name={v.icon} />
-              </button>
-            ))}
-          </div>
+          <ViewMenu view={view} onView={setView} look={look} onLook={setLook} />
         </div>
 
         <Grid
@@ -496,6 +495,7 @@ export function Workspace(props: {
           lib={lib}
           cards={visible}
           view={view}
+          look={look}
           selected={selected}
           activeId={openId}
           onOpen={(c) => setOpenId(c.id)}
