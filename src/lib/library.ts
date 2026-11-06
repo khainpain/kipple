@@ -1,4 +1,5 @@
 import type { Action, Card, EditEvent, Library, UserFields } from "./types";
+import { linkText } from "./embeds";
 
 /**
  * Merge a fresh import into the existing library: AI fields, link previews and user
@@ -106,7 +107,7 @@ export function findTopic(names: Iterable<string>, name: string): string | undef
 }
 
 export function effectiveTitle(c: Card): string {
-  return c.user?.title ?? c.ai?.title ?? c.link?.title ?? "";
+  return c.user?.title ?? c.ai?.title ?? linkText(c.link).title ?? "";
 }
 
 export type FilterKey = "all" | "links" | "photos" | "videos" | "docs" | "ideas" | "reference" | "read_later" | "junk" | "sensitive";
@@ -147,7 +148,7 @@ const BATCH_MS = 10 * 1000;
 const MEDIA_KINDS = new Set(["photo", "video", "animation", "document", "audio", "video_note"]);
 
 function firstLine(c: Card): string | undefined {
-  const t = c.user?.title || c.ai?.title || c.link?.title || c.text.split("\n").find((l) => l.trim());
+  const t = c.user?.title || c.ai?.title || linkText(c.link).title || c.text.split("\n").find((l) => l.trim());
   return t?.trim().slice(0, 100) || undefined;
 }
 

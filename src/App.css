@@ -1403,6 +1403,118 @@ code {
   align-items: center;
   gap: 4px;
 }
+/* Video links: a play mark on the card, the site's own player in the opened card. */
+.play-mark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--overlay);
+  color: var(--on-overlay);
+  pointer-events: none;
+}
+.card.view-list .play-mark {
+  width: 26px;
+  height: 26px;
+}
+.play-mark .icon path,
+.link-player .play-btn .icon path {
+  fill: currentColor;
+}
+.link-player {
+  position: relative;
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--line);
+  max-height: 72vh;
+  flex-shrink: 0;
+}
+.link-player.vertical {
+  width: auto;
+  max-width: 100%;
+  height: min(62vh, 560px);
+  align-self: center;
+}
+.link-player.provider-instagram:not(.facade) {
+  max-height: none;
+  width: min(100%, 420px);
+  height: auto;
+  min-height: 480px;
+  align-self: center;
+  border: 1px solid var(--line);
+}
+.link-player iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.link-player.provider-instagram:not(.facade) iframe {
+  min-height: inherit;
+}
+.link-player.facade {
+  display: block;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.link-player.facade img,
+.link-player.facade .facade-blank {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.link-player .play-btn {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--overlay);
+  color: var(--on-overlay);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.link-player.facade:hover .play-btn {
+  transform: translate(-50%, -50%) scale(1.06);
+  background: var(--accent);
+}
+.link-player .facade-hint {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  background: var(--overlay);
+  color: var(--on-overlay);
+  font-size: 12px;
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+.detail-desc p {
+  margin: -6px 0 0;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.detail-desc.open p {
+  display: block;
+}
+.detail-desc .link-btn {
+  margin-top: 4px;
+}
 .detail-summary {
   margin: -6px 0 0;
   line-height: 1.5;

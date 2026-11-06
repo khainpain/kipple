@@ -335,6 +335,8 @@ export const en: Dict = {
   },
 
   detail: {
+    more: "Show more",
+    less: "Show less",
     resize: "Drag to resize. Double-click to reset",
     label: "Card",
     prev: "Previous (↑)",
@@ -470,10 +472,20 @@ export const en: Dict = {
     onInstagram: (author) => `${author} on Instagram`,
   },
 
+  player: {
+    play: "Play video",
+    showPost: "Show post",
+    hint: (site) => `Watch here · loads from ${site}`,
+    post: (site) => `Show post · loads from ${site}`,
+  },
+
   demo: {
     chatName: "Saved Messages (demo)",
     topics: ["Design", "Programming", "Food", "Travel", "Finance"],
     article: (i) => `Article number ${i}`,
+    reelTitle: "Anna Cooks on Instagram: \"10-minute pasta 🍝\nThe sauce is ready before the water boils. You only need three things: tomatoes, garlic and good olive oil. Recipe below, save it!\"",
+    reelDescription: "12K likes, 340 comments - anna.cooks on May 1, 2026: \"10-minute pasta 🍝\nThe sauce is ready before the water boils. You only need three things: tomatoes, garlic and good olive oil. Recipe below, save it!\". ",
+    videoTitle: "How Telegram works inside",
     card: (i, kind) => `Card ${i}: ${kind}`,
     summary: "A short note on what's saved here and why you'd come back to it.",
     groups: ["Color and type", "Grids and layout"],

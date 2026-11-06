@@ -8,6 +8,8 @@ import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic } from "
 import { Icon } from "./Icon";
 import { coverOf, displayTitle, siteOf } from "./CardView";
 import { Preview } from "./Preview";
+import { LinkPlayer } from "./LinkPlayer";
+import { embedOf, linkText } from "../lib/embeds";
 import { isImportant } from "../lib/smart";
 import { OPEN_MODES, PANEL_WIDTH, clampPanelWidth, hueOf, loadPanelWidth, savePref, type OpenMode } from "./nav";
 import { TopicMenu } from "./TopicMenu";
@@ -43,6 +45,11 @@ export function Detail(props: {
   const photos = card.kind === "photo" ? [card.media, ...(card.album ?? [])].filter((m) => m?.path) : [];
   const cover = card.kind !== "photo" ? coverOf(lib, card).src : undefined;
   const site = siteOf(card);
+  const embed = card.kind === "link" ? embedOf(card.urls[0]) : undefined;
+  const linked = linkText(card.link);
+  // The page's own description (an Instagram caption, a video blurb), unless it just repeats the heading.
+  const description = linked.description && linked.description.trim() !== (title || linked.title || "").trim() ? linked.description : undefined;
+  const [moreDesc, setMoreDesc] = useState(false);
 
   function saveText() {
     const patch: UserFields = {};
@@ -194,8 +201,12 @@ export function Detail(props: {
             ))}
           </div>
         )}
-        {cover && <img className="detail-cover" src={cover} alt="" onError={(e) => (e.currentTarget.style.display = "none")} />}
-        {site && <div className="detail-site">{site}</div>}
+        {embed ? (
+          <LinkPlayer embed={embed} cover={cover} />
+        ) : (
+          cover && <img className="detail-cover" src={cover} alt="" onError={(e) => (e.currentTarget.style.display = "none")} />
+        )}
+        {site && <div className="detail-site">{[site, linked.author].filter(Boolean).join(" · ")}</div>}
 
         <Preview lib={lib} card={card} />
 
@@ -219,7 +230,17 @@ export function Detail(props: {
             )}
           </div>
         )}
-        {card.ai?.summary && <p className="detail-summary">{card.ai.summary}</p>}
+        {description && (
+          <div className={`detail-desc${moreDesc ? " open" : ""}`}>
+            <p>{description}</p>
+            {description.length > 280 && (
+              <button className="link-btn" onClick={() => setMoreDesc(!moreDesc)}>
+                {moreDesc ? T.detail.less : T.detail.more}
+              </button>
+            )}
+          </div>
+        )}
+        {card.ai?.summary && !description && <p className="detail-summary">{card.ai.summary}</p>}
 
         <div className="field">
           <span>{T.detail.status}</span>

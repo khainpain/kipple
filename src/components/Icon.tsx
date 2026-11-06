@@ -12,6 +12,7 @@ const PATHS: Record<string, string> = {
   link: "M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1",
   photo: "M3 5h18v14H3zM3 16l5-5 4 4 3-3 6 6M15.5 9.5a1.5 1.5 0 1 0 0-.01",
   video: "M3 6h13v12H3zM16 10l5-3v10l-5-3",
+  play: "M8 5.5v13l11-6.5z",
   file: "M6 3h8l4 4v14H6zM14 3v4h4",
   hash: "M5 9h14M5 15h14M10 4L8 20M16 4l-2 16",
   masonry: "M4 4h7v9H4zM13 4h7v5h-7zM4 15h7v5H4zM13 11h7v9h-7z",
