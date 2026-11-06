@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { TelegramAccount } from "../platform/types";
 import logoLight from "../../brand/kipple-icon-tiny-light.svg";
 import logoDark from "../../brand/kipple-icon-tiny-dark.svg";
 import { Icon } from "./Icon";
 import { T, formatNumber } from "../i18n";
 import { SMART_LISTS, hueOf, sameScope, type Scope } from "./nav";
+import { TopicActions } from "./TopicActions";
 
 const TOPICS_SHOWN = 10;
 const TAGS_SHOWN = 12;
@@ -32,6 +33,36 @@ function Section(props: { title: string; children: React.ReactNode; defaultOpen?
       </h4>
       {open && props.children}
     </section>
+  );
+}
+
+/** Typing a topic's name in place: Enter or clicking away keeps it, Esc cancels. */
+function TopicInput(props: { initial?: string; onDone: (name: string | null) => void }) {
+  const [v, setV] = useState(props.initial ?? "");
+  const done = useRef(false);
+  const finish = (name: string | null) => {
+    if (done.current) return;
+    done.current = true;
+    props.onDone(name?.trim() || null);
+  };
+  return (
+    <div className="side-item side-edit">
+      <span className="topic-dot" style={{ "--h": hueOf(v.trim() || props.initial || "") } as React.CSSProperties} />
+      <input
+        autoFocus
+        value={v}
+        maxLength={40}
+        placeholder={T.topics.namePlaceholder}
+        aria-label={T.topics.namePlaceholder}
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => setV(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") finish(v);
+          else if (e.key === "Escape") finish(null);
+        }}
+        onBlur={() => finish(v)}
+      />
+    </div>
   );
 }
 
@@ -101,12 +132,19 @@ export function Sidebar(props: {
   onTag: (t: string | null) => void;
   tidyCount: number;
   onTidy: () => void;
+  onCreateTopic: (name: string) => void;
+  onRenameTopic: (from: string, to: string) => void;
+  onDeleteTopic: (name: string) => void;
 }) {
   const [showAllTags, setShowAllTags] = useState(false);
   const [showAllTopics, setShowAllTopics] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [menu, setMenu] = useState<{ name: string; count: number; at: HTMLElement } | null>(null);
   const is = (s: Scope) => sameScope(props.scope, s);
-  // Topics are the shelves: the biggest few, the rest one click away. The open one always shows.
-  const topics = showAllTopics ? props.topics : props.topics.filter(([t], i) => i < TOPICS_SHOWN || is({ kind: "topic", name: t }));
+  // Topics are the shelves: the biggest few, the rest one click away. The open one, and the
+  // user's own still empty ones, always show.
+  const topics = showAllTopics ? props.topics : props.topics.filter(([t, n], i) => i < TOPICS_SHOWN || n === 0 || is({ kind: "topic", name: t }));
   // Tags are fine filters: only the common ones by default; tags on a single card wait under "more".
   const shortTags = props.tags.filter(([t, n], i) => (i < TAGS_SHOWN && n > 1) || t === props.tag);
   const tags = showAllTags ? props.tags : shortTags;
@@ -127,17 +165,68 @@ export function Sidebar(props: {
         ))}
       </nav>
 
-      <Section title={T.sidebar.topics} extra={props.topics.length > 1 ? tidyBtn : undefined}>
-        {topics.map(([t, n]) => (
-          <Item key={t} dot={hueOf(t)} label={t} count={n} active={is({ kind: "topic", name: t })} onClick={() => props.onScope({ kind: "topic", name: t })} />
-        ))}
+      <Section
+        title={T.sidebar.topics}
+        extra={
+          <>
+            {props.topics.length > 1 && tidyBtn}
+            <button className="icon-btn side-tidy" onClick={() => setAdding(true)} title={T.topics.add} aria-label={T.topics.add}>
+              <Icon name="plus" size={14} />
+            </button>
+          </>
+        }
+      >
+        {adding && (
+          <TopicInput
+            onDone={(name) => {
+              setAdding(false);
+              if (name) props.onCreateTopic(name);
+            }}
+          />
+        )}
+        {topics.map(([t, n]) =>
+          renaming === t ? (
+            <TopicInput
+              key={t}
+              initial={t}
+              onDone={(name) => {
+                setRenaming(null);
+                if (name && name !== t) props.onRenameTopic(t, name);
+              }}
+            />
+          ) : (
+            <div
+              key={t}
+              className={`side-row${menu?.name === t ? " menu-open" : ""}`}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setMenu({ name: t, count: n, at: e.currentTarget });
+              }}
+            >
+              <Item dot={hueOf(t)} label={t} count={n} active={is({ kind: "topic", name: t })} onClick={() => props.onScope({ kind: "topic", name: t })} />
+              <button className="icon-btn side-row-more" title={T.topics.actions} aria-label={T.topics.actions} onClick={(e) => setMenu({ name: t, count: n, at: e.currentTarget.parentElement! })}>
+                <Icon name="more" size={14} />
+              </button>
+            </div>
+          ),
+        )}
+        {menu && (
+          <TopicActions
+            anchor={menu.at}
+            name={menu.name}
+            count={menu.count}
+            onRename={() => setRenaming(menu.name)}
+            onDelete={() => props.onDeleteTopic(menu.name)}
+            onClose={() => setMenu(null)}
+          />
+        )}
         {props.noTopic > 0 && <Item icon="inbox" label={T.nav.noTopic} count={props.noTopic} active={is({ kind: "notopic" })} onClick={() => props.onScope({ kind: "notopic" })} />}
         {props.topics.length > TOPICS_SHOWN && (
           <button className="link-btn side-more" onClick={() => setShowAllTopics(!showAllTopics)}>
             {showAllTopics ? T.sidebar.collapse : T.sidebar.more(props.topics.length - topics.length)}
           </button>
         )}
-        {props.topics.length === 0 && <p className="hint side-hint">{T.sidebar.topicsHint}</p>}
+        {props.topics.length === 0 && !adding && <p className="hint side-hint">{T.sidebar.topicsHint}</p>}
       </Section>
 
       {props.tags.length > 0 && (

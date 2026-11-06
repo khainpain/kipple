@@ -38,7 +38,7 @@ export type CardHandlers = {
  * Virtualized board for all four views. Masonry uses the virtualizer's lanes; the uniform
  * grid virtualizes rows so cards line up; list and headlines are a single column.
  */
-export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?: CardLook }) {
+export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?: CardLook; /** Instead of the usual "nothing here". */ empty?: { title: string; hint: string } }) {
   const { cards, view } = props;
   const parentRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1000);
@@ -102,8 +102,8 @@ export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?
     return (
       <div className="grid-scroll" ref={parentRef}>
         <div className="empty">
-          <b>{T.grid.emptyTitle}</b>
-          <span>{T.grid.emptyHint}</span>
+          <b>{props.empty?.title ?? T.grid.emptyTitle}</b>
+          <span>{props.empty?.hint ?? T.grid.emptyHint}</span>
         </div>
       </div>
     );
