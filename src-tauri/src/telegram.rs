@@ -15,6 +15,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use grammers_client::client::{LoginToken, PasswordToken};
+use grammers_client::media::Downloadable;
 use grammers_client::sender::{AutoSleep, ConnectionParams, SenderPool};
 use grammers_client::session::storages::MemorySession;
 use grammers_client::session::{Session, SessionData};
@@ -53,6 +54,16 @@ pub struct TgStatus {
     built_in_api: bool,
     authorized: bool,
     name: Option<String>,
+}
+
+/// The signed-in account, for the sidebar header.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Account {
+    name: String,
+    username: Option<String>,
+    /// The small (160×160) profile photo as JPEG bytes, if the user has one.
+    photo: Option<Vec<u8>>,
 }
 
 #[derive(Serialize)]
@@ -168,7 +179,7 @@ fn connect() -> Result<Conn, String> {
     let (api_id, api_hash) = api_credentials().ok_or("NO_API")?;
     let session = Arc::new(load_session());
     let params = ConnectionParams {
-        device_model: "Saved Board".into(),
+        device_model: "Kipple".into(),
         app_version: env!("CARGO_PKG_VERSION").into(),
         // Short rate-limit waits are slept through here; longer ones go back to the UI,
         // which shows the pause and resumes by itself.
@@ -239,6 +250,62 @@ pub async fn tg_status(state: tauri::State<'_, TgState>) -> Result<TgStatus, Str
     let c = conn(&state).await?;
     let name = me(&c.client).await.map_err(err)?;
     Ok(TgStatus { has_api: true, built_in_api, authorized: name.is_some(), name })
+}
+
+/// The small profile photo of the signed-in user.
+struct OwnPhoto {
+    photo_id: i64,
+    dc_id: i32,
+}
+
+impl Downloadable for OwnPhoto {
+    fn to_raw_input_location(&self) -> Option<tl::enums::InputFileLocation> {
+        Some(tl::types::InputPeerPhotoFileLocation { big: false, peer: tl::enums::InputPeer::PeerSelf, photo_id: self.photo_id }.into())
+    }
+
+    fn dc_id(&self) -> Option<i32> {
+        Some(self.dc_id)
+    }
+}
+
+/// Name, @username and avatar of the signed-in account, or None when nobody is signed in.
+/// Like tg_status, it doesn't connect when there's no saved session.
+#[tauri::command]
+pub async fn tg_account(state: tauri::State<'_, TgState>) -> Result<Option<Account>, String> {
+    if api_credentials().is_none() {
+        return Ok(None);
+    }
+    let connected = state.0.lock().await.is_some();
+    if read_secret(SESSION_KEY).is_none() && !connected {
+        return Ok(None);
+    }
+    let c = conn(&state).await?;
+    let req = tl::functions::users::GetUsers { id: vec![tl::enums::InputUser::UserSelf] };
+    let user = match c.client.invoke(&req).await {
+        Ok(users) => match users.into_iter().next() {
+            Some(tl::enums::User::User(u)) => u,
+            _ => return Ok(None),
+        },
+        Err(InvocationError::Rpc(e)) if e.code == 401 => return Ok(None),
+        Err(e) => return Err(err(e)),
+    };
+    let name = user_name(&tl::enums::User::User(user.clone()));
+    let photo = match &user.photo {
+        Some(tl::enums::UserProfilePhoto::Photo(p)) => {
+            let mut bytes = Vec::new();
+            let mut download = c.client.iter_download(&OwnPhoto { photo_id: p.photo_id, dc_id: p.dc_id });
+            // The avatar is a nice-to-have: a failed download just shows initials.
+            loop {
+                match download.next().await {
+                    Ok(Some(chunk)) => bytes.extend(chunk),
+                    Ok(None) => break Some(bytes),
+                    Err(_) => break None,
+                }
+            }
+        }
+        _ => None,
+    };
+    Ok(Some(Account { name, username: user.username.clone(), photo: photo.filter(|b| !b.is_empty()) }))
 }
 
 /// Saves the user's own api_id / api_hash (from my.telegram.org) and reconnects with them.

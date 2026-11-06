@@ -11,6 +11,7 @@ import { SortMenu } from "./SortMenu";
 import { nextThemePref, setThemePref, THEME_ICONS, THEME_LABELS, useThemePref } from "../lib/theme";
 import { T, compareText, formatNumber } from "../i18n";
 import { BOARD_TITLE } from "../lib/telegram";
+import type { TelegramAccount } from "../platform/types";
 import { actionLabel } from "../lib/types";
 import {
   OPEN_MODES,
@@ -45,6 +46,8 @@ export function Workspace(props: {
   onSettings: () => void;
   /** Desktop only: opens "Send to Telegram". */
   onTelegram?: () => void;
+  /** The signed-in Telegram account, shown at the top of the sidebar. */
+  tgAccount?: TelegramAccount | null;
   onRunAi: () => void;
   /** Ask the AI to name one photo from its content (sends that picture). */
   onNameImage?: (card: Card) => void;
@@ -181,6 +184,7 @@ export function Workspace(props: {
       {sideOpen && (
         <Sidebar
           chatName={lib.chatName}
+          account={props.tgAccount}
           scope={scope}
           tag={tag}
           listCounts={listCounts}

@@ -1,4 +1,4 @@
-# Saved Board
+# Kipple
 
 Desktop app that turns Telegram «Избранное» (Saved Messages) into a visual, searchable library: a masonry grid of cards with AI topics, tags, summaries and actions (read later / idea / reference / todo / junk).
 
@@ -7,7 +7,7 @@ Everything stays on your computer. The only things that leave it are message tex
 ## How to use
 
 1. In Telegram Desktop open «Избранное» → ⋮ → «Экспорт истории чата», format **JSON**, tick «Фотографии» (videos and files are optional).
-2. Start Saved Board and pick the export folder (the one with `result.json`).
+2. Start Kipple and pick the export folder (the one with `result.json`).
 3. Optionally add an Anthropic API key in Settings (stored in Windows Credential Manager / macOS Keychain). Tagging ~10k messages with Claude Haiku 5.5 costs about $1–2.
 4. Filter, search, mark junk (hover a card → 🗑, or Ctrl/Shift-click to select several), and export to Markdown or CSV.
 
@@ -15,7 +15,7 @@ Re-importing a newer export keeps your edits and AI tags; only new messages are 
 
 ### Send back to Telegram (desktop only)
 
-The paper-plane button in the toolbar lays the library out inside Telegram: the app creates a private group «Saved Board» with one topic per theme, forwards each original message from «Избранное» into its topic, and replies under it with the title, summary and hashtags (`#прочитать_позже`, `#идея`, the card's tags), so tapping a hashtag in Telegram shows everything with it.
+The paper-plane button in the toolbar lays the library out inside Telegram: the app creates a private group «Kipple» (a group made by an older version keeps its name «Saved Board» and is reused) with one topic per theme, forwards each original message from «Избранное» into its topic, and replies under it with the title, summary and hashtags (`#прочитать_позже`, `#идея`, the card's tags), so tapping a hashtag in Telegram shows everything with it.
 
 - It logs in to **your own account** over MTProto (the protocol Telegram's apps use, via [grammers](https://github.com/Lonami/grammers)): phone number, code, and the cloud password if you have one. There is no server in between; the session key is kept in the OS credential store and «Выйти» ends the session.
 - Telegram needs an app key: open [my.telegram.org](https://my.telegram.org/apps) → «API development tools», create an app (any name, platform Desktop) and paste `api_id` and `api_hash` into the dialog once. If the repository secrets `TG_API_ID` and `TG_API_HASH` are set, builds carry them and nobody has to do this.
@@ -31,6 +31,8 @@ The paper-plane button in the toolbar lays the library out inside Telegram: the 
 | Anthropic API key, Telegram session and api_id/api_hash | OS credential store |
 | What was sent to the Telegram group | `%APPDATA%\com.khainpain.savedboard\telegram.json` |
 | Photos and files | Read in place from the Telegram export folder, never copied |
+
+The folder and credential-store entries are named after the app identifier `com.khainpain.savedboard`, from before the app was called Kipple. It stays as is on purpose: changing it would make the app lose the library, the keys and the Telegram session on update.
 
 Settings → «Удалить все данные» removes the library, edits and the key.
 

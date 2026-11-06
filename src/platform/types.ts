@@ -25,6 +25,14 @@ export interface TelegramStatus {
   name?: string | null;
 }
 
+/** The signed-in Telegram account, shown in the sidebar header. */
+export interface TelegramAccount {
+  name: string;
+  username?: string | null;
+  /** Small profile photo, JPEG bytes. */
+  photo?: number[] | null;
+}
+
 export type SignInResult = { status: "ok"; name: string } | { status: "password"; hint?: string | null };
 
 /**
@@ -33,6 +41,8 @@ export type SignInResult = { status: "ok"; name: string } | { status: "password"
  */
 export interface TelegramApi {
   status(): Promise<TelegramStatus>;
+  /** Who is signed in (name, @username, avatar), or null. */
+  account(): Promise<TelegramAccount | null>;
   setApi(apiId: string, apiHash: string): Promise<void>;
   requestCode(phone: string): Promise<void>;
   signIn(code: string): Promise<SignInResult>;

@@ -50,6 +50,7 @@ pub fn run() {
             set_secret,
             delete_secret,
             telegram::tg_status,
+            telegram::tg_account,
             telegram::tg_set_api,
             telegram::tg_request_code,
             telegram::tg_sign_in,

@@ -12,7 +12,7 @@ import { T, compareText } from "../i18n";
 import { en } from "../i18n/en";
 import { ru } from "../i18n/ru";
 
-export const BOARD_TITLE = "Saved Board";
+export const BOARD_TITLE = "Kipple";
 export const boardAbout = () => T.telegram.boardAbout(BOARD_TITLE);
 /**
  * The catch-all topic. Once a group has one, it is reused whatever the interface language
