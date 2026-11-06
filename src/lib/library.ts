@@ -39,12 +39,48 @@ export function effectiveAction(c: Card): Action | undefined {
   return c.user?.action ?? (c.autoJunk ? "junk" : c.ai?.action);
 }
 
+/**
+ * Merged topics and tags: each merged-away name points at the one it was merged into.
+ * Applied when cards are read, so the AI's own fields stay as they were and a merge can be undone.
+ */
+export interface Aliases {
+  topics: Record<string, string>;
+  tags: Record<string, string>;
+}
+
+export const NO_ALIASES: Aliases = { topics: {}, tags: {} };
+let aliases: Aliases = NO_ALIASES;
+
+/** Set once settings are loaded and after every merge or split. */
+export function setAliases(a: Aliases | undefined) {
+  aliases = a ?? NO_ALIASES;
+}
+
+export function getAliases(): Aliases {
+  return aliases;
+}
+
+/** Points every name in `from` at `to` (and whatever already pointed at them), without chains or loops. */
+export function mergeAlias(map: Record<string, string>, from: string[], to: string): Record<string, string> {
+  const gone = new Set(from.filter((f) => f !== to));
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(map)) if (k !== to) out[k] = gone.has(v) ? to : v;
+  for (const f of gone) out[f] = to;
+  return out;
+}
+
+const own = (m: Record<string, string>, k: string) => Object.prototype.hasOwnProperty.call(m, k);
+/** The name a tag or topic is shown under after merges. */
+export const tagName = (t: string) => (own(aliases.tags, t) ? aliases.tags[t] : t);
+export const topicName = (t: string) => (own(aliases.topics, t) ? aliases.topics[t] : t);
+
 export function effectiveTags(c: Card): string[] {
-  return c.user?.tags ?? [...new Set([...(c.ai?.tags ?? []), ...c.hashtags])];
+  return [...new Set((c.user?.tags ?? [...(c.ai?.tags ?? []), ...c.hashtags]).map(tagName))];
 }
 
 export function effectiveTopic(c: Card): string | undefined {
-  return c.user?.topic ?? c.ai?.topic;
+  const t = c.user?.topic ?? c.ai?.topic;
+  return t ? topicName(t) : t;
 }
 
 export function effectiveTitle(c: Card): string {

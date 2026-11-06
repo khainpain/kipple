@@ -1,12 +1,12 @@
 import type { Card } from "../lib/types";
 import { T, compareText, locale } from "../i18n";
 import { effectiveAction, effectiveTitle, effectiveTopic, matchesFilter } from "../lib/library";
+import { isImportant, isRecent, isUnsorted } from "../lib/smart";
 
-/** What the sidebar points at: a smart list, one topic, or cards without a topic. */
-export type Scope =
-  | { kind: "list"; key: "all" | "read_later" | "ideas" | "reference" | "todo" | "junk" | "sensitive" }
-  | { kind: "topic"; name: string }
-  | { kind: "notopic" };
+export type ListKey = "all" | "important" | "read_later" | "ideas" | "reference" | "todo" | "junk" | "sensitive" | "recent" | "unsorted" | "duplicates";
+
+/** What the sidebar points at: the overview, a smart list, one topic, or cards without a topic. */
+export type Scope = { kind: "home" } | { kind: "list"; key: ListKey } | { kind: "topic"; name: string } | { kind: "notopic" };
 
 export type TypeKey = "links" | "photos" | "videos" | "docs" | "notes";
 export type SortKey = "new" | "old" | "title" | "title_desc" | "priority";
@@ -20,8 +20,9 @@ export const OPEN_MODES: Array<{ key: OpenMode; label: string; icon: string }> =
   { key: "full", get label() { return T.nav.openFull; }, icon: "peekFull" },
 ];
 
-export const SMART_LISTS: Array<{ key: Extract<Scope, { kind: "list" }>["key"]; label: string; icon: string }> = [
+export const SMART_LISTS: Array<{ key: ListKey; label: string; icon: string }> = [
   { key: "all", get label() { return T.nav.all; }, icon: "all" },
+  { key: "important", get label() { return T.nav.important; }, icon: "star" },
   { key: "read_later", get label() { return T.nav.readLater; }, icon: "clock" },
   { key: "ideas", get label() { return T.nav.ideas; }, icon: "bulb" },
   { key: "reference", get label() { return T.nav.reference; }, icon: "bookmark" },
@@ -52,10 +53,33 @@ export const SORTS: Array<{ key: SortKey; label: string; short: string; icon: st
   { key: "priority", get label() { return T.nav.sortPriority; }, get short() { return T.nav.sortPriorityShort; }, icon: "flag" },
 ];
 
-export function matchesScope(c: Card, s: Scope): boolean {
+/** Lists reached from the overview rather than the sidebar. */
+const MORE_LISTS: Partial<Record<ListKey, () => string>> = {
+  junk: () => T.nav.junk,
+  sensitive: () => T.nav.sensitive,
+  recent: () => T.nav.recent,
+  unsorted: () => T.nav.unsorted,
+  duplicates: () => T.nav.duplicates,
+};
+
+/** `dupes` (from findDuplicates) is needed only for the duplicates list. */
+export function matchesScope(c: Card, s: Scope, dupes?: Map<number, string>): boolean {
+  if (s.kind === "home") return matchesFilter(c, "all");
   if (s.kind === "list") {
-    if (s.key === "todo") return matchesFilter(c, "all") && effectiveAction(c) === "todo";
-    return matchesFilter(c, s.key);
+    switch (s.key) {
+      case "todo":
+        return matchesFilter(c, "all") && effectiveAction(c) === "todo";
+      case "important":
+        return matchesFilter(c, "all") && isImportant(c);
+      case "recent":
+        return matchesFilter(c, "all") && isRecent(c);
+      case "unsorted":
+        return matchesFilter(c, "all") && isUnsorted(c);
+      case "duplicates":
+        return matchesFilter(c, "all") && !!dupes?.has(c.id);
+      default:
+        return matchesFilter(c, s.key);
+    }
   }
   if (!matchesFilter(c, "all")) return false;
   const t = effectiveTopic(c);
@@ -78,9 +102,8 @@ export function sameScope(a: Scope, b: Scope): boolean {
 export function scopeTitle(s: Scope): string {
   if (s.kind === "topic") return s.name;
   if (s.kind === "notopic") return T.nav.noTopic;
-  if (s.key === "junk") return T.nav.junk;
-  if (s.key === "sensitive") return T.nav.sensitive;
-  return SMART_LISTS.find((x) => x.key === s.key)?.label ?? "";
+  if (s.kind === "home") return T.nav.home;
+  return MORE_LISTS[s.key]?.() ?? SMART_LISTS.find((x) => x.key === s.key)?.label ?? "";
 }
 
 export function sortCards(cards: Card[], sort: SortKey): Card[] {

@@ -4,13 +4,14 @@ import { useUpdateCheck } from "./useUpdateCheck";
 import { useTelegramAccount } from "./useTelegramAccount";
 import "./App.css";
 import type { Card, Library, UserFields } from "./lib/types";
-import { makeEdit } from "./lib/library";
+import { effectiveTags, effectiveTopic, makeEdit, matchesFilter, NO_ALIASES, setAliases, type Aliases } from "./lib/library";
 import { aiAllowed, appendEdit, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadSettings, saveBoardState, saveLibrary, saveSettings, wipeAll, type Settings } from "./lib/store";
 import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type SendOptions } from "./lib/telegram";
 import { TelegramDialog } from "./components/TelegramDialog";
 import { importFolder, pickExportFolder } from "./lib/importer";
 import { fetchLinkMeta, needsPreview } from "./lib/linkmeta";
-import { AiStop, aiModelOf, type AiAuth, classifyCards, retagCount, nameImages, pendingForAi, pendingImages } from "./lib/ai";
+import { AiStop, aiModelOf, type AiAuth, classifyCards, retagCount, nameImages, pendingForAi, pendingImages, suggestSynonyms, groupCards } from "./lib/ai";
+import { displayTitle } from "./components/CardView";
 import { toCsv, toMarkdown } from "./lib/exporters";
 import { deleteApiKey, getAiAuth, getApiKey, setApiKey } from "./lib/secrets";
 import { Workspace, type Job } from "./components/Workspace";
@@ -49,6 +50,8 @@ export default function App() {
    * so nothing done in it can touch the real library. "Exit demo" goes back to the start.
    */
   const [demo, setDemo] = useState(false);
+  /** Merges tried out in the demo stay in memory, apart from the real ones in settings. */
+  const [demoAliases, setDemoAliases] = useState<Aliases>(NO_ALIASES);
   const demoRef = useRef(demo);
   demoRef.current = demo;
   /** Loading from Telegram already started by itself after sign-in in this launch. */
@@ -433,6 +436,48 @@ export default function App() {
     notify(T.app.wiped);
   }
 
+  // Card names are read through the merges (lib/library.ts); set them before anything renders cards.
+  const aliases = demo ? demoAliases : (settings.aliases ?? NO_ALIASES);
+  setAliases(aliases);
+
+  async function onAliases(a: Aliases) {
+    if (demoRef.current) setDemoAliases(a);
+    else {
+      const s = { ...settingsRef.current, aliases: a };
+      settingsRef.current = s;
+      setSettings(s);
+      try {
+        await saveSettings(s);
+      } catch (e) {
+        notify(T.app.saveFailed(String(e)));
+      }
+    }
+    setRev((r) => r + 1);
+  }
+
+  async function askSynonyms(kind: "topics" | "tags", counts: Map<string, number>) {
+    if (!aiAllowed(settingsRef.current) || demoRef.current) return []; // nothing leaves without consent
+    try {
+      return await suggestSynonyms(await getAiAuth(), aiModelOf(settingsRef.current.aiModel), kind, counts);
+    } catch (e) {
+      throw new Error(e instanceof AiStop ? e.message : T.app.aiError(String(e)));
+    }
+  }
+
+  /** Splits one topic into AI subgroups and keeps them in the library. Errors come back as readable messages. */
+  async function groupTopic(topic: string) {
+    if (!lib || !aiAllowed(settingsRef.current) || demoRef.current) return; // nothing leaves without consent
+    const cards = lib.cards.filter((c) => !c.removed && matchesFilter(c, "all") && effectiveTopic(c) === topic);
+    try {
+      const groups = await groupCards(await getAiAuth(), aiModelOf(settingsRef.current.aiModel), aiLang(), topic, cards, displayTitle, effectiveTags);
+      lib.subgroups = { ...lib.subgroups, [topic]: { at: new Date().toISOString(), groups } };
+      await persist(lib);
+      setRev((r) => r + 1);
+    } catch (e) {
+      throw new Error(e instanceof AiStop ? e.message : T.app.aiError(String(e)));
+    }
+  }
+
   if (loading) return <div className="center">{T.common.loading}</div>;
 
   const needAi = lib ? pendingForAi(lib.cards).length + (settings.aiImages ? pendingImages(lib.cards).length : 0) : 0;
@@ -518,6 +563,10 @@ export default function App() {
         onNameImage={aiAllowed(settings) && !demo ? nameOne : undefined}
         onStop={() => abortRef.current?.abort()}
         onEdit={edit}
+        aliases={aliases}
+        onAliases={onAliases}
+        askSynonyms={aiAllowed(settings) && !demo ? askSynonyms : undefined}
+        onGroupTopic={aiAllowed(settings) && !demo ? groupTopic : undefined}
       />
       {settingsDialog}
       {consentDialog}

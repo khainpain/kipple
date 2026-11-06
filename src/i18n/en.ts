@@ -163,6 +163,11 @@ export const en: Dict = {
   },
 
   nav: {
+    home: "Overview",
+    important: "Important",
+    recent: "Recent",
+    unsorted: "To sort",
+    duplicates: "Possible duplicates",
     openCenter: "Open in the center",
     openSide: "Open on the side",
     openFull: "Open full screen",
@@ -210,6 +215,55 @@ export const en: Dict = {
     junk: "Junk",
   },
 
+  overview: {
+    emptyTitle: "Nothing to show yet",
+    emptyHint: "Import your saved messages and what needs attention shows up here.",
+    showAll: "All",
+    unsorted: "No topic or tags yet: tag them with AI or by hand.",
+    important: "Starred by you or marked important by the AI.",
+    readLater: "Articles and videos put off for later.",
+    todo: "Tasks and reminders.",
+    recent: "Saved in the last 30 days.",
+    duplicates: (groups) => `${num(groups)} ${groups === 1 ? "group" : "groups"}: the same link, file or text. Send the extras to the junk.`,
+  },
+
+  tidy: {
+    open: "Tidy up topics and tags",
+    title: "Tidy up",
+    intro: "Merge topics and tags that mean the same thing: cards stay as they are and just show one name. Every merge can be undone.",
+    found: (n) => `${num(n)} similar group${s(n)}.`,
+    none: "No similar names found.",
+    rare: (n) => `${num(n)} tag${s(n)} ${n === 1 ? "is" : "are"} on a single card only: the sidebar tucks them under "more".`,
+    askAi: "Find synonyms with AI",
+    askAiHint: "Sends only the names and how often they're used, no message text. Finds translations and synonyms like ai and ии.",
+    asking: "Looking…",
+    aiNothing: "The AI found no synonyms.",
+    fromAi: "Suggested by the AI",
+    mergeAll: "Merge all",
+    merge: (into) => `Merge into ${into}`,
+    keep: "This name stays",
+    makeMain: "Keep this name",
+    merged: "Already merged",
+    undo: "Undo",
+    notice: (n) => `${num(n)} group${s(n)} of similar topics and tags. Merge them to keep the list short.`,
+    noticeAction: "Tidy up",
+  },
+
+  move: {
+    button: "Move to topic",
+    bulk: "To topic",
+    filter: "Find or create a topic",
+    create: (name) => `Create topic "${name}"`,
+    clear: "Remove from topic",
+  },
+
+  groups: {
+    make: "Split into groups",
+    redo: "Regroup",
+    working: "Grouping…",
+    hint: "The AI splits the topic into a few subgroups by subject. Only card titles, summaries and tags are sent.",
+  },
+
   sidebar: {
     signedIn: "Signed in to Telegram",
     topics: "Topics",
@@ -246,6 +300,9 @@ export const en: Dict = {
   },
 
   card: {
+    important: "Important",
+    pin: "Mark important",
+    unpin: "Remove from important",
     kindPhoto: "Photo",
     kindVideo: "Video",
     kindGif: "GIF",
@@ -406,6 +463,7 @@ export const en: Dict = {
     article: (i) => `Article number ${i}`,
     card: (i, kind) => `Card ${i}: ${kind}`,
     summary: "A short note on what's saved here and why you'd come back to it.",
+    groups: ["Color and type", "Grids and layout"],
     tags: ["css", "ideas", "references"],
     textFile: "shopping.txt",
     textBody: "Shopping list\n\n- coffee\n- bread\n- E27 light bulb\n\nText files show right inside the card.",
