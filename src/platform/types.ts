@@ -18,6 +18,33 @@ export interface AvailableUpdate {
 /** fetch() plus Tauri's connectTimeout option, ignored in the browser. */
 export type HttpFetch = (url: string, init?: RequestInit & { connectTimeout?: number }) => Promise<Response>;
 
+export interface TelegramStatus {
+  hasApi: boolean;
+  builtInApi: boolean;
+  authorized: boolean;
+  name?: string | null;
+}
+
+export type SignInResult = { status: "ok"; name: string } | { status: "password"; hint?: string | null };
+
+/**
+ * The user's own Telegram account over MTProto (desktop only). Errors are strings:
+ * `FLOOD_WAIT:<seconds>` for rate limits, otherwise Telegram's error name.
+ */
+export interface TelegramApi {
+  status(): Promise<TelegramStatus>;
+  setApi(apiId: string, apiHash: string): Promise<void>;
+  requestCode(phone: string): Promise<void>;
+  signIn(code: string): Promise<SignInResult>;
+  checkPassword(password: string): Promise<SignInResult>;
+  logout(): Promise<void>;
+  ensureBoard(prev: { channelId: number; accessHash: string } | null, title: string, about: string): Promise<{ channelId: number; accessHash: string; created: boolean }>;
+  createTopic(board: { channelId: number; accessHash: string }, title: string, iconColor?: number): Promise<number>;
+  /** Returns the new message ids; empty when the originals no longer exist in Saved Messages. */
+  forward(board: { channelId: number; accessHash: string }, topicId: number, ids: number[]): Promise<number[]>;
+  sendNote(board: { channelId: number; accessHash: string }, topicId: number, replyTo: number, text: string, boldLen: number): Promise<number>;
+}
+
 export interface Platform {
   kind: "desktop" | "web";
   /** Whether link previews can be loaded (the browser build goes through its Vercel function). */
@@ -46,6 +73,8 @@ export interface Platform {
   httpFetch: HttpFetch;
   appVersion(): Promise<string>;
   checkUpdate(): Promise<AvailableUpdate | null>;
+  /** Sending the sorted library back to Telegram; only the desktop app can log in to Telegram. */
+  telegram?: TelegramApi;
 }
 
 export function joinPath(dir: string, rel: string): string {

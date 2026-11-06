@@ -1182,6 +1182,19 @@ code {
   gap: 8px;
   margin-top: 8px;
 }
+.tg-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tg-form p {
+  margin: 0;
+  line-height: 1.5;
+}
+.modal .error {
+  color: #c0392b;
+  margin: 0;
+}
 .toast {
   position: fixed;
   bottom: 20px;

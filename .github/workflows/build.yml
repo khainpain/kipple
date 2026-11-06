@@ -40,6 +40,9 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Optional: Telegram app credentials from my.telegram.org, so users don't enter their own.
+          TG_API_ID: ${{ secrets.TG_API_ID }}
+          TG_API_HASH: ${{ secrets.TG_API_HASH }}
         run: |
           if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
             npx tauri build

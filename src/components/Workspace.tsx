@@ -38,6 +38,8 @@ export function Workspace(props: {
   onImport: () => void;
   onExport: (kind: "csv" | "md", cards: Card[]) => void;
   onSettings: () => void;
+  /** Desktop only: opens «Отправить в Telegram». */
+  onTelegram?: () => void;
   onRunAi: () => void;
   /** Ask the AI to name one photo from its content (sends that picture). */
   onNameImage?: (card: Card) => void;
@@ -238,6 +240,11 @@ export function Workspace(props: {
               </div>
             )}
           </div>
+          {props.onTelegram && (
+            <button className="icon-btn" onClick={props.onTelegram} title="Отправить в Telegram: разложить по темам в группе «Saved Board»">
+              <Icon name="send" />
+            </button>
+          )}
           <button className="icon-btn" onClick={props.onSettings} title="Настройки">
             <Icon name="settings" />
           </button>

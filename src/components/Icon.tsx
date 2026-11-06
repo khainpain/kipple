@@ -39,6 +39,7 @@ const PATHS: Record<string, string> = {
   peekCenter: "M3 4h18v16H3zM7 8h10v8H7z",
   peekSide: "M3 4h18v16H3zM13 4v16",
   peekFull: "M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5",
+  send: "M21 3L10 14M21 3l-7 18-4-7-7-4z",
 };
 
 export type IconName = keyof typeof PATHS;
