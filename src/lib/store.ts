@@ -3,6 +3,7 @@ import type { EditEvent, Library } from "./types";
 import { annotateContext, applyEdits } from "./library";
 import { emptyBoardState, type BoardState } from "./telegram";
 import type { LangPref } from "../i18n";
+import { DEFAULT_AI_MODEL, type AiModel } from "./ai";
 
 const { exists, read, write: atomicWrite, append } = platform.data;
 const LIBRARY = "library.json";
@@ -19,9 +20,11 @@ export interface Settings {
   language: LangPref;
   /** AI titles, summaries, topics and tags: in the interface language, or in each message's own. */
   aiLanguage: "ui" | "source";
+  /** Which Claude model tags cards and names pictures. */
+  aiModel: AiModel;
 }
 
-export const DEFAULT_SETTINGS: Settings = { aiEnabled: true, fetchLinks: true, aiImages: false, language: "auto", aiLanguage: "ui" };
+export const DEFAULT_SETTINGS: Settings = { aiEnabled: true, fetchLinks: true, aiImages: false, language: "auto", aiLanguage: "ui", aiModel: DEFAULT_AI_MODEL };
 
 export async function loadLibrary(): Promise<Library | null> {
   if (!(await exists(LIBRARY))) return null;

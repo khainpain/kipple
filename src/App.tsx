@@ -9,7 +9,7 @@ import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type
 import { TelegramDialog } from "./components/TelegramDialog";
 import { importFolder, pickExportFolder } from "./lib/importer";
 import { fetchLinkMeta, needsPreview } from "./lib/linkmeta";
-import { AiKeyMissing, classifyCards, nameImages, pendingForAi, pendingImages } from "./lib/ai";
+import { AiKeyMissing, aiModelOf, classifyCards, retagCount, nameImages, pendingForAi, pendingImages } from "./lib/ai";
 import { toCsv, toMarkdown } from "./lib/exporters";
 import { deleteApiKey, getApiKey, setApiKey } from "./lib/secrets";
 import { Workspace, type Job } from "./components/Workspace";
@@ -37,6 +37,9 @@ export default function App() {
   updatingRef.current = updating;
   const { update, later: updateLater } = useUpdateCheck(() => updatingRef.current !== false);
   const abortRef = useRef<AbortController | null>(null);
+  /** Settings as of now, for AI runs that start right after a save (state updates later). */
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
 
   const notify = useCallback((msg: string) => {
     setToast(msg);
@@ -93,7 +96,7 @@ export default function App() {
   }, []);
 
   /** Default: the interface language, so all topics in the sidebar are in one language. */
-  const aiLang = (): AiLang => (settings.aiLanguage === "source" ? "source" : lang());
+  const aiLang = (): AiLang => (settingsRef.current.aiLanguage === "source" ? "source" : lang());
 
   async function enrichLinks(l: Library, signal: AbortSignal) {
     const todo = l.cards.filter(needsPreview);
@@ -124,7 +127,7 @@ export default function App() {
       return;
     }
     await runTextAi(key, l, signal);
-    if (settings.aiImages && !signal.aborted) await runImageAi(key, l, pendingImages(l.cards), signal);
+    if (settingsRef.current.aiImages && !signal.aborted) await runImageAi(key, l, pendingImages(l.cards), signal);
   }
 
   async function runImageAi(key: string, l: Library, todo: Card[], signal: AbortSignal) {
@@ -136,6 +139,7 @@ export default function App() {
         l.cards,
         todo,
         aiLang(),
+        aiModelOf(settingsRef.current.aiModel),
         (c) => platform.readMedia(l.sourceDir, c.media!.path!),
         (p) => {
           setJob({ label: T.app.jobImages, done: p.done + p.failed, total: p.total });
@@ -182,6 +186,7 @@ export default function App() {
         key,
         l.cards,
         aiLang(),
+        aiModelOf(settingsRef.current.aiModel),
         (p) => {
           setJob({ label: T.app.jobAi, done: p.done + p.failed, total: p.total });
           setRev((r) => r + 1);
@@ -201,8 +206,8 @@ export default function App() {
     const ctl = new AbortController();
     abortRef.current = ctl;
     try {
-      if (settings.fetchLinks && platform.canFetchLinks) await enrichLinks(l, ctl.signal);
-      if (settings.aiEnabled && !ctl.signal.aborted) await runAi(l, ctl.signal);
+      if (settingsRef.current.fetchLinks && platform.canFetchLinks) await enrichLinks(l, ctl.signal);
+      if (settingsRef.current.aiEnabled && !ctl.signal.aborted) await runAi(l, ctl.signal);
     } finally {
       setJob(null);
       setRev((r) => r + 1);
@@ -282,6 +287,7 @@ export default function App() {
   async function onSaveSettings(s: Settings, key: string | null) {
     await saveSettings(s);
     setLang(resolveLang(s.language));
+    settingsRef.current = s;
     setSettings(s);
     if (key) {
       try {
@@ -292,6 +298,23 @@ export default function App() {
       }
     }
     setShowSettings(false);
+  }
+
+  /** Saves the settings, then tags every already tagged card again with the chosen model. */
+  async function onRetag(s: Settings, key: string | null) {
+    await onSaveSettings(s, key);
+    if (!lib) return;
+    const old = new Map<Card, NonNullable<Card["ai"]>>();
+    for (const c of lib.cards) {
+      if (!c.ai) continue;
+      old.set(c, c.ai);
+      c.ai = undefined;
+    }
+    // Put back what this run won't redo (hidden cards, photos when picture naming is off), so nothing loses its title.
+    const redo = new Set([...pendingForAi(lib.cards), ...(s.aiImages ? pendingImages(lib.cards) : [])]);
+    for (const [c, ai] of old) if (!redo.has(c)) c.ai = ai;
+    setRev((r) => r + 1);
+    void processAll(lib);
   }
 
   async function onWipe() {
@@ -308,7 +331,7 @@ export default function App() {
   if (loading) return <div className="center">{T.common.loading}</div>;
 
   const needAi = lib ? pendingForAi(lib.cards).length + (settings.aiImages ? pendingImages(lib.cards).length : 0) : 0;
-  const settingsDialog = showSettings && <SettingsDialog settings={settings} hasKey={hasKey} version={version} onSave={onSaveSettings} onWipe={onWipe} onClose={() => setShowSettings(false)} />;
+  const settingsDialog = showSettings && <SettingsDialog settings={settings} hasKey={hasKey} version={version} onSave={onSaveSettings} onRetag={onRetag} retagCount={lib ? retagCount(lib.cards) : 0} onWipe={onWipe} onClose={() => setShowSettings(false)} />;
 
   const banners = (
     <>
