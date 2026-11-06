@@ -20,8 +20,10 @@ jobs:
       - run: npm run build
       - run: npm run build:web
 
+  # The Windows installer is slow, so it is built only on a manual run (Actions -> build -> Run workflow).
   windows:
     needs: test
+    if: github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
