@@ -1,0 +1,265 @@
+/* Settings dialog, after docs/design/kipple-welcome/screens/05-settings.png and 06-settings-advanced-own-key.png. */
+.modal.s2 {
+  padding: 0;
+  gap: 0;
+  width: min(680px, 94vw);
+  overflow: hidden;
+}
+
+.s2-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 24px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.s2-head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+}
+.s2-head p {
+  margin: 1px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.s2-head-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+.s2-head .close {
+  position: static;
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  border-radius: 8px;
+}
+.s2-head .close:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+
+.s2-body {
+  overflow-y: auto;
+  padding: 4px 24px 20px;
+  display: flex;
+  flex-direction: column;
+}
+.s2-sec {
+  margin: 18px 4px 8px;
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.s2-panel {
+  background: var(--side);
+  border-radius: 14px;
+  padding: 2px 16px;
+}
+.s2-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 13px 0;
+  border: 0;
+  margin: 0;
+}
+.s2-row + .s2-row {
+  border-top: 1px solid var(--line);
+}
+.s2-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--ink);
+  font-size: 14px;
+}
+.s2-text b {
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.s2-text small,
+.s2-note {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.s2-text code {
+  align-self: flex-start;
+  font-size: 12px;
+  background: var(--panel);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+.s2-note a {
+  color: var(--accent-ink);
+}
+.modal.s2 select {
+  width: auto;
+  min-width: 200px;
+}
+
+/* Radio groups under AI tagging */
+.s2-choice {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding-top: 11px;
+}
+.s2-choice legend {
+  float: left;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  padding: 0;
+  margin-bottom: 2px;
+}
+.s2-choice .hint {
+  margin: 0;
+}
+
+/* Anthropic key */
+.s2-key {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.s2-key-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0 4px 0 12px;
+  color: var(--muted);
+}
+.s2-key-input input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  padding: 10px 0;
+  box-shadow: none;
+}
+.s2-key-input input:focus {
+  outline: none;
+}
+.s2-key-input:focus-within {
+  border-color: var(--muted);
+}
+.s2-foot {
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.s2-foot svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Data rows with a leading icon */
+.s2-icon-row {
+  align-items: flex-start;
+}
+.s2-icon-row > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--muted);
+}
+.s2-icon-row.danger > svg {
+  color: var(--danger);
+}
+.s2-icon-row .k-hold {
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* «Для продвинутых» */
+.s2-advanced {
+  margin-top: 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+}
+.s2-advanced summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  font-size: 14px;
+}
+.s2-advanced summary::-webkit-details-marker {
+  display: none;
+}
+.s2-advanced summary small {
+  color: var(--muted);
+  font-size: 13px;
+}
+.s2-chev {
+  color: var(--muted);
+  transition: transform var(--duration-ui, 0.4s) var(--ease-out, ease);
+}
+.s2-advanced[open] .s2-chev {
+  transform: rotate(90deg);
+}
+.s2-advanced[open] summary {
+  border-bottom: 1px solid var(--line);
+}
+.s2-advanced[open] summary small {
+  display: none;
+}
+.s2-advanced .tg-api {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 16px;
+}
+.s2-advanced .tg-api .hint {
+  margin: 0;
+}
+.s2-advanced a {
+  color: var(--accent-ink);
+}
+.s2-tg-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.s2-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+.s2-version {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .s2-chev {
+    transition: none;
+  }
+}
