@@ -335,6 +335,7 @@ export const en: Dict = {
   },
 
   detail: {
+    resize: "Drag to resize. Double-click to reset",
     label: "Card",
     prev: "Previous (↑)",
     next: "Next (↓)",
