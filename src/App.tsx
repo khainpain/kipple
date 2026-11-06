@@ -10,9 +10,9 @@ import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type
 import { TelegramDialog } from "./components/TelegramDialog";
 import { importFolder, pickExportFolder } from "./lib/importer";
 import { fetchLinkMeta, needsPreview } from "./lib/linkmeta";
-import { AiKeyMissing, aiModelOf, classifyCards, retagCount, nameImages, pendingForAi, pendingImages } from "./lib/ai";
+import { AiStop, aiModelOf, type AiAuth, classifyCards, retagCount, nameImages, pendingForAi, pendingImages } from "./lib/ai";
 import { toCsv, toMarkdown } from "./lib/exporters";
-import { deleteApiKey, getApiKey, setApiKey } from "./lib/secrets";
+import { deleteApiKey, getAiAuth, getApiKey, setApiKey } from "./lib/secrets";
 import { Workspace, type Job } from "./components/Workspace";
 import { SettingsDialog } from "./components/Settings";
 import { Welcome } from "./components/Welcome";
@@ -132,21 +132,17 @@ export default function App() {
   }
 
   async function runAi(l: Library, signal: AbortSignal) {
-    const key = await getApiKey().catch(() => null);
-    if (!key) {
-      notify(T.app.needKeyAi);
-      return;
-    }
-    await runTextAi(key, l, signal);
-    if (settingsRef.current.aiImages && !signal.aborted) await runImageAi(key, l, pendingImages(l.cards), signal);
+    const auth = await getAiAuth();
+    if (!(await runTextAi(auth, l, signal))) return;
+    if (settingsRef.current.aiImages && !signal.aborted) await runImageAi(auth, l, pendingImages(l.cards), signal);
   }
 
-  async function runImageAi(key: string, l: Library, todo: Card[], signal: AbortSignal) {
+  async function runImageAi(auth: AiAuth, l: Library, todo: Card[], signal: AbortSignal) {
     if (!todo.length) return;
     setJob({ label: T.app.jobImages, done: 0, total: todo.length });
     try {
       const res = await nameImages(
-        key,
+        auth,
         l.cards,
         todo,
         aiLang(),
@@ -161,7 +157,7 @@ export default function App() {
       );
       if (res.failed) notify(T.app.imagesFailed(res.failed));
     } catch (e) {
-      notify(e instanceof AiKeyMissing ? e.message : T.app.aiError(String(e)));
+      notify(e instanceof AiStop ? e.message : T.app.aiError(String(e)));
     }
     await persist(l);
   }
@@ -169,18 +165,14 @@ export default function App() {
   /** One photo, on the user's request from the card: sends just this picture. */
   async function nameOne(card: Card) {
     if (!lib) return;
-    const key = await getApiKey().catch(() => null);
-    if (!key) {
-      notify(T.app.needKeyImage);
-      return;
-    }
+    const auth = await getAiAuth();
     abortRef.current?.abort();
     const ctl = new AbortController();
     abortRef.current = ctl;
     const saved = card.ai;
     card.ai = undefined;
     try {
-      await runImageAi(key, lib, [card], ctl.signal);
+      await runImageAi(auth, lib, [card], ctl.signal);
     } finally {
       if (!card.ai) card.ai = saved;
       setJob(null);
@@ -188,13 +180,14 @@ export default function App() {
     }
   }
 
-  async function runTextAi(key: string, l: Library, signal: AbortSignal) {
+  /** Tags the pending cards; false when the run had to stop (key, allowance), so pictures wait too. */
+  async function runTextAi(auth: AiAuth, l: Library, signal: AbortSignal): Promise<boolean> {
     const total = pendingForAi(l.cards).length;
-    if (!total) return;
+    if (!total) return true;
     setJob({ label: T.app.jobAi, done: 0, total });
     try {
       const res = await classifyCards(
-        key,
+        auth,
         l.cards,
         aiLang(),
         aiModelOf(settingsRef.current.aiModel),
@@ -207,9 +200,14 @@ export default function App() {
       );
       if (res.failed) notify(T.app.aiFailed(res.failed));
     } catch (e) {
-      notify(e instanceof AiKeyMissing ? e.message : T.app.aiError(String(e)));
+      notify(e instanceof AiStop ? e.message : T.app.aiError(String(e)));
+      if (e instanceof AiStop) {
+        await persist(l);
+        return false;
+      }
     }
     await persist(l);
+    return true;
   }
 
   async function processAll(l: Library) {
@@ -339,6 +337,16 @@ export default function App() {
     void processAll(lib);
   }
 
+  /** Back to the built-in key. */
+  async function onForgetKey() {
+    try {
+      await deleteApiKey();
+      setHasKey(false);
+    } catch (e) {
+      notify(T.app.keyFailed(String(e)));
+    }
+  }
+
   async function onWipe() {
     abortRef.current?.abort();
     await wipeAll();
@@ -354,7 +362,7 @@ export default function App() {
   if (loading) return <div className="center">{T.common.loading}</div>;
 
   const needAi = lib ? pendingForAi(lib.cards).length + (settings.aiImages ? pendingImages(lib.cards).length : 0) : 0;
-  const settingsDialog = showSettings && <SettingsDialog settings={settings} hasKey={hasKey} version={version} onSave={onSaveSettings} onRetag={onRetag} retagCount={lib && !demo ? retagCount(lib.cards) : 0} onWipe={onWipe} onClose={() => setShowSettings(false)} />;
+  const settingsDialog = showSettings && <SettingsDialog settings={settings} hasKey={hasKey} version={version} onSave={onSaveSettings} onRetag={onRetag} retagCount={lib && !demo ? retagCount(lib.cards) : 0} onWipe={onWipe} onForgetKey={onForgetKey} onClose={() => setShowSettings(false)} />;
 
   const banners = (
     <>
@@ -424,7 +432,7 @@ export default function App() {
         onSettings={() => setShowSettings(true)}
         onTelegram={platform.telegram && !demo ? () => setShowTelegram(true) : undefined}
         onRunAi={() => processAll(lib)}
-        onNameImage={settings.aiEnabled && hasKey && !demo ? nameOne : undefined}
+        onNameImage={settings.aiEnabled && !demo ? nameOne : undefined}
         onStop={() => abortRef.current?.abort()}
         onEdit={edit}
       />

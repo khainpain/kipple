@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { platform } from "@platform";
 import type { Settings } from "../lib/store";
-import { AI_MODELS, aiModelOf, costEstimate } from "../lib/ai";
+import { AI_MODELS, aiModelOf, builtinUsage, costEstimate } from "../lib/ai";
+import { getInstallId } from "../lib/secrets";
 import { setThemePref, THEME_ICONS, THEME_LABELS, THEME_PREFS, useThemePref } from "../lib/theme";
 import { Icon } from "./Icon";
 import { LANGS, T, systemLang, type LangPref } from "../i18n";
@@ -17,6 +18,8 @@ export function SettingsDialog(props: {
   retagCount: number;
   onRetag: (s: Settings, apiKey: string | null) => void;
   onWipe: () => void;
+  /** Deletes the user's own key, so AI goes back to the built-in one. */
+  onForgetKey: () => void;
   onClose: () => void;
 }) {
   const [s, setS] = useState(props.settings);
@@ -24,6 +27,18 @@ export function SettingsDialog(props: {
   const theme = useThemePref();
   const L = T.settings;
   const systemName = LANGS.find((l) => l.key === systemLang())?.name ?? "";
+  // How much of today's built-in allowance is used; only asked when there is no own key.
+  const [used, setUsed] = useState<number | null>(null);
+  useEffect(() => {
+    if (props.hasKey) return;
+    let live = true;
+    void getInstallId()
+      .then(builtinUsage)
+      .then((u) => live && setUsed(u));
+    return () => {
+      live = false;
+    };
+  }, [props.hasKey]);
 
   return (
     <div className="modal-backdrop" onClick={props.onClose}>
@@ -56,18 +71,6 @@ export function SettingsDialog(props: {
           </select>
         </label>
 
-        <label>
-          {L.apiKey} {props.hasKey && <span className="ok">{L.keySaved}</span>}
-          <input type="password" placeholder={props.hasKey ? L.keyKeep : "sk-ant-..."} value={key} onChange={(e) => setKey(e.target.value)} />
-        </label>
-        <p className="hint">
-          {platform.kind === "web" ? L.keyWhereWeb : L.keyWhereDesktop} {L.keyGet}{" "}
-          <a href="#" onClick={(e) => (e.preventDefault(), platform.openUrl("https://console.anthropic.com/settings/keys"))}>
-            console.anthropic.com
-          </a>
-          {L.keyCost}
-        </p>
-
         <label className="check">
           <input type="checkbox" checked={s.aiEnabled} onChange={(e) => setS({ ...s, aiEnabled: e.target.checked })} />
           {L.aiEnabled}
@@ -99,7 +102,6 @@ export function SettingsDialog(props: {
             <div>
               <button
                 className="secondary small"
-                disabled={!props.hasKey && !key.trim()}
                 onClick={() => {
                   const m = aiModelOf(s.aiModel);
                   if (confirm(L.retagConfirm(props.retagCount, L.aiModels[m].name, costEstimate(props.retagCount, m)))) props.onRetag(s, key.trim() || null);
@@ -114,6 +116,30 @@ export function SettingsDialog(props: {
           <input type="checkbox" checked={s.aiImages} disabled={!s.aiEnabled} onChange={(e) => setS({ ...s, aiImages: e.target.checked })} />
           <span>{L.aiImages}</span>
         </label>
+        <p className="hint">
+          {props.hasKey ? L.aiViaOwnKey : L.aiViaBuiltin}
+          {!props.hasKey && used !== null && <> {L.builtinUsed(Math.round(used * 100))}</>}
+        </p>
+        <details className="own-key" open={props.hasKey || undefined}>
+          <summary>{L.ownKey}</summary>
+          <p className="hint">{L.ownKeyWhy}</p>
+          <label>
+            {L.apiKey} {props.hasKey && <span className="ok">{L.keySaved}</span>}
+            <input type="password" placeholder={props.hasKey ? L.keyKeep : "sk-ant-..."} value={key} onChange={(e) => setKey(e.target.value)} />
+          </label>
+          <p className="hint">
+            {platform.kind === "web" ? L.keyWhereWeb : L.keyWhereDesktop} {L.keyGet}{" "}
+            <a href="#" onClick={(e) => (e.preventDefault(), platform.openUrl("https://console.anthropic.com/settings/keys"))}>
+              console.anthropic.com
+            </a>
+            {L.keyCost}
+          </p>
+          {props.hasKey && (
+            <button className="secondary small" onClick={() => confirm(L.forgetKeyConfirm) && props.onForgetKey()}>
+              {L.forgetKey}
+            </button>
+          )}
+        </details>
         <label className="check" hidden={!platform.canFetchLinks}>
           <input type="checkbox" checked={s.fetchLinks} onChange={(e) => setS({ ...s, fetchLinks: e.target.checked })} />
           {L.fetchLinks}

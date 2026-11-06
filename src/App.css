@@ -1359,3 +1359,7 @@ code {
   flex-direction: column;
   gap: 8px;
 }
+.own-key summary {
+  cursor: pointer;
+  margin: 4px 0 8px;
+}
