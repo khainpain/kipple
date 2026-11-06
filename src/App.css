@@ -17,29 +17,41 @@
   --shadow-hover: 0 2px 4px rgba(40, 30, 20, 0.08), 0 10px 24px rgba(40, 30, 20, 0.08);
   --tile-l: 90%;
   --tile-ink-l: 38%;
+  --ok: #1b7a43;
+  --act-read: #1b7a43;
+  --act-idea: #8a4fd8;
+  --act-todo: #c25e00;
+  --act-ref: #2f6fae;
   font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Inter, Roboto, sans-serif;
   font-size: 14px;
   color: var(--ink);
   background: var(--bg);
-  color-scheme: light dark;
+  color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #171614;
-    --side: #1f1d1b;
-    --panel: #252320;
-    --ink: #eeeae4;
-    --muted: #9d978e;
-    --line: #36332f;
-    --hover: rgba(255, 250, 240, 0.06);
-    --accent: #f07a5f;
-    --accent-ink: #f59a84;
-    --accent-soft: #3a2621;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
-    --shadow-hover: 0 4px 18px rgba(0, 0, 0, 0.45);
-    --tile-l: 24%;
-    --tile-ink-l: 78%;
-  }
+/* public/theme-init.js and src/lib/theme.ts set data-theme from the user's choice (or the OS). */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #171614;
+  --side: #1f1d1b;
+  --panel: #252320;
+  --ink: #eeeae4;
+  --muted: #9d978e;
+  --line: #36332f;
+  --hover: rgba(255, 250, 240, 0.06);
+  --accent: #f07a5f;
+  --accent-ink: #f59a84;
+  --accent-soft: #3a2621;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-hover: 0 4px 18px rgba(0, 0, 0, 0.45);
+  --tile-l: 24%;
+  --tile-ink-l: 78%;
+  --ok: #5fcf8f;
+  --act-read: #5fcf8f;
+  --act-idea: #b994ff;
+  --act-todo: #f0a052;
+  --act-ref: #7fb2f0;
+  --warn: #f0a052;
+  --danger: #ef6b5b;
 }
 * {
   box-sizing: border-box;
@@ -485,17 +497,67 @@ code {
 .pill.warn {
   color: var(--warn);
 }
-.sort {
-  width: auto;
+/* Sort: quiet toolbar button + dropdown with an icon and a radio mark per option */
+.sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 5px 8px;
   font-size: 13px;
   background: transparent;
-  border-color: transparent;
+  border: 1px solid transparent;
   color: var(--muted);
+  border-radius: 8px;
   cursor: pointer;
+  white-space: nowrap;
 }
-.sort:hover {
+.sort-btn:hover,
+.sort-btn.open {
   background: var(--hover);
+  color: var(--ink);
+}
+.sort-btn .chev {
+  opacity: 0.7;
+  transition: transform 0.15s;
+}
+.sort-btn.open .chev {
+  transform: rotate(180deg);
+}
+.sort-menu {
+  min-width: 230px;
+}
+.sort-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 7px;
+}
+.sort-menu button .icon {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.sort-menu button.on .icon {
+  color: var(--accent);
+}
+.sort-menu button:focus-visible {
+  outline: none;
+  background: var(--hover);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+.sort-menu .radio {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  box-sizing: border-box;
+}
+.sort-menu button:hover .radio {
+  border-color: var(--muted);
+}
+.sort-menu button.on .radio {
+  border-color: var(--accent);
+  background: radial-gradient(circle, var(--accent) 0 3.5px, transparent 4px);
 }
 .segmented {
   display: inline-flex;
@@ -517,6 +579,25 @@ code {
   background: var(--panel);
   color: var(--ink);
   box-shadow: var(--shadow);
+}
+.segmented.labeled button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  padding: 0 12px;
+  height: 30px;
+}
+.modal .field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.modal .segmented.labeled button.on {
+  background: var(--bg);
 }
 
 /* Board */
@@ -542,16 +623,16 @@ code {
   font-size: 16px;
 }
 .action-read_later {
-  color: #1b7a43;
+  color: var(--act-read);
 }
 .action-idea {
-  color: #8a4fd8;
+  color: var(--act-idea);
 }
 .action-todo {
-  color: #c25e00;
+  color: var(--act-todo);
 }
 .action-reference {
-  color: #2f6fae;
+  color: var(--act-ref);
 }
 .action-junk {
   color: var(--muted);
@@ -1191,7 +1272,7 @@ code {
   padding: 2px 8px;
 }
 .ok {
-  color: #1b7a43;
+  color: var(--ok);
   margin-left: 6px;
 }
 .dialog-buttons {
@@ -1209,7 +1290,7 @@ code {
   line-height: 1.5;
 }
 .modal .error {
-  color: #c0392b;
+  color: var(--danger);
   margin: 0;
 }
 .toast {
@@ -1249,17 +1330,3 @@ code {
   margin-bottom: 20px;
 }
 
-@media (prefers-color-scheme: dark) {
-  .action-read_later {
-    color: #5fcf8f;
-  }
-  .action-idea {
-    color: #b994ff;
-  }
-  .action-todo {
-    color: #f0a052;
-  }
-  .action-reference {
-    color: #7fb2f0;
-  }
-}

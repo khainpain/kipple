@@ -107,7 +107,21 @@ export const en: Dict = {
     viewHeadlines: "Headlines",
     sortNew: "Newest first",
     sortOld: "Oldest first",
-    sortTitle: "By title",
+    sortTitle: "Title (A–Z)",
+    sortTitleDesc: "Title (Z–A)",
+    sortPriority: "Important first",
+    sortNewShort: "Newest",
+    sortOldShort: "Oldest",
+    sortTitleShort: "A–Z",
+    sortTitleDescShort: "Z–A",
+    sortPriorityShort: "Important",
+  },
+  theme: {
+    label: "Theme",
+    system: "System",
+    light: "Light",
+    dark: "Dark",
+    toggle: (name) => `Theme: ${name.toLowerCase()}. Click to switch`,
   },
 
   actions: {

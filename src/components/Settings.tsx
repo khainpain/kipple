@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { platform } from "@platform";
 import type { Settings } from "../lib/store";
+import { setThemePref, THEME_ICONS, THEME_LABELS, THEME_PREFS, useThemePref } from "../lib/theme";
+import { Icon } from "./Icon";
 import { LANGS, T, systemLang, type LangPref } from "../i18n";
 
 export function SettingsDialog(props: {
@@ -13,6 +15,7 @@ export function SettingsDialog(props: {
 }) {
   const [s, setS] = useState(props.settings);
   const [key, setKey] = useState("");
+  const theme = useThemePref();
   const L = T.settings;
   const systemName = LANGS.find((l) => l.key === systemLang())?.name ?? "";
 
@@ -23,6 +26,17 @@ export function SettingsDialog(props: {
           ×
         </button>
         <h2>{L.title}</h2>
+
+        <div className="field">
+          <span id="theme-label">{T.theme.label}</span>
+          <div className="segmented labeled" role="radiogroup" aria-labelledby="theme-label">
+            {THEME_PREFS.map((t) => (
+              <button key={t} role="radio" aria-checked={theme === t} className={theme === t ? "on" : ""} onClick={() => setThemePref(t)}>
+                <Icon name={THEME_ICONS[t]} size={14} /> {THEME_LABELS[t]}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <label>
           {L.language}

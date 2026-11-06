@@ -9,7 +9,7 @@ export type Scope =
   | { kind: "notopic" };
 
 export type TypeKey = "links" | "photos" | "videos" | "docs" | "notes";
-export type SortKey = "new" | "old" | "title";
+export type SortKey = "new" | "old" | "title" | "title_desc" | "priority";
 export type ViewKey = "masonry" | "grid" | "list" | "headlines";
 export type OpenMode = "center" | "side" | "full";
 
@@ -36,16 +36,19 @@ export const TYPES: Array<{ key: TypeKey; label: string; icon: string }> = [
 ];
 
 export const VIEWS: Array<{ key: ViewKey; label: string; icon: string }> = [
-  { key: "masonry", get label() { return T.nav.viewMasonry; }, icon: "masonry" },
   { key: "grid", get label() { return T.nav.viewGrid; }, icon: "grid" },
+  { key: "masonry", get label() { return T.nav.viewMasonry; }, icon: "masonry" },
   { key: "list", get label() { return T.nav.viewList; }, icon: "list" },
   { key: "headlines", get label() { return T.nav.viewHeadlines; }, icon: "rows" },
 ];
 
-export const SORTS: Array<{ key: SortKey; label: string }> = [
-  { key: "new", get label() { return T.nav.sortNew; } },
-  { key: "old", get label() { return T.nav.sortOld; } },
-  { key: "title", get label() { return T.nav.sortTitle; } },
+/** Sort options for the sort menu; `short` is what the toolbar button shows. */
+export const SORTS: Array<{ key: SortKey; label: string; short: string; icon: string }> = [
+  { key: "new", get label() { return T.nav.sortNew; }, get short() { return T.nav.sortNewShort; }, icon: "sortNew" },
+  { key: "old", get label() { return T.nav.sortOld; }, get short() { return T.nav.sortOldShort; }, icon: "sortOld" },
+  { key: "title", get label() { return T.nav.sortTitle; }, get short() { return T.nav.sortTitleShort; }, icon: "sortAz" },
+  { key: "title_desc", get label() { return T.nav.sortTitleDesc; }, get short() { return T.nav.sortTitleDescShort; }, icon: "sortZa" },
+  { key: "priority", get label() { return T.nav.sortPriority; }, get short() { return T.nav.sortPriorityShort; }, icon: "flag" },
 ];
 
 export function matchesScope(c: Card, s: Scope): boolean {
@@ -82,12 +85,18 @@ export function scopeTitle(s: Scope): string {
 export function sortCards(cards: Card[], sort: SortKey): Card[] {
   if (sort === "new") return cards; // the library is stored newest first
   if (sort === "old") return [...cards].reverse();
+  if (sort === "priority") {
+    // AI priority 1 (important) first; cards without AI markup go last; newest first inside a group.
+    const p = (c: Card) => c.ai?.priority ?? 4;
+    return cards.map((c, i) => [c, i] as const).sort((a, b) => p(a[0]) - p(b[0]) || a[1] - b[1]).map(([c]) => c);
+  }
+  const dir = sort === "title_desc" ? -1 : 1;
   const key = (c: Card) => (effectiveTitle(c) || c.text || c.link?.siteName || "").trim().toLocaleLowerCase(locale());
   return [...cards].sort((a, b) => {
     const ka = key(a);
     const kb = key(b);
-    if (!ka !== !kb) return ka ? -1 : 1;
-    return compareText(ka, kb);
+    if (!ka !== !kb) return ka ? -1 : 1; // untitled cards stay at the end either way
+    return dir * compareText(ka, kb);
   });
 }
 

@@ -7,6 +7,8 @@ import { Grid } from "./Grid";
 import { Detail } from "./Detail";
 import { Sidebar } from "./Sidebar";
 import { Icon } from "./Icon";
+import { SortMenu } from "./SortMenu";
+import { nextThemePref, setThemePref, THEME_ICONS, THEME_LABELS, useThemePref } from "../lib/theme";
 import { T, compareText, formatNumber } from "../i18n";
 import { BOARD_TITLE } from "../lib/telegram";
 import { actionLabel } from "../lib/types";
@@ -52,10 +54,12 @@ export function Workspace(props: {
   const { lib, rev, onEdit } = props;
   const [scope, setScope] = useState<Scope>({ kind: "list", key: "all" });
   const [type, setType] = useState<TypeKey | null>(null);
+  const theme = useThemePref();
   const [tag, setTag] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<SortKey>(() => loadPref("sort", ["new", "old", "title"] as const, "new"));
-  const [view, setView] = useState<ViewKey>(() => loadPref("view", ["masonry", "grid", "list", "headlines"] as const, "masonry"));
+  const [sort, setSort] = useState<SortKey>(() => loadPref("sort", SORTS.map((s) => s.key), "new"));
+  // Default is the even grid (all cards the same size); a new pref key so earlier saved "masonry" doesn't stick.
+  const [view, setView] = useState<ViewKey>(() => loadPref("layout", ["masonry", "grid", "list", "headlines"] as const, "grid"));
   const [sideOpen, setSideOpen] = useState(() => loadPref("sidebar", ["open", "closed"] as const, "open") === "open");
   const [openMode, setOpenMode] = useState<OpenMode>(() => loadPref("open", OPEN_MODES.map((m) => m.key), "center"));
   const [openId, setOpenId] = useState<number | null>(null);
@@ -65,7 +69,7 @@ export function Workspace(props: {
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => savePref("sort", sort), [sort]);
-  useEffect(() => savePref("view", view), [view]);
+  useEffect(() => savePref("layout", view), [view]);
   useEffect(() => savePref("sidebar", sideOpen ? "open" : "closed"), [sideOpen]);
   useEffect(() => savePref("open", openMode), [openMode]);
 
@@ -248,6 +252,9 @@ export function Workspace(props: {
               <Icon name="send" />
             </button>
           )}
+          <button className="icon-btn" onClick={() => setThemePref(nextThemePref(theme))} title={T.theme.toggle(THEME_LABELS[theme])}>
+            <Icon name={THEME_ICONS[theme]} />
+          </button>
           <button className="icon-btn" onClick={props.onSettings} title={T.toolbar.settings}>
             <Icon name="settings" />
           </button>
@@ -290,13 +297,7 @@ export function Workspace(props: {
             </div>
           )}
           <div className="spacer" />
-          <select className="sort" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label={T.toolbar.sort}>
-            {SORTS.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+          <SortMenu value={sort} onChange={setSort} />
           <div className="segmented" role="radiogroup" aria-label={T.toolbar.view}>
             {VIEWS.map((v) => (
               <button key={v.key} role="radio" aria-checked={view === v.key} className={view === v.key ? "on" : ""} onClick={() => setView(v.key)} title={v.label}>

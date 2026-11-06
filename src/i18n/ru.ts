@@ -111,7 +111,21 @@ export const ru = {
     viewHeadlines: "Заголовки",
     sortNew: "Сначала новые",
     sortOld: "Сначала старые",
-    sortTitle: "По названию",
+    sortTitle: "По названию (А–Я)",
+    sortTitleDesc: "По названию (Я–А)",
+    sortPriority: "Сначала важные",
+    sortNewShort: "Новые",
+    sortOldShort: "Старые",
+    sortTitleShort: "А–Я",
+    sortTitleDescShort: "Я–А",
+    sortPriorityShort: "Важные",
+  },
+  theme: {
+    label: "Тема",
+    system: "Как в системе",
+    light: "Светлая",
+    dark: "Тёмная",
+    toggle: (name: string) => `Тема: ${name.toLowerCase()}. Нажми, чтобы переключить`,
   },
 
   actions: {
