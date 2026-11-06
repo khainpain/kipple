@@ -16,12 +16,38 @@
   --shadow: 0 1px 2px rgba(40, 30, 20, 0.06), 0 2px 10px rgba(40, 30, 20, 0.04);
   --shadow-hover: 0 2px 4px rgba(40, 30, 20, 0.08), 0 10px 24px rgba(40, 30, 20, 0.08);
   --tile-l: 90%;
+  --tile-s: 45%;
+  --tile-ink-s: 35%;
   --tile-ink-l: 38%;
   --ok: #1b7a43;
   --act-read: #1b7a43;
   --act-idea: #8a4fd8;
   --act-todo: #c25e00;
   --act-ref: #2f6fae;
+  /* Text/icons on a filled accent or ok surface (buttons, active chips, badges). */
+  --on-accent: #ffffff;
+  --on-ok: #ffffff;
+  --ok-soft: rgba(27, 122, 67, 0.1);
+  /* Dimmed layer behind modals and the centred peek panel. */
+  --scrim: rgba(20, 16, 12, 0.4);
+  /* Dark chip laid over media (video duration etc.); same in both themes. */
+  --overlay: rgba(0, 0, 0, 0.6);
+  --on-overlay: #ffffff;
+  --shadow-float: 0 1px 4px rgba(0, 0, 0, 0.18);
+  --shadow-pop: 0 24px 64px rgba(0, 0, 0, 0.28);
+  /* Per-topic colour dot: hue comes from the topic (--h), saturation/lightness from here. */
+  --topic-s: 55%;
+  --topic-l: 58%;
+  /* Theme-independent surfaces: the QR code must stay black on white, and the welcome
+     collage mocks a Telegram video card, which is always dark. */
+  --fixed-paper: #ffffff;
+  --fixed-qr: #000000;
+  --fixed-ink: #23211e;
+  --fixed-muted: #77726a;
+  --fixed-line: #e3dfd7;
+  --fixed-cream: #fbf3e6;
+  --fixed-accent: #d9573b;
+  --fixed-on-dark-track: rgba(255, 255, 255, 0.2);
   font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Inter, Roboto, sans-serif;
   font-size: 14px;
   color: var(--ink);
@@ -52,6 +78,11 @@
   --act-ref: #7fb2f0;
   --warn: #f0a052;
   --danger: #ef6b5b;
+  --on-ok: var(--bg);
+  --ok-soft: rgba(95, 207, 143, 0.12);
+  --scrim: rgba(0, 0, 0, 0.55);
+  --shadow-float: 0 1px 4px rgba(0, 0, 0, 0.45);
+  --shadow-pop: 0 24px 64px rgba(0, 0, 0, 0.55);
 }
 * {
   box-sizing: border-box;
@@ -72,7 +103,7 @@ button {
   border-radius: 8px;
   padding: 8px 14px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 button:disabled {
   opacity: 0.35;
@@ -222,7 +253,7 @@ code {
   border-radius: 50%;
   overflow: hidden;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 700;
   font-size: 12px;
 }
@@ -338,7 +369,7 @@ code {
   margin: 0 3px;
   border-radius: 3px;
   flex-shrink: 0;
-  background: hsl(var(--h) 55% 58%);
+  background: hsl(var(--h) var(--topic-s) var(--topic-l));
 }
 .side-hint {
   padding: 0 10px;
@@ -366,10 +397,10 @@ code {
 .side-tag.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 .side-tag.active small {
-  color: #fff;
+  color: var(--on-accent);
 }
 
 /* Toolbar */
@@ -732,8 +763,8 @@ code {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: hsl(var(--h) 45% var(--tile-l));
-  color: hsl(var(--h) 35% var(--tile-ink-l));
+  background: hsl(var(--h) var(--tile-s) var(--tile-l));
+  color: hsl(var(--h) var(--tile-ink-s) var(--tile-ink-l));
   font-size: 12.5px;
   font-weight: 600;
   padding: 10px;
@@ -744,8 +775,8 @@ code {
   position: absolute;
   right: 8px;
   bottom: 8px;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
+  background: var(--overlay);
+  color: var(--on-overlay);
   font-size: 12px;
   border-radius: 6px;
   padding: 2px 6px;
@@ -841,12 +872,12 @@ code {
   border-radius: 7px;
   background: var(--panel);
   color: var(--ink);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow-float);
 }
 .ha:hover,
 .ha.on {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 .card.selected .ha:not(.sel) {
   display: none;
@@ -975,7 +1006,7 @@ code {
   animation: peek-fade 0.12s ease-out;
 }
 .peek-backdrop.mode-center {
-  background: rgba(20, 16, 12, 0.38);
+  background: var(--scrim);
   padding: 5vh 24px;
 }
 .detail-panel.mode-center {
@@ -983,7 +1014,7 @@ code {
   max-height: 90vh;
   border: 1px solid var(--line);
   border-radius: 14px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--shadow-pop);
   overflow: hidden;
   animation: peek-rise 0.16s ease-out;
 }
@@ -1249,7 +1280,7 @@ code {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--scrim);
   display: grid;
   place-items: center;
   z-index: 10;
