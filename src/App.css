@@ -796,7 +796,7 @@ code {
   border-radius: 4px;
   border: 1.5px solid var(--line);
   box-sizing: border-box;
-  color: var(--bg);
+  color: var(--on-accent);
 }
 .view-menu button:hover .checkbox {
   border-color: var(--muted);
