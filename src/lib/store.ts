@@ -32,6 +32,8 @@ export interface Settings {
   aiModel: AiModel;
   /** Merged topics and tags (see Aliases in library.ts). */
   aliases?: Aliases;
+  /** Topics the user made by hand: shown even when empty, offered to the AI first. */
+  topics?: string[];
 }
 
 export const DEFAULT_SETTINGS: Settings = { aiEnabled: false, fetchLinks: true, aiImages: false, language: "auto", aiLanguage: "ui", aiModel: DEFAULT_AI_MODEL };

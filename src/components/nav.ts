@@ -147,3 +147,39 @@ export function savePref(key: string, value: string) {
     /* preferences are a convenience only */
   }
 }
+
+/**
+ * Width of the card panel when it opens on the side. The user drags its left edge;
+ * these are the "safe zones" it can't cross so the board and the sidebar stay usable.
+ */
+export const PANEL_WIDTH = {
+  /** What the panel starts at, and what a double click on the edge brings it back to. */
+  default: 420,
+  /** Narrower than this and the header buttons and the fields wrap badly. */
+  min: 320,
+  /** Wider than this is better served by the "full window" mode. */
+  max: 960,
+  /** The board keeps at least this much: a card column and a toolbar that still reads. */
+  minBoard: 440,
+  /** Step for the arrow keys on the focused edge. */
+  step: 24,
+} as const;
+
+/**
+ * Clamps a wanted panel width to the safe zone. `room` is the width shared by the board
+ * and the panel (the window minus the sidebar). When there's too little room for both,
+ * the panel keeps its minimum and the board gives way.
+ */
+export function clampPanelWidth(wanted: number, room: number): number {
+  const max = Math.min(PANEL_WIDTH.max, room - PANEL_WIDTH.minBoard);
+  return Math.round(Math.max(PANEL_WIDTH.min, Math.min(wanted, max)));
+}
+
+export function loadPanelWidth(): number {
+  try {
+    const v = Number(localStorage.getItem("sb.panelWidth"));
+    return Number.isFinite(v) && v >= PANEL_WIDTH.min && v <= PANEL_WIDTH.max ? v : PANEL_WIDTH.default;
+  } catch {
+    return PANEL_WIDTH.default;
+  }
+}

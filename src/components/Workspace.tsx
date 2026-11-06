@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { platform } from "@platform";
 import type { Card, Library, UserFields } from "../lib/types";
-import { effectiveAction, effectiveTags, effectiveTopic, matchesFilter, tagName, topicName } from "../lib/library";
+import { effectiveAction, effectiveTags, effectiveTopic, getOwnTopics, matchesFilter, tagName, topicName } from "../lib/library";
 import { countDuplicateGroups, findDuplicates, groupDuplicates, isImportant } from "../lib/smart";
 import { Overview, type OverviewSection } from "./Overview";
 import { TidyDialog, type TidyKind } from "./TidyDialog";
@@ -71,6 +71,10 @@ export function Workspace(props: {
   askSynonyms?: (kind: TidyKind, counts: Map<string, number>) => Promise<Array<{ into: string; from: string[] }>>;
   /** Split a topic into AI subgroups; undefined when AI can't be used. */
   onGroupTopic?: (topic: string) => Promise<void>;
+  /** Topics made by hand: each returns the name the topic ends up under. */
+  onCreateTopic: (name: string) => Promise<string>;
+  onRenameTopic: (from: string, to: string) => Promise<string>;
+  onDeleteTopic: (name: string) => Promise<void>;
 }) {
   const { lib, rev, onEdit } = props;
   const [scope, setScope] = useState<Scope>({ kind: "home" });
@@ -136,8 +140,10 @@ export function Workspace(props: {
       if (t) m.set(t, (m.get(t) ?? 0) + 1);
       else none++;
     }
+    // The user's own topics show even before anything is in them.
+    for (const t of getOwnTopics()) if (!m.has(t)) m.set(t, 0);
     return { topics: [...m.entries()].sort((a, b) => b[1] - a[1] || compareText(a[0], b[0])), noTopic: none };
-  }, [base]);
+  }, [base, rev]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Searching from the overview searches everything, shown as a board.
   const home = scope.kind === "home" && !query.trim();
@@ -156,7 +162,7 @@ export function Workspace(props: {
     }
     return { topics, tags };
   }, [lib, rev]); // eslint-disable-line react-hooks/exhaustive-deps
-  const topicNames = useMemo(() => [...names.topics.keys()], [names]);
+  const topicNames = useMemo(() => [...new Set([...names.topics.keys(), ...getOwnTopics()])], [names]);
   const tidyCount = useMemo(() => suggestMerges(names.topics).length + suggestMerges(names.tags).length, [names]);
 
   const inScope = useMemo(() => base.filter((c) => matchesScope(c, shown, dupes)), [base, JSON.stringify(shown), dupes]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -317,20 +323,31 @@ export function Workspace(props: {
           onTag={setTag}
           tidyCount={tidyCount}
           onTidy={() => setTidy("tags")}
+          onCreateTopic={async (name) => pickScope({ kind: "topic", name: await props.onCreateTopic(name) })}
+          onRenameTopic={async (from, to) => {
+            const name = await props.onRenameTopic(from, to);
+            if (scope.kind === "topic" && scope.name === from) pickScope({ kind: "topic", name });
+          }}
+          onDeleteTopic={async (name) => {
+            await props.onDeleteTopic(name);
+            if (scope.kind === "topic" && scope.name === name) pickScope({ kind: "home" });
+          }}
         />
       )}
 
       <section className="content">
         <header className="toolbar">
-          <button className="icon-btn" onClick={() => setSideOpen(!sideOpen)} title={sideOpen ? T.toolbar.hideSidebar : T.toolbar.showSidebar}>
-            <Icon name="sidebar" />
-          </button>
-          <div className="heading">
-            <h1>{heading}</h1>
-            <span className="count">
-              {formatNumber(visible.length)}
-              {subtitle && <> · {subtitle}</>}
-            </span>
+          <div className="toolbar-start">
+            <button className="icon-btn" onClick={() => setSideOpen(!sideOpen)} title={sideOpen ? T.toolbar.hideSidebar : T.toolbar.showSidebar}>
+              <Icon name="sidebar" />
+            </button>
+            <div className="heading" title={heading}>
+              <h1>{heading}</h1>
+              <span className="count">
+                {formatNumber(visible.length)}
+                {subtitle && <> · {subtitle}</>}
+              </span>
+            </div>
           </div>
           <label className="search">
             <Icon name="search" />
@@ -343,51 +360,52 @@ export function Workspace(props: {
               <kbd>/</kbd>
             )}
           </label>
-          <div className="spacer" />
-          {props.job ? (
-            <span className="job">
-              <span className="progress" style={{ "--p": `${Math.round((props.job.done / Math.max(props.job.total, 1)) * 100)}%` } as React.CSSProperties} />
-              {props.job.label} {formatNumber(props.job.done)}/{formatNumber(props.job.total)}
-              <button className="secondary small-btn" onClick={props.onStop}>
-                {T.common.stop}
-              </button>
-            </span>
-          ) : (
-            props.needAi > 0 &&
-            props.aiEnabled && (
-              <button className="secondary small-btn" onClick={props.onRunAi} title={T.toolbar.runAiHint}>
-                <Icon name="sparkle" size={14} /> {T.toolbar.runAi(props.needAi)}
-              </button>
-            )
-          )}
-          {props.onImport && (
-            <button className="icon-btn" onClick={props.onImport} title={T.toolbar.import}>
-              <Icon name="import" />
-            </button>
-          )}
-          <div className="menu-wrap">
-            <button className="icon-btn" onClick={() => setExportOpen(!exportOpen)} title={T.toolbar.export}>
-              <Icon name="export" />
-            </button>
-            {exportOpen && (
-              <div className="menu" onMouseLeave={() => setExportOpen(false)}>
-                <small>{selected.size ? T.toolbar.exportSelected(exportCards.length) : T.toolbar.exportAll(exportCards.length)}</small>
-                <button onClick={() => (setExportOpen(false), props.onExport("md", exportCards))}>Markdown</button>
-                <button onClick={() => (setExportOpen(false), props.onExport("csv", exportCards))}>CSV</button>
-              </div>
+          <div className="toolbar-end">
+            {props.job ? (
+              <span className="job">
+                <span className="progress" style={{ "--p": `${Math.round((props.job.done / Math.max(props.job.total, 1)) * 100)}%` } as React.CSSProperties} />
+                {props.job.label} {formatNumber(props.job.done)}/{formatNumber(props.job.total)}
+                <button className="secondary small-btn" onClick={props.onStop}>
+                  {T.common.stop}
+                </button>
+              </span>
+            ) : (
+              props.needAi > 0 &&
+              props.aiEnabled && (
+                <button className="secondary small-btn" onClick={props.onRunAi} title={T.toolbar.runAiHint}>
+                  <Icon name="sparkle" size={14} /> {T.toolbar.runAi(props.needAi)}
+                </button>
+              )
             )}
-          </div>
-          {props.onTelegram && (
-            <button className="icon-btn" onClick={props.onTelegram} title={T.toolbar.telegram(BOARD_TITLE)}>
-              <Icon name="send" />
+            {props.onImport && (
+              <button className="icon-btn" onClick={props.onImport} title={T.toolbar.import}>
+                <Icon name="import" />
+              </button>
+            )}
+            <div className="menu-wrap">
+              <button className="icon-btn" onClick={() => setExportOpen(!exportOpen)} title={T.toolbar.export}>
+                <Icon name="export" />
+              </button>
+              {exportOpen && (
+                <div className="menu" onMouseLeave={() => setExportOpen(false)}>
+                  <small>{selected.size ? T.toolbar.exportSelected(exportCards.length) : T.toolbar.exportAll(exportCards.length)}</small>
+                  <button onClick={() => (setExportOpen(false), props.onExport("md", exportCards))}>Markdown</button>
+                  <button onClick={() => (setExportOpen(false), props.onExport("csv", exportCards))}>CSV</button>
+                </div>
+              )}
+            </div>
+            {props.onTelegram && (
+              <button className="icon-btn" onClick={props.onTelegram} title={T.toolbar.telegram(BOARD_TITLE)}>
+                <Icon name="send" />
+              </button>
+            )}
+            <button className="icon-btn" onClick={() => setThemePref(nextThemePref(theme))} title={T.theme.toggle(THEME_LABELS[theme])}>
+              <Icon name={THEME_ICONS[theme]} />
             </button>
-          )}
-          <button className="icon-btn" onClick={() => setThemePref(nextThemePref(theme))} title={T.theme.toggle(THEME_LABELS[theme])}>
-            <Icon name={THEME_ICONS[theme]} />
-          </button>
-          <button className="icon-btn" onClick={props.onSettings} title={T.toolbar.settings}>
-            <Icon name="settings" />
-          </button>
+            <button className="icon-btn" onClick={props.onSettings} title={T.toolbar.settings}>
+              <Icon name="settings" />
+            </button>
+          </div>
         </header>
 
         {home ? (
@@ -487,6 +505,7 @@ export function Workspace(props: {
           topics={topicNames}
           onMove={moveTo}
           onOpenLink={(u) => void platform.openUrl(u)}
+          empty={shown.kind === "topic" && !inScope.length && !query.trim() ? { title: T.topics.emptyTitle, hint: T.topics.emptyHint } : undefined}
         />
         </>
         )}

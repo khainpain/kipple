@@ -19,16 +19,20 @@ export function TopicMenu(props: {
   /** "" takes the topic away. */
   onPick: (topic: string) => void;
   onClose: () => void;
+  /** Open under the anchor at its width (a form field) instead of right-aligned to a button. */
+  matchAnchor?: boolean;
 }) {
   const [q, setQ] = useState("");
-  const [pos, setPos] = useState<{ left: number; top: number; up: boolean }>({ left: 0, top: 0, up: false });
+  const [pos, setPos] = useState<{ left: number; top: number; up: boolean; width: number }>({ left: 0, top: 0, up: false, width: WIDTH });
   const input = useRef<HTMLInputElement>(null);
   const box = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     const r = props.anchor.getBoundingClientRect();
     const up = r.bottom + 320 > window.innerHeight && r.top > 320;
-    setPos({ left: Math.max(8, Math.min(r.right - WIDTH, window.innerWidth - WIDTH - 8)), top: up ? r.top - 6 : r.bottom + 6, up });
+    const width = props.matchAnchor ? Math.max(WIDTH, r.width) : WIDTH;
+    const left = props.matchAnchor ? r.left : r.right - width;
+    setPos({ left: Math.max(8, Math.min(left, window.innerWidth - width - 8)), top: up ? r.top - 6 : r.bottom + 6, up, width });
   }, [props.anchor]);
 
   useEffect(() => {
@@ -62,11 +66,17 @@ export function TopicMenu(props: {
       <div
         ref={box}
         className={`menu topic-menu${pos.up ? " up" : ""}`}
-        style={{ left: pos.left, top: pos.top, width: WIDTH }}
+        style={{ left: pos.left, top: pos.top, width: pos.width }}
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
           e.stopPropagation();
           if (e.key === "Escape") props.onClose();
+          // ↑/↓ walk the filter field and the options.
+          if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+          const els = [input.current, ...Array.from(box.current?.querySelectorAll<HTMLButtonElement>("button") ?? [])].filter(Boolean) as HTMLElement[];
+          const i = els.indexOf(document.activeElement as HTMLElement);
+          e.preventDefault();
+          els[(i + (e.key === "ArrowDown" ? 1 : -1) + els.length) % els.length]?.focus();
         }}
       >
         <input
