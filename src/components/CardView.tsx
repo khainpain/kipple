@@ -24,6 +24,14 @@ const KIND_ICON: Record<string, string> = {
   text: "text",
 };
 
+const KIND_NAME: Record<string, string> = {
+  photo: "Фото",
+  video: "Видео",
+  animation: "GIF",
+  document: "Файл",
+  audio: "Аудио",
+};
+
 export function formatSize(bytes?: number): string {
   if (!bytes) return "";
   const units = ["Б", "КБ", "МБ", "ГБ"];
@@ -71,12 +79,17 @@ export function siteOf(card: Card): string | undefined {
 export function displayTitle(card: Card): string {
   const t = effectiveTitle(card);
   if (t) return t;
+  if (card.context) return card.context;
   if (card.media?.fileName) return card.media.fileName;
   if (card.kind === "voice") return "Голосовое сообщение";
   if (card.kind === "video_note") return "Видеосообщение";
   if (card.kind === "sticker") return `Стикер ${card.text}`;
   const line = card.text.split("\n").find((l) => l.trim());
-  return line ? line.slice(0, 120) : siteOf(card) ?? "Без названия";
+  if (line) return line.slice(0, 120);
+  const site = siteOf(card);
+  if (site) return site;
+  const kind = KIND_NAME[card.kind];
+  return kind ? `${kind}, ${formatDate(card.date)}` : "Без названия";
 }
 
 function excerptOf(card: Card): string {

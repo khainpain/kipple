@@ -10,6 +10,14 @@ export type Scope =
 export type TypeKey = "links" | "photos" | "videos" | "docs" | "notes";
 export type SortKey = "new" | "old" | "title";
 export type ViewKey = "masonry" | "grid" | "list" | "headlines";
+export type OpenMode = "center" | "side" | "full";
+
+/** How a card opens, like Notion's peek modes. */
+export const OPEN_MODES: Array<{ key: OpenMode; label: string; icon: string }> = [
+  { key: "center", label: "Открывать по центру", icon: "peekCenter" },
+  { key: "side", label: "Открывать сбоку", icon: "peekSide" },
+  { key: "full", label: "Открывать на весь экран", icon: "peekFull" },
+];
 
 export const SMART_LISTS: Array<{ key: Extract<Scope, { kind: "list" }>["key"]; label: string; icon: string }> = [
   { key: "all", label: "Все карточки", icon: "all" },

@@ -64,6 +64,8 @@ export interface Platform {
   };
   pickExport(): Promise<ExportSource | null>;
   mediaUrl(sourceDir: string, rel: string): string | undefined;
+  /** A file of the export as bytes: for PDF and text previews, and for photos the user lets the AI name. */
+  readMedia(sourceDir: string, rel: string): Promise<Blob>;
   openUrl(url: string): Promise<void>;
   openFile(sourceDir: string, rel: string): Promise<void>;
   /** Asks where to save (desktop) or downloads (web). Returns where it went, or null if cancelled. */

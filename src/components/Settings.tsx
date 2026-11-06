@@ -49,7 +49,15 @@ export function SettingsDialog(props: {
 
         <label className="check">
           <input type="checkbox" checked={s.aiEnabled} onChange={(e) => setS({ ...s, aiEnabled: e.target.checked })} />
-          AI-разметка (в Anthropic уходит только текст сообщений и описания страниц; медиа и «чувствительные» сообщения не отправляются)
+          AI-разметка (в Anthropic уходит только текст сообщений и описания страниц; «чувствительные» сообщения не отправляются, медиа — только если включено ниже)
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={s.aiImages} disabled={!s.aiEnabled} onChange={(e) => setS({ ...s, aiImages: e.target.checked })} />
+          <span>
+            Называть картинки без подписи по их содержимому. Тогда в Anthropic уходят и сами картинки: уменьшенные до 768 px копии, оригиналы остаются на компьютере. Скриншоты
+            с личными данными тоже уйдут, если они без подписи. Стоит около $0.15 за 1000 картинок. Без этой галочки название берётся из соседнего сообщения или ставится
+            «Фото, дата»; одну картинку можно назвать по кнопке в карточке.
+          </span>
         </label>
         <label className="check" hidden={!platform.canFetchLinks}>
           <input type="checkbox" checked={s.fetchLinks} onChange={(e) => setS({ ...s, fetchLinks: e.target.checked })} />

@@ -2,7 +2,7 @@ import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
-import { BaseDirectory, exists, mkdir, readTextFile, rename, writeTextFile } from "@tauri-apps/plugin-fs";
+import { BaseDirectory, exists, mkdir, readFile, readTextFile, rename, writeTextFile } from "@tauri-apps/plugin-fs";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -60,6 +60,7 @@ export const platform: Platform = {
     return { dir, readText: (rel) => readTextFile(joinPath(dir, rel)) };
   },
   mediaUrl: (sourceDir, rel) => convertFileSrc(joinPath(sourceDir, rel)),
+  readMedia: async (sourceDir, rel) => new Blob([await readFile(joinPath(sourceDir, rel))]),
   openUrl: (url) => openUrl(url),
   openFile: (sourceDir, rel) => openPath(joinPath(sourceDir, rel)),
   async saveTextFile(defaultName, filter, content) {
