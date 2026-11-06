@@ -6,7 +6,7 @@ import type { Card, Library, UserFields } from "./lib/types";
 import { makeEdit } from "./lib/library";
 import { appendEdit, DEFAULT_SETTINGS, loadLibrary, loadSettings, saveLibrary, saveSettings, wipeAll, type Settings } from "./lib/store";
 import { importFolder, pickExportFolder } from "./lib/importer";
-import { fetchLinkMeta } from "./lib/linkmeta";
+import { fetchLinkMeta, needsPreview } from "./lib/linkmeta";
 import { AiKeyMissing, classifyCards, pendingForAi } from "./lib/ai";
 import { toCsv, toMarkdown } from "./lib/exporters";
 import { deleteApiKey, getApiKey, setApiKey } from "./lib/secrets";
@@ -42,6 +42,15 @@ export default function App() {
         setLib(l);
         setSettings(s);
         setHasKey(!!k);
+        // Libraries imported before previews worked here (or by an older version) catch up in the background.
+        if (l && s.fetchLinks && platform.canFetchLinks && l.cards.some(needsPreview)) {
+          const ctl = new AbortController();
+          abortRef.current = ctl;
+          void enrichLinks(l, ctl.signal).finally(() => {
+            setJob(null);
+            setRev((r) => r + 1);
+          });
+        }
       } catch (e) {
         notify(`Не удалось загрузить библиотеку: ${e}`);
       } finally {
@@ -77,7 +86,7 @@ export default function App() {
   }, []);
 
   async function enrichLinks(l: Library, signal: AbortSignal) {
-    const todo = l.cards.filter((c) => c.kind === "link" && c.urls[0] && !c.link && !c.removed);
+    const todo = l.cards.filter(needsPreview);
     if (!todo.length) return;
     let done = 0;
     setJob({ label: "Превью ссылок", done, total: todo.length });
