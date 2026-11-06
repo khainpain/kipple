@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import type { QrResult, TelegramApi } from "../platform/types";
 import { telegramErrorText } from "../lib/telegram";
 import { qrPath } from "../lib/qr";
@@ -6,6 +6,7 @@ import { ANGRY_MS, INITIAL_TAPS, SALTO_MS, tapMascot } from "../lib/mascot";
 import { nextThemePref, setThemePref, THEME_ICONS, THEME_LABELS, useThemePref } from "../lib/theme";
 import { LANGS, T, lang, type Lang } from "../i18n";
 import { Icon } from "./Icon";
+import { BounceIn, Done, Reveal, RiseList, Spark, StepBar, Title } from "./Motion";
 import logoLight from "../../brand/kipple-logo-light.svg";
 import logoDark from "../../brand/kipple-logo-dark.svg";
 import mascot from "../../brand/kipple-mascot-light.svg";
@@ -78,21 +79,20 @@ export function Welcome(props: {
           <div className="w-viewport">
             <div className="w-track" style={{ transform: `translateX(${screen ? "-50%" : "0"})` }}>
               <section className={`w-pane${screen === 0 ? " on" : ""}`} inert={screen !== 0} aria-hidden={screen !== 0}>
-                <h1 className="w-h1">{L.title}</h1>
-                <p className="w-lead">{L.lead}</p>
-                <span className="w-safe">
-                  <span className="w-safe-dot">
-                    <Icon name="lock" size={11} />
+                <h1 className="w-h1">
+                  <Title text={L.title} />
+                </h1>
+                <Reveal stagger delay={0.15} className="w-reveal">
+                  <p className="w-lead">{L.lead}</p>
+                  <span className="w-safe">
+                    <span className="w-safe-dot">
+                      <Icon name="lock" size={11} />
+                    </span>
+                    {L.localOnly}
                   </span>
-                  {L.localOnly}
-                </span>
-                {props.tg && (
-                  <>
-                    <SignInCard tg={props.tg} active={screen === 0} onSettings={props.onSettings} onExport={() => setScreen(1)} onSignedIn={props.onSignedIn} />
-                    <div className="w-or">{L.orWithout}</div>
-                  </>
-                )}
-                <div className="w-tiles">
+                  {props.tg && <SignInCard tg={props.tg} active={screen === 0} onSettings={props.onSettings} onExport={() => setScreen(1)} onSignedIn={props.onSignedIn} />}
+                  {props.tg && <div className="w-or">{L.orWithout}</div>}
+                  <div className="w-tiles">
                   <button className="w-tile grow" onClick={() => setScreen(1)}>
                     <span className="w-tile-icon">
                       <Icon name="folder" size={18} />
@@ -114,7 +114,8 @@ export function Welcome(props: {
                       </span>
                     </button>
                   )}
-                </div>
+                  </div>
+                </Reveal>
               </section>
 
               <section className={`w-pane${screen === 1 ? " on" : ""}`} inert={screen !== 1} aria-hidden={screen !== 1}>
@@ -122,21 +123,24 @@ export function Welcome(props: {
                   <Icon name="right" size={14} className="flip" />
                   {L.back}
                 </button>
-                <h1 className="w-h1 small">{L.exportTitle}</h1>
+                <h1 className="w-h1 small">{screen === 1 ? <Title text={L.exportTitle} /> : L.exportTitle}</h1>
                 <p className="w-lead">{L.exportLead}</p>
-                <ol className="w-steps">
+                {/* Replays its entrance each time the screen slides in. */}
+                <RiseList className="w-steps" play={screen} delay={screen === 1 ? 0.2 : 0}>
                   {L.steps.map((s, i) => (
-                    <li key={i}>
+                    <Fragment key={i}>
                       <span className="w-num">{i + 1}</span>
                       <span>{rich(s, props.openUrl)}</span>
-                    </li>
+                    </Fragment>
                   ))}
-                </ol>
+                </RiseList>
                 <div className="w-actions">
-                  <button className="w-primary" onClick={props.onImport}>
-                    <Icon name="folder" size={18} />
-                    {L.pickFolder}
-                  </button>
+                  <Spark>
+                    <button className="w-primary" onClick={props.onImport}>
+                      <Icon name="folder" size={18} />
+                      {L.pickFolder}
+                    </button>
+                  </Spark>
                   {props.showDemo && (
                     <button className="secondary w-secondary" onClick={props.onDemo}>
                       {L.demo}
@@ -298,14 +302,14 @@ function SignInCard(props: { tg: TelegramApi; active: boolean; onSettings: () =>
                 </button>
               )}
             </div>
-            <ol className="w-qr-steps">
+            <RiseList className="w-qr-steps" delay={0.5}>
               {L.qrSteps.map((s, i) => (
-                <li key={i}>
+                <Fragment key={i}>
                   <span className="w-num soft">{i + 1}</span>
                   <span>{rich(s, () => undefined)}</span>
-                </li>
+                </Fragment>
               ))}
-            </ol>
+            </RiseList>
           </div>
         )}
 
@@ -313,7 +317,7 @@ function SignInCard(props: { tg: TelegramApi; active: boolean; onSettings: () =>
           <div className="w-stepper" aria-hidden>
             {[L.stepPhone, L.stepCode, L.stepPassword].map((s, i) => (
               <div key={i} className={i <= phoneIdx ? "on" : ""}>
-                <i />
+                <StepBar on={i <= phoneIdx} />
                 <span>
                   {s}
                   {i === 2 && <small> · {L.stepOptional}</small>}
@@ -388,7 +392,7 @@ function SignInCard(props: { tg: TelegramApi; active: boolean; onSettings: () =>
         {step === "done" && (
           <div className="w-done">
             <p>
-              <b>{L.signedIn(name)}</b>
+              <Done label={L.signedIn(name)} />
             </p>
             <p className="hint">{props.onSignedIn ? L.signedInLoad : L.signedInNext}</p>
             <div className="w-inline">
@@ -487,10 +491,12 @@ function Mascot() {
   return (
     <button className="kp-mascot kp-tap kp-bob" aria-label="Kipple" onClick={onClick}>
       <div>
-        <div key={flip} className={`kp-body ${cls}`}>
-          <img src={mascotNoFace} alt="" draggable={false} />
-          <Face angry={angry} />
-        </div>
+        <Spark style={{ width: "100%", height: "100%" }}>
+          <div key={flip} className={`kp-body ${cls}`}>
+            <img src={mascotNoFace} alt="" draggable={false} />
+            <Face angry={angry} />
+          </div>
+        </Spark>
       </div>
     </button>
   );
@@ -501,68 +507,76 @@ function Collage() {
   return (
     <div className="w-collage">
       <div className="w-soft" aria-hidden />
-      <div className="w-cc card kp-f kp-f1" style={{ left: 0, top: 70, width: 170, ["--r" as string]: "-5deg" }} aria-hidden>
-        <div className="cover">
-          <img src={containerQueries} alt="" style={{ height: 72, objectFit: "cover" }} />
-        </div>
-        <div className="card-body">
-          <h3>{L.cardCq}</h3>
-          <div className="tags">
-            <span className="pill action-read_later">{L.readLater}</span>
+      <BounceIn index={0} className="w-cc-pos" style={{ left: 0, top: 70, width: 170 }}>
+        <div className="w-cc card kp-f kp-f1" style={{ ["--r" as string]: "-5deg" }} aria-hidden>
+          <div className="cover">
+            <img src={containerQueries} alt="" style={{ height: 72, objectFit: "cover" }} />
+          </div>
+          <div className="card-body">
+            <h3>{L.cardCq}</h3>
+            <div className="tags">
+              <span className="pill action-read_later">{L.readLater}</span>
+            </div>
           </div>
         </div>
-      </div>
-      <div className="w-cc card kp-f kp-f2" style={{ right: 0, top: 30, width: 160, ["--r" as string]: "4deg" }} aria-hidden>
-        <div className="card-body">
-          <h3>{L.cardBot}</h3>
-          <div className="tags">
-            <span className="pill action-idea">{L.idea}</span>
+      </BounceIn>
+      <BounceIn index={1} className="w-cc-pos" style={{ right: 0, top: 30, width: 160 }}>
+        <div className="w-cc card kp-f kp-f2" style={{ ["--r" as string]: "4deg" }} aria-hidden>
+          <div className="card-body">
+            <h3>{L.cardBot}</h3>
+            <div className="tags">
+              <span className="pill action-idea">{L.idea}</span>
+            </div>
           </div>
         </div>
-      </div>
-      <div className="w-cc card kp-f kp-f3" style={{ left: 242, top: 344, width: 178, ["--r" as string]: "-3deg" }} aria-hidden>
-        <div className="cover">
-          <img src={shakshuka} alt="" style={{ height: 84, objectFit: "cover" }} />
-        </div>
-        <div className="card-body">
-          <h3>{L.cardShakshuka}</h3>
-          <div className="tags">
-            <span className="tag">{L.tagRecipes}</span>
+      </BounceIn>
+      <BounceIn index={2} className="w-cc-pos" style={{ left: 242, top: 344, width: 178 }}>
+        <div className="w-cc card kp-f kp-f3" style={{ ["--r" as string]: "-3deg" }} aria-hidden>
+          <div className="cover">
+            <img src={shakshuka} alt="" style={{ height: 84, objectFit: "cover" }} />
+          </div>
+          <div className="card-body">
+            <h3>{L.cardShakshuka}</h3>
+            <div className="tags">
+              <span className="tag">{L.tagRecipes}</span>
+            </div>
           </div>
         </div>
-      </div>
-      <div className="w-cc card kp-f kp-f4" style={{ left: 0, top: 384, width: 214, ["--r" as string]: "3deg" }} aria-hidden>
-        <div className="cover w-video">
-          <div className="w-video-mascot kp-hop">
-            <img src={mascotNoFace} alt="" />
-            <Face talking />
-          </div>
-          <div className="w-bubble">
-            {L.speech.map((s, i) => (
-              <span key={i} className="kp-cap" style={{ animationDelay: `${i * 3}s` }}>
-                {s}
+      </BounceIn>
+      <BounceIn index={3} className="w-cc-pos" style={{ left: 0, top: 384, width: 214 }}>
+        <div className="w-cc card kp-f kp-f4" style={{ ["--r" as string]: "3deg" }} aria-hidden>
+          <div className="cover w-video">
+            <div className="w-video-mascot kp-hop">
+              <img src={mascotNoFace} alt="" />
+              <Face talking />
+            </div>
+            <div className="w-bubble">
+              {L.speech.map((s, i) => (
+                <span key={i} className="kp-cap" style={{ animationDelay: `${i * 3}s` }}>
+                  {s}
+                </span>
+              ))}
+            </div>
+            <div className="w-player">
+              <span className="w-play" />
+              <span className="w-bar">
+                <i className="kp-prog" />
               </span>
-            ))}
+            </div>
+            <span className="badge-corner">0:30</span>
           </div>
-          <div className="w-player">
-            <span className="w-play" />
-            <span className="w-bar">
-              <i className="kp-prog" />
-            </span>
-          </div>
-          <span className="badge-corner">0:30</span>
-        </div>
-        <div className="card-body">
-          <h3>{L.cardVideo}</h3>
-          <div className="tags">
-            <span className="pill action-read_later">{L.watchLater}</span>
-            <span className="tag">{L.tagVideo}</span>
-          </div>
-          <div className="meta-row">
-            <span className="site">youtube.com</span>
+          <div className="card-body">
+            <h3>{L.cardVideo}</h3>
+            <div className="tags">
+              <span className="pill action-read_later">{L.watchLater}</span>
+              <span className="tag">{L.tagVideo}</span>
+            </div>
+            <div className="meta-row">
+              <span className="site">youtube.com</span>
+            </div>
           </div>
         </div>
-      </div>
+      </BounceIn>
       <Mascot />
     </div>
   );

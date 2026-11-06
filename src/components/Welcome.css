@@ -79,7 +79,8 @@
 .w-track {
   display: flex;
   width: 200%;
-  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* MOTION.md: the track slides 50% in 450 ms ease-out; the leaving screen fades. */
+  transition: transform 0.45s var(--ease-out, cubic-bezier(0.22, 1, 0.36, 1));
 }
 .w-pane {
   width: 50%;
@@ -89,10 +90,17 @@
   align-items: flex-start;
   gap: 18px;
   opacity: 0;
-  transition: opacity 0.3s;
+  transition: opacity 0.3s var(--ease-out, ease);
 }
 .w-pane.on {
   opacity: 1;
+}
+/* Wrappers of the blocks that fade in one after another (Motion.tsx Reveal): keep the pane's column layout. */
+.w-reveal {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .w-h1 {
@@ -522,8 +530,12 @@
   background: var(--side);
   border-radius: 32px;
 }
-.w-collage .w-cc {
+.w-cc-pos {
   position: absolute;
+}
+.w-collage .w-cc {
+  position: relative;
+  width: 100%;
   cursor: default;
   transform: rotate(var(--r, 0deg));
   box-shadow: var(--shadow-hover);
