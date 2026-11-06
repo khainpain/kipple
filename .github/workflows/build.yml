@@ -10,8 +10,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -20,12 +20,14 @@ jobs:
       - run: npm run build
       - run: npm run build:web
 
+  # The Windows installer is slow, so it is built only on a manual run (Actions -> build -> Run workflow).
   windows:
     needs: test
+    if: github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -49,7 +51,7 @@ jobs:
           else
             npx tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}'
           fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: saved-board-windows
           path: |

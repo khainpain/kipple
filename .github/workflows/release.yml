@@ -1,11 +1,15 @@
 name: release
 
-# Every push to main publishes a new signed Windows release (v0.1.<run number>).
+# Runs only on demand: Actions -> release -> Run workflow.
+# Publishes a signed Windows release (v0.1.<run number> unless a version is given).
 # Installed apps find it through latest.json and offer to update themselves.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      version:
+        description: "Version, e.g. 0.2.0 (empty = 0.1.<run number>). Must be higher than the last release."
+        required: false
+        default: ""
 
 concurrency:
   group: release
@@ -18,8 +22,8 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -31,8 +35,14 @@ jobs:
       - run: npm test
       - name: Set version
         shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          VERSION="0.1.${{ github.run_number }}"
+          VERSION="${INPUT_VERSION#v}"
+          if [ -z "$VERSION" ]; then VERSION="0.1.${{ github.run_number }}"; fi
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version must look like 1.2.3, got '$VERSION'"; exit 1
+          fi
           node -e "const f='src-tauri/tauri.conf.json',fs=require('fs'),c=JSON.parse(fs.readFileSync(f));c.version='$VERSION';fs.writeFileSync(f,JSON.stringify(c,null,2))"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
       - uses: tauri-apps/tauri-action@v0
@@ -47,7 +57,7 @@ jobs:
           tagName: v__VERSION__
           releaseName: Saved Board v__VERSION__
           releaseBody: |
-            Автоматическая сборка из ${{ github.sha }}.
+            Сборка из ${{ github.ref_name }} @ ${{ github.sha }}.
             Уже установленное приложение предложит обновиться само. Для первой установки скачай `Saved.Board_${{ env.VERSION }}_x64-setup.exe` ниже.
           releaseDraft: false
           prerelease: false
