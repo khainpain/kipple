@@ -27,6 +27,10 @@ tauri-plugin-process = "2"
 keyring = { version = "3", features = ["apple-native", "windows-native", "linux-native"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Telegram over MTProto, for «Отправить в Telegram». Pure Rust; no SQLite session storage.
+grammers-client = { version = "0.11", default-features = false }
+grammers-session = { version = "0.11", default-features = false }
+tokio = { version = "1", features = ["sync"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"

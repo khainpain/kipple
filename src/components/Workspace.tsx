@@ -36,6 +36,8 @@ export function Workspace(props: {
   onImport: () => void;
   onExport: (kind: "csv" | "md", cards: Card[]) => void;
   onSettings: () => void;
+  /** Desktop only: opens «Отправить в Telegram». */
+  onTelegram?: () => void;
   onRunAi: () => void;
   onStop: () => void;
   onEdit: (ids: number[], patch: UserFields) => void;
@@ -232,6 +234,11 @@ export function Workspace(props: {
               </div>
             )}
           </div>
+          {props.onTelegram && (
+            <button className="icon-btn" onClick={props.onTelegram} title="Отправить в Telegram: разложить по темам в группе «Saved Board»">
+              <Icon name="send" />
+            </button>
+          )}
           <button className="icon-btn" onClick={props.onSettings} title="Настройки">
             <Icon name="settings" />
           </button>

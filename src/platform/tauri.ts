@@ -6,7 +6,21 @@ import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check } from "@tauri-apps/plugin-updater";
-import { joinPath, type HttpFetch, type Platform } from "./types";
+import { joinPath, type HttpFetch, type Platform, type TelegramApi } from "./types";
+
+// Telegram over MTProto lives in src-tauri/src/telegram.rs; these are thin wrappers around its commands.
+const telegram: TelegramApi = {
+  status: () => invoke("tg_status"),
+  setApi: (apiId, apiHash) => invoke("tg_set_api", { apiId, apiHash }),
+  requestCode: (phone) => invoke("tg_request_code", { phone }),
+  signIn: (code) => invoke("tg_sign_in", { code }),
+  checkPassword: (password) => invoke("tg_check_password", { password }),
+  logout: () => invoke("tg_logout"),
+  ensureBoard: (prev, title, about) => invoke("tg_ensure_board", { channelId: prev?.channelId ?? null, accessHash: prev?.accessHash ?? null, title, about }),
+  createTopic: (b, title, iconColor) => invoke("tg_create_topic", { channelId: b.channelId, accessHash: b.accessHash, title, iconColor: iconColor ?? null }),
+  forward: (b, topicId, ids) => invoke("tg_forward", { channelId: b.channelId, accessHash: b.accessHash, topicId, ids }),
+  sendNote: (b, topicId, replyTo, text, boldLen) => invoke("tg_send_note", { channelId: b.channelId, accessHash: b.accessHash, topicId, replyTo, text, boldLen }),
+};
 
 // App data lives in the app's own folder (on Windows: %APPDATA%\com.khainpain.savedboard).
 const base = { baseDir: BaseDirectory.AppData };
@@ -54,6 +68,7 @@ export const platform: Platform = {
     return path;
   },
   httpFetch: tauriFetch as HttpFetch,
+  telegram,
   appVersion: () => getVersion(),
   async checkUpdate() {
     const update = await check();

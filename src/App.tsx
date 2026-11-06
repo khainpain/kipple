@@ -4,7 +4,9 @@ import type { AvailableUpdate } from "./platform/types";
 import "./App.css";
 import type { Card, Library, UserFields } from "./lib/types";
 import { makeEdit } from "./lib/library";
-import { appendEdit, DEFAULT_SETTINGS, loadLibrary, loadSettings, saveLibrary, saveSettings, wipeAll, type Settings } from "./lib/store";
+import { appendEdit, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadSettings, saveBoardState, saveLibrary, saveSettings, wipeAll, type Settings } from "./lib/store";
+import { sendToTelegram, TelegramAuthError, telegramErrorText, type SendOptions } from "./lib/telegram";
+import { TelegramDialog } from "./components/TelegramDialog";
 import { importFolder, pickExportFolder } from "./lib/importer";
 import { fetchLinkMeta, needsPreview } from "./lib/linkmeta";
 import { AiKeyMissing, classifyCards, pendingForAi } from "./lib/ai";
@@ -23,6 +25,8 @@ export default function App() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [hasKey, setHasKey] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showTelegram, setShowTelegram] = useState(false);
+  const [sendingTg, setSendingTg] = useState(false);
   const [job, setJob] = useState<Job>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [version, setVersion] = useState("");
@@ -190,6 +194,34 @@ export default function App() {
     notify(`Сохранено ${cards.length} карточек в ${path}`);
   }
 
+  async function sendTelegram(opts: SendOptions) {
+    const tg = platform.telegram;
+    if (!lib || !tg) return;
+    setShowTelegram(false);
+    abortRef.current?.abort();
+    const ctl = new AbortController();
+    abortRef.current = ctl;
+    setSendingTg(true);
+    const label = "В Telegram";
+    try {
+      const state = await loadBoardState();
+      const res = await sendToTelegram(lib.cards, state, opts, {
+        tg,
+        save: saveBoardState,
+        signal: ctl.signal,
+        onProgress: (p) => setJob({ label: p.waitSeconds ? `${label}, пауза ${p.waitSeconds} с` : label, done: p.done, total: p.total }),
+      });
+      const missing = res.missing ? ` ${res.missing} сообщений уже нет в «Избранном», они пропущены.` : "";
+      notify(ctl.signal.aborted ? `Остановлено: отправлено ${res.done} из ${res.total}. Нажми «Отправить» ещё раз, чтобы продолжить.` : `Готово: ${res.done - res.missing} карточек в группе «Saved Board».${missing}`);
+    } catch (e) {
+      notify(telegramErrorText(e));
+      if (e instanceof TelegramAuthError) setShowTelegram(true);
+    } finally {
+      setSendingTg(false);
+      setJob(null);
+    }
+  }
+
   async function onSaveSettings(s: Settings, key: string | null) {
     await saveSettings(s);
     setSettings(s);
@@ -208,6 +240,7 @@ export default function App() {
     abortRef.current?.abort();
     await wipeAll();
     await deleteApiKey().catch(() => undefined);
+    await platform.telegram?.logout().catch(() => undefined);
     setLib(null);
     setHasKey(false);
     setShowSettings(false);
@@ -287,11 +320,15 @@ export default function App() {
         onImport={doImport}
         onExport={doExport}
         onSettings={() => setShowSettings(true)}
+        onTelegram={platform.telegram ? () => setShowTelegram(true) : undefined}
         onRunAi={() => processAll(lib)}
         onStop={() => abortRef.current?.abort()}
         onEdit={edit}
       />
       {settingsDialog}
+      {showTelegram && platform.telegram && (
+        <TelegramDialog tg={platform.telegram} cards={lib.cards} running={sendingTg} onStart={sendTelegram} onClose={() => setShowTelegram(false)} />
+      )}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
