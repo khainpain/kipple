@@ -379,6 +379,9 @@ export const ru = {
     zoom: "Открыть на весь экран",
   },
   detail: {
+    properties: "Свойства карточки",
+    more: "Показать полностью",
+    less: "Свернуть",
     resize: "Потяните, чтобы изменить ширину. Двойной клик — исходная ширина",
     label: "Карточка",
     prev: "Предыдущая (↑)",
@@ -523,10 +526,21 @@ export const ru = {
     onInstagram: (author: string) => `${author} в Instagram`,
   },
 
+  player: {
+    play: "Смотреть видео",
+    showPost: "Показать пост",
+    hint: (site: string) => `Смотреть здесь · загрузится с ${site}`,
+    post: (site: string) => `Показать пост · загрузится с ${site}`,
+  },
+
   demo: {
     chatName: "Избранное (демо)",
     topics: ["Дизайн", "Программирование", "Еда", "Путешествия", "Финансы"],
     article: (i: number) => `Статья номер ${i}`,
+    // Instagram writes its page title like this whatever the language; the app splits it up.
+    reelTitle: "Анна готовит on Instagram: \"Паста за 10 минут 🍝\nСоус готов, пока закипает вода. Нужны всего три вещи: томаты, чеснок и хорошее оливковое масло. Рецепт в описании, сохраняйте!\"",
+    reelDescription: "12K likes, 340 comments - anna.gotovit on May 1, 2026: \"Паста за 10 минут 🍝\nСоус готов, пока закипает вода. Нужны всего три вещи: томаты, чеснок и хорошее оливковое масло. Рецепт в описании, сохраняйте!\". ",
+    videoTitle: "Как устроен Telegram изнутри",
     card: (i: number, kind: string) => `Карточка ${i}: ${kind}`,
     summary: "Короткое описание того, что здесь сохранено и зачем к этому вернуться.",
     groups: ["Цвет и шрифты", "Сетки и вёрстка"],

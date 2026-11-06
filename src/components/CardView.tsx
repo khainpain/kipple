@@ -5,7 +5,7 @@ import { T, formatNumber, locale } from "../i18n";
 import { mediaUrl } from "../lib/importer";
 import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic } from "../lib/library";
 import { domainOf } from "../lib/rules";
-import { instantImage } from "../lib/embeds";
+import { instantImage, isVideoLink, linkText } from "../lib/embeds";
 import { isImportant } from "../lib/smart";
 import { TopicMenu } from "./TopicMenu";
 import { Icon } from "./Icon";
@@ -96,7 +96,8 @@ export function displayTitle(card: Card): string {
 
 function excerptOf(card: Card): string {
   const title = displayTitle(card);
-  const s = card.ai?.summary || card.link?.description || card.text;
+  const link = linkText(card.link);
+  const s = card.ai?.summary || link.description || link.author || card.text;
   if (!s || s.trim() === title.trim() || card.kind === "sticker") return "";
   return s.slice(0, 320);
 }
@@ -132,6 +133,11 @@ function Cover({ lib, card, view }: { lib: Library; card: Card; view: ViewKey })
         style={!fixed && c.ratio ? { aspectRatio: String(Math.max(c.ratio, 1 / 1.6)) } : undefined}
         onError={() => setFailed(true)}
       />
+      {card.kind === "link" && isVideoLink(card.urls[0]) && (
+        <span className="play-mark" aria-hidden="true">
+          <Icon name="play" size={view === "list" ? 14 : 20} />
+        </span>
+      )}
       {card.album && <span className="badge-corner">+{formatNumber(card.album.length)}</span>}
       {card.media?.duration && (card.kind === "video" || card.kind === "animation") ? <span className="badge-corner">{formatDuration(card.media.duration)}</span> : null}
     </div>

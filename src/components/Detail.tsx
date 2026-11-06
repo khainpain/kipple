@@ -7,6 +7,8 @@ import { Icon } from "./Icon";
 import { coverOf, displayTitle, siteOf } from "./CardView";
 import { SiteIcon } from "./SiteIcon";
 import { Preview } from "./Preview";
+import { LinkPlayer } from "./LinkPlayer";
+import { embedOf, linkText } from "../lib/embeds";
 import { Gallery } from "./Gallery";
 import { isImportant } from "../lib/smart";
 import { OPEN_MODES, PANEL_WIDTH, clampPanelWidth, hueOf, loadPanelWidth, savePref, type OpenMode } from "./nav";
@@ -47,6 +49,11 @@ export function Detail(props: {
   const photos = card.kind === "photo" ? [card.media, ...(card.album ?? [])].filter((m): m is MediaRef => !!m?.path) : [];
   const cover = card.kind !== "photo" ? coverOf(lib, card).src : undefined;
   const site = siteOf(card);
+  const embed = card.kind === "link" ? embedOf(card.urls[0]) : undefined;
+  const linked = linkText(card.link);
+  // The page's own description (an Instagram caption, a video blurb), unless it just repeats the heading.
+  const description = linked.description && linked.description.trim() !== (title || linked.title || "").trim() ? linked.description : undefined;
+  const [moreDesc, setMoreDesc] = useState(false);
   // A one-liner like "Important, safety": the message itself is the heading, and the AI
   // title and summary (often longer than the message) step back.
   const text = card.text?.trim() ?? "";
@@ -190,19 +197,27 @@ export function Detail(props: {
 
       <div className="detail-scroll">
         <div className="detail-body">
+        <div className="detail-main">
+        <div className="d-media">
         {photos.length > 0 && (
           <Gallery lib={lib} items={photos} />
         )}
-        {cover && <img className="detail-cover" src={cover} alt="" onError={(e) => (e.currentTarget.style.display = "none")} />}
+        {embed ? (
+          <LinkPlayer embed={embed} cover={cover} />
+        ) : (
+          cover && <img className="detail-cover" src={cover} alt="" onError={(e) => (e.currentTarget.style.display = "none")} />
+        )}
         {site && (
           <div className="detail-site">
             <SiteIcon url={card.urls[0]} favicon={card.link?.favicon} />
-            {site}
+            {[site, linked.author].filter(Boolean).join(" · ")}
           </div>
         )}
 
         <Preview lib={lib} card={card} />
+        </div>
 
+        <div className="d-head">
         {short ? (
           <>
             <p className="detail-lead">{text}</p>
@@ -240,10 +255,38 @@ export function Detail(props: {
                 )}
               </div>
             )}
-            {card.ai?.summary && <p className="detail-summary">{card.ai.summary}</p>}
+            {card.ai?.summary && !description && <p className="detail-summary">{card.ai.summary}</p>}
           </>
         )}
+        {description && (
+          <div className={`detail-desc${moreDesc ? " open" : ""}`}>
+            <p>{description}</p>
+            {description.length > 280 && (
+              <button className="link-btn" onClick={() => setMoreDesc(!moreDesc)}>
+                {moreDesc ? T.detail.less : T.detail.more}
+              </button>
+            )}
+          </div>
+        )}
+        </div>
+        <div className="d-rest">
+        {card.urls.length > 0 && (
+          <div className="field">
+            <span>{T.detail.links}</span>
+            <div className="links">
+              {card.urls.map((u) => (
+                <a key={u} href="#" onClick={(e) => (e.preventDefault(), platform.openUrl(u))}>
+                  {u}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+        {!short && text && <pre className="orig-full" aria-label={T.detail.message}>{card.text}</pre>}
+        </div>
+        </div>
 
+        <aside className="detail-side" aria-label={T.detail.properties}>
         <div className="props">
           <PropRow icon="flag" label={T.detail.status} id="detail-status-label">
             <StatusChip value={action} labelledBy="detail-status-label" onChange={(a) => props.onEdit({ action: a })} />
@@ -292,19 +335,6 @@ export function Detail(props: {
           </PropRow>
         </div>
 
-        {card.urls.length > 0 && (
-          <div className="field">
-            <span>{T.detail.links}</span>
-            <div className="links">
-              {card.urls.map((u) => (
-                <a key={u} href="#" onClick={(e) => (e.preventDefault(), platform.openUrl(u))}>
-                  {u}
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-        {!short && text && <pre className="orig-full" aria-label={T.detail.message}>{card.text}</pre>}
         <div className="detail-foot">
           <span className="meta">
             {[
@@ -322,6 +352,7 @@ export function Detail(props: {
             {card.user?.hidden ? T.detail.show : T.detail.hide}
           </button>
         </div>
+        </aside>
         </div>
       </div>
     </aside>

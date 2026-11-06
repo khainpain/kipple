@@ -54,6 +54,24 @@ export function demoLibrary(): Library {
         model: "demo",
         at: "",
       };
+    // A saved Instagram reel and a YouTube video, to show the in-card player.
+    if (i === 2) {
+      c.kind = "link";
+      c.media = undefined;
+      c.album = undefined;
+      c.urls = ["https://www.instagram.com/reel/C9demoReel1/"];
+      c.text = c.urls[0];
+      c.link = { url: c.urls[0], title: D.reelTitle, description: D.reelDescription, siteName: "Instagram", image: swatch(330, 720, 1280), fetchedAt: "" };
+      c.ai = undefined; // not tagged yet: the heading comes from the caption
+    }
+    if (i === 13) {
+      c.kind = "link";
+      c.media = undefined;
+      c.album = undefined;
+      c.urls = ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"];
+      c.text = c.urls[0];
+      c.link = { url: c.urls[0], title: D.videoTitle, description: "Kipple Lab", siteName: "YouTube", fetchedAt: "" };
+    }
     // Spread over the last two months, so "Recent" has something but not everything.
     c.date = new Date(Date.now() - 60 * 864e5 + i * 864e5 + (i % 5) * 3_600_000).toISOString();
     return c;
