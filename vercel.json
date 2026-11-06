@@ -5,6 +5,25 @@
   "buildCommand": "npm run build:web",
   "outputDirectory": "dist",
   "functions": {
-    "api/claude/v1/messages.ts": { "maxDuration": 300 }
-  }
+    "api/claude/v1/messages.ts": {
+      "maxDuration": 300
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/download",
+      "destination": "/api/download"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/img/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        }
+      ]
+    }
+  ]
 }

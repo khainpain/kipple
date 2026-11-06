@@ -1,0 +1,118 @@
+// Landing page copy, English and Russian. Short on purpose: the page shows, the app explains.
+// **bold** works. {ver} and {size} are filled in at build time from the latest GitHub release.
+
+export const en = {
+  lang: "en",
+  locale: "en_US",
+  path: "/",
+  title: "Kipple: Telegram Saved Messages organizer for Windows",
+  description: "Turn Telegram Saved Messages into a searchable board of cards with topics, tags and read-later lists. Free, open source, stays on your PC.",
+  ogTitle: "Kipple: tame your Telegram Saved Messages",
+  ogDescription: "Links, photos, videos and notes from Saved Messages as a board you can search. Free Windows app, fully local.",
+  ogAlt: "Kipple showing Telegram Saved Messages as a grid of cards with topics and tags",
+  skip: "Skip to content",
+  other: "Русский",
+  hero: {
+    title: "Tame your Saved Messages",
+    sub: "Kipple turns the endless Telegram feed into a board you can search. Free, for Windows, and it all stays on your PC.",
+    download: "Download for Windows",
+    demo: "Try it in the browser",
+    meta: ["Windows 10 and 11", "{size}", "v{ver}"],
+    replay: "Mess it up again",
+  },
+  pile: {
+    link1: "Postgres indexes, explained",
+    video: "10-minute pasta",
+    note1: "wifi: correct-horse",
+    link2: "Lisbon in 3 days",
+    note2: "Idea: a bot that sends three random saves a week",
+    link3: "Fewer tabs, more focus",
+    pdf: "report.pdf",
+    voice: "0:07",
+    topics: ["Programming", "Food", "Travel", "Ideas"],
+  },
+  started: "Downloading. If Windows warns you, click **More info**, then **Run anyway**.",
+  notWindows: "Kipple is Windows-only for now. The demo works anywhere.",
+  points: [
+    ["Find it", "Search text, links and file names."],
+    ["Sort it", "Topics, tags, read later, ideas, todos."],
+    ["Clean it", "Duplicates found and merged in a click."],
+  ],
+  shot: {
+    alt: "Kipple window: Telegram Saved Messages as a grid of cards with titles, statuses and tags, and topics in the sidebar",
+    cta: "Open the live demo",
+  },
+  privacy: ["Stays on your PC", "No account", "AI off until you allow it", "Open source"],
+  faq: {
+    title: "Questions",
+    items: [
+      ["Windows says “Windows protected your PC”", "The installer isn't code-signed yet. Click **More info**, then **Run anyway**. The source and the build are public on GitHub."],
+      ["Mac or Linux?", "Not yet. The demo runs in any browser."],
+      ["Can Telegram ban me for this?", "Kipple signs in through Telegram's official API like any other client and only reads your Saved Messages. Prefer not to sign in? Import a Telegram Desktop export instead."],
+      ["What does the AI send?", "Nothing, unless you turn it on. Then message text goes to Claude by Anthropic for tags and topics. Messages that look like passwords or card numbers never do."],
+    ],
+  },
+  closing: { title: "Tame your kipple", text: "Kipple is Philip K. Dick's word for junk that multiplies by itself." },
+  footer: {
+    note: "Independent open-source project, not affiliated with Telegram.",
+    links: [["GitHub", "repo"], ["Releases", "releases"], ["Report a bug", "issues"]],
+  },
+};
+
+export const ru = {
+  lang: "ru",
+  locale: "ru_RU",
+  path: "/ru/",
+  title: "Kipple: органайзер «Избранного» Telegram для Windows",
+  description: "Kipple превращает «Избранное» Telegram в доску карточек с поиском, темами и тегами. Бесплатно, открытый код, всё хранится на твоём компьютере.",
+  ogTitle: "Kipple: приручи «Избранное» Telegram",
+  ogDescription: "Ссылки, фото, видео и заметки из «Избранного» в виде доски с поиском. Бесплатно для Windows, работает локально.",
+  ogAlt: "Kipple: «Избранное» Telegram в виде сетки карточек с темами и тегами",
+  skip: "К содержанию",
+  other: "English",
+  hero: {
+    title: "Приручи своё «Избранное»",
+    sub: "Kipple превращает бесконечную ленту Telegram в доску с поиском. Бесплатно, для Windows, и всё остаётся у тебя на компьютере.",
+    download: "Скачать для Windows",
+    demo: "Попробовать в браузере",
+    meta: ["Windows 10 и 11", "{size}", "v{ver}"],
+    replay: "Устроить бардак снова",
+  },
+  pile: {
+    link1: "Индексы в Postgres",
+    video: "Паста за 10 минут",
+    note1: "wifi: correct-horse",
+    link2: "Лиссабон за 3 дня",
+    note2: "Идея: бот, который раз в неделю присылает три случайные сохранёнки",
+    link3: "Меньше вкладок, больше фокуса",
+    pdf: "отчёт.pdf",
+    voice: "0:07",
+    topics: ["Код", "Еда", "Поездки", "Идеи"],
+  },
+  started: "Скачивается. Если Windows предупредит, нажми **Подробнее**, затем **Выполнить в любом случае**.",
+  notWindows: "Пока Kipple только для Windows. Демо работает где угодно.",
+  points: [
+    ["Найди", "Поиск по тексту, ссылкам и файлам."],
+    ["Разложи", "Темы, теги, «прочитать позже», идеи, задачи."],
+    ["Почисти", "Дубли находятся и сливаются в один клик."],
+  ],
+  shot: {
+    alt: "Окно Kipple: «Избранное» Telegram в виде сетки карточек с заголовками, статусами и тегами, слева список тем",
+    cta: "Открыть живое демо",
+  },
+  privacy: ["Всё на твоём компьютере", "Без регистрации", "AI выключен, пока не разрешишь", "Открытый код"],
+  faq: {
+    title: "Вопросы",
+    items: [
+      ["Windows пишет «Система Windows защитила ваш компьютер»", "У установщика пока нет цифровой подписи. Нажми **Подробнее**, затем **Выполнить в любом случае**. Код и сборка открыты на GitHub."],
+      ["А для Mac или Linux?", "Пока нет. Демо работает в любом браузере."],
+      ["Telegram не заблокирует аккаунт?", "Kipple входит через официальный API Telegram, как обычный клиент, и читает только «Избранное». Не хочешь входить? Загрузи экспорт из Telegram Desktop."],
+      ["Что отправляет AI?", "Ничего, пока ты его не включишь. Тогда текст сообщений уходит в Claude от Anthropic за темами и тегами. Сообщения, похожие на пароли и номера карт, не уходят никогда."],
+    ],
+  },
+  closing: { title: "Tame your kipple", text: "Kipple у Филипа К. Дика: хлам, который размножается сам." },
+  footer: {
+    note: "Независимый проект с открытым кодом, не связан с Telegram.",
+    links: [["GitHub", "repo"], ["Версии", "releases"], ["Сообщить об ошибке", "issues"]],
+  },
+};
