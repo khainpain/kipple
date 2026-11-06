@@ -197,6 +197,8 @@ export function Detail(props: {
 
       <div className="detail-scroll">
         <div className="detail-body">
+        <div className="detail-main">
+        <div className="d-media">
         {photos.length > 0 && (
           <Gallery lib={lib} items={photos} />
         )}
@@ -213,7 +215,9 @@ export function Detail(props: {
         )}
 
         <Preview lib={lib} card={card} />
+        </div>
 
+        <div className="d-head">
         {short ? (
           <>
             <p className="detail-lead">{text}</p>
@@ -264,7 +268,25 @@ export function Detail(props: {
             )}
           </div>
         )}
+        </div>
+        <div className="d-rest">
+        {card.urls.length > 0 && (
+          <div className="field">
+            <span>{T.detail.links}</span>
+            <div className="links">
+              {card.urls.map((u) => (
+                <a key={u} href="#" onClick={(e) => (e.preventDefault(), platform.openUrl(u))}>
+                  {u}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+        {!short && text && <pre className="orig-full" aria-label={T.detail.message}>{card.text}</pre>}
+        </div>
+        </div>
 
+        <aside className="detail-side" aria-label={T.detail.properties}>
         <div className="props">
           <PropRow icon="flag" label={T.detail.status} id="detail-status-label">
             <StatusChip value={action} labelledBy="detail-status-label" onChange={(a) => props.onEdit({ action: a })} />
@@ -313,19 +335,6 @@ export function Detail(props: {
           </PropRow>
         </div>
 
-        {card.urls.length > 0 && (
-          <div className="field">
-            <span>{T.detail.links}</span>
-            <div className="links">
-              {card.urls.map((u) => (
-                <a key={u} href="#" onClick={(e) => (e.preventDefault(), platform.openUrl(u))}>
-                  {u}
-                </a>
-              ))}
-            </div>
-          </div>
-        )}
-        {!short && text && <pre className="orig-full" aria-label={T.detail.message}>{card.text}</pre>}
         <div className="detail-foot">
           <span className="meta">
             {[
@@ -343,6 +352,7 @@ export function Detail(props: {
             {card.user?.hidden ? T.detail.show : T.detail.hide}
           </button>
         </div>
+        </aside>
         </div>
       </div>
     </aside>

@@ -1240,7 +1240,7 @@ code {
   padding: 5vh 24px;
 }
 .detail-panel.mode-center {
-  width: min(880px, 100%);
+  width: min(1040px, 100%);
   max-height: 90vh;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -1264,11 +1264,11 @@ code {
   width: 100%;
 }
 .detail-panel.mode-center .detail-body {
-  max-width: 760px;
+  max-width: 980px;
   margin: 0 auto;
 }
 .detail-panel.mode-full .detail-body {
-  max-width: 900px;
+  max-width: 1120px;
   margin: 0 auto;
 }
 .detail-panel.mode-center .detail-title,
@@ -1755,6 +1755,10 @@ code {
   font-size: 12px;
   border-radius: 6px;
   padding: 3px 8px;
+  max-width: calc(100% - 16px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .detail-desc p {
   margin: -6px 0 0;
@@ -1865,6 +1869,78 @@ code {
 .detail-summary {
   color: var(--muted);
   font-size: 13.5px;
+}
+
+/*
+ * Opened card layout. Narrow (side panel): one column — media, heading, properties,
+ * links and message, footer. Wide: content on the left, properties and footer in a
+ * column on the right that stays in view while the left side scrolls.
+ */
+.detail-scroll {
+  container-type: inline-size;
+}
+.detail-main,
+.detail-side {
+  display: contents;
+}
+.d-media,
+.d-head,
+.d-rest {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.d-media:empty,
+.d-rest:empty {
+  display: none;
+}
+.d-media {
+  order: 1;
+}
+.d-head {
+  order: 2;
+}
+.detail-side .props {
+  order: 3;
+}
+.d-rest {
+  order: 4;
+}
+.detail-side .detail-foot {
+  order: 5;
+}
+@container (min-width: 720px) {
+  .detail-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 280px;
+    column-gap: 32px;
+    align-items: start;
+  }
+  .detail-main,
+  .detail-side {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+  }
+  .detail-side {
+    position: sticky;
+    top: 0;
+    padding-left: 24px;
+    border-left: 1px solid var(--line);
+  }
+  .detail-side .props {
+    column-gap: 12px;
+  }
+  .detail-side .detail-foot {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  /* Keep the heading of an upright video in view next to the properties. */
+  .link-player.vertical {
+    height: min(52vh, 460px);
+  }
 }
 
 /* Card settings as compact property rows (status, topic, tags, note) */

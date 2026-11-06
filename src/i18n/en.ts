@@ -351,6 +351,7 @@ export const en: Dict = {
     zoom: "Open full screen",
   },
   detail: {
+    properties: "Card properties",
     more: "Show more",
     less: "Show less",
     resize: "Drag to resize. Double-click to reset",
