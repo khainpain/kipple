@@ -315,15 +315,17 @@ export function Workspace(props: {
 
       <section className="content">
         <header className="toolbar">
-          <button className="icon-btn" onClick={() => setSideOpen(!sideOpen)} title={sideOpen ? T.toolbar.hideSidebar : T.toolbar.showSidebar}>
-            <Icon name="sidebar" />
-          </button>
-          <div className="heading">
-            <h1>{heading}</h1>
-            <span className="count">
-              {formatNumber(visible.length)}
-              {subtitle && <> · {subtitle}</>}
-            </span>
+          <div className="toolbar-start">
+            <button className="icon-btn" onClick={() => setSideOpen(!sideOpen)} title={sideOpen ? T.toolbar.hideSidebar : T.toolbar.showSidebar}>
+              <Icon name="sidebar" />
+            </button>
+            <div className="heading" title={heading}>
+              <h1>{heading}</h1>
+              <span className="count">
+                {formatNumber(visible.length)}
+                {subtitle && <> · {subtitle}</>}
+              </span>
+            </div>
           </div>
           <label className="search">
             <Icon name="search" />
@@ -336,51 +338,52 @@ export function Workspace(props: {
               <kbd>/</kbd>
             )}
           </label>
-          <div className="spacer" />
-          {props.job ? (
-            <span className="job">
-              <span className="progress" style={{ "--p": `${Math.round((props.job.done / Math.max(props.job.total, 1)) * 100)}%` } as React.CSSProperties} />
-              {props.job.label} {formatNumber(props.job.done)}/{formatNumber(props.job.total)}
-              <button className="secondary small-btn" onClick={props.onStop}>
-                {T.common.stop}
-              </button>
-            </span>
-          ) : (
-            props.needAi > 0 &&
-            props.aiEnabled && (
-              <button className="secondary small-btn" onClick={props.onRunAi} title={T.toolbar.runAiHint}>
-                <Icon name="sparkle" size={14} /> {T.toolbar.runAi(props.needAi)}
-              </button>
-            )
-          )}
-          {props.onImport && (
-            <button className="icon-btn" onClick={props.onImport} title={T.toolbar.import}>
-              <Icon name="import" />
-            </button>
-          )}
-          <div className="menu-wrap">
-            <button className="icon-btn" onClick={() => setExportOpen(!exportOpen)} title={T.toolbar.export}>
-              <Icon name="export" />
-            </button>
-            {exportOpen && (
-              <div className="menu" onMouseLeave={() => setExportOpen(false)}>
-                <small>{selected.size ? T.toolbar.exportSelected(exportCards.length) : T.toolbar.exportAll(exportCards.length)}</small>
-                <button onClick={() => (setExportOpen(false), props.onExport("md", exportCards))}>Markdown</button>
-                <button onClick={() => (setExportOpen(false), props.onExport("csv", exportCards))}>CSV</button>
-              </div>
+          <div className="toolbar-end">
+            {props.job ? (
+              <span className="job">
+                <span className="progress" style={{ "--p": `${Math.round((props.job.done / Math.max(props.job.total, 1)) * 100)}%` } as React.CSSProperties} />
+                {props.job.label} {formatNumber(props.job.done)}/{formatNumber(props.job.total)}
+                <button className="secondary small-btn" onClick={props.onStop}>
+                  {T.common.stop}
+                </button>
+              </span>
+            ) : (
+              props.needAi > 0 &&
+              props.aiEnabled && (
+                <button className="secondary small-btn" onClick={props.onRunAi} title={T.toolbar.runAiHint}>
+                  <Icon name="sparkle" size={14} /> {T.toolbar.runAi(props.needAi)}
+                </button>
+              )
             )}
-          </div>
-          {props.onTelegram && (
-            <button className="icon-btn" onClick={props.onTelegram} title={T.toolbar.telegram(BOARD_TITLE)}>
-              <Icon name="send" />
+            {props.onImport && (
+              <button className="icon-btn" onClick={props.onImport} title={T.toolbar.import}>
+                <Icon name="import" />
+              </button>
+            )}
+            <div className="menu-wrap">
+              <button className="icon-btn" onClick={() => setExportOpen(!exportOpen)} title={T.toolbar.export}>
+                <Icon name="export" />
+              </button>
+              {exportOpen && (
+                <div className="menu" onMouseLeave={() => setExportOpen(false)}>
+                  <small>{selected.size ? T.toolbar.exportSelected(exportCards.length) : T.toolbar.exportAll(exportCards.length)}</small>
+                  <button onClick={() => (setExportOpen(false), props.onExport("md", exportCards))}>Markdown</button>
+                  <button onClick={() => (setExportOpen(false), props.onExport("csv", exportCards))}>CSV</button>
+                </div>
+              )}
+            </div>
+            {props.onTelegram && (
+              <button className="icon-btn" onClick={props.onTelegram} title={T.toolbar.telegram(BOARD_TITLE)}>
+                <Icon name="send" />
+              </button>
+            )}
+            <button className="icon-btn" onClick={() => setThemePref(nextThemePref(theme))} title={T.theme.toggle(THEME_LABELS[theme])}>
+              <Icon name={THEME_ICONS[theme]} />
             </button>
-          )}
-          <button className="icon-btn" onClick={() => setThemePref(nextThemePref(theme))} title={T.theme.toggle(THEME_LABELS[theme])}>
-            <Icon name={THEME_ICONS[theme]} />
-          </button>
-          <button className="icon-btn" onClick={props.onSettings} title={T.toolbar.settings}>
-            <Icon name="settings" />
-          </button>
+            <button className="icon-btn" onClick={props.onSettings} title={T.toolbar.settings}>
+              <Icon name="settings" />
+            </button>
+          </div>
         </header>
 
         {home ? (
