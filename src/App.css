@@ -7,6 +7,8 @@
   --muted: #77726a;
   --line: #e3dfd7;
   --hover: rgba(35, 33, 30, 0.06);
+  --scroll-thumb: rgba(35, 33, 30, 0.18);
+  --scroll-thumb-hover: rgba(35, 33, 30, 0.34);
   --accent: #d9573b;
   --accent-ink: #b8432a;
   --accent-soft: #fbe7e0;
@@ -53,6 +55,8 @@
   color: var(--ink);
   background: var(--bg);
   color-scheme: light;
+  /* Native checkboxes and radios take the accent instead of the system blue. */
+  accent-color: var(--accent);
 }
 /* public/theme-init.js and src/lib/theme.ts set data-theme from the user's choice (or the OS). */
 :root[data-theme="dark"] {
@@ -64,6 +68,8 @@
   --muted: #9d978e;
   --line: #36332f;
   --hover: rgba(255, 250, 240, 0.06);
+  --scroll-thumb: rgba(255, 250, 240, 0.16);
+  --scroll-thumb-hover: rgba(255, 250, 240, 0.32);
   --accent: #f07a5f;
   --accent-ink: #f59a84;
   --accent-soft: #3a2621;
@@ -86,6 +92,37 @@
 }
 * {
   box-sizing: border-box;
+}
+/* Scrollbars: thin, no arrows, a soft rounded thumb that darkens on hover, same in every
+   scrolling area. WebView2/Chromium uses the ::-webkit-scrollbar rules (they give a padded,
+   rounded thumb); other engines fall back to the standard properties. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  min-height: 32px;
+}
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--scroll-thumb-hover);
+}
+::-webkit-scrollbar-button {
+  display: none;
+}
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scroll-thumb) transparent;
+  }
 }
 html,
 body,
@@ -504,6 +541,84 @@ code {
   padding: 7px 8px;
 }
 .menu button:hover {
+  background: var(--hover);
+}
+
+/* App-styled select (replaces native <select>): looks like an input, opens a .menu list */
+.select {
+  width: 100%;
+}
+.select-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 10px;
+}
+.select-btn:hover {
+  border-color: var(--muted);
+}
+.select-btn.open {
+  border-color: var(--muted);
+}
+.select-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.select-btn .label,
+.select-menu .label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.select-btn .chev {
+  color: var(--muted);
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+.select-btn.open .chev {
+  transform: rotate(180deg);
+}
+.select-btn .topic-dot {
+  margin: 0;
+}
+.select-btn .placeholder {
+  color: var(--muted);
+}
+.select-menu {
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 40;
+  max-height: 260px;
+  overflow-y: auto;
+  gap: 1px;
+}
+.select-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 7px;
+  font-size: 13.5px;
+}
+.select-menu button.on {
+  font-weight: 600;
+}
+.select-menu button .icon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.select-menu button:focus-visible,
+.topic-menu button:focus-visible {
+  outline: none;
   background: var(--hover);
 }
 
