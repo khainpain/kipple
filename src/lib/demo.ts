@@ -30,7 +30,9 @@ export function demoLibrary(): Library {
       c.link = undefined;
       const [w, h] = i % 2 ? [800, 1000] : [1200, 800];
       c.media = { ...c.media, path: swatch(i * 53, w, h), width: w, height: h, missing: false };
-      c.album = undefined;
+      // Some photos are albums of phone screenshots, to show the carousel.
+      c.album = i % 18 === 2 ? [1, 2, 3, 4].map((k) => ({ path: swatch(i * 53 + k * 40, 390, 844), width: 390, height: 844 })) : undefined;
+      if (c.album) c.media = { ...c.media, path: swatch(i * 53, 390, 844), width: 390, height: 844 };
     }
     if (c.kind === "document") {
       const txt = i % 2 === 1;
