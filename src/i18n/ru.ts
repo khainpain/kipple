@@ -329,6 +329,13 @@ export const ru = {
     sizeUnits: ["Б", "КБ", "МБ", "ГБ"],
   },
 
+  gallery: {
+    label: "Фотографии",
+    of: (i: number, n: number) => `${i} из ${n}`,
+    prev: "Предыдущее фото (←)",
+    next: "Следующее фото (→)",
+    zoom: "Открыть на весь экран",
+  },
   detail: {
     label: "Карточка",
     prev: "Предыдущая (↑)",

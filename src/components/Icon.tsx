@@ -29,6 +29,7 @@ const PATHS: Record<string, string> = {
   up: "M6 15l6-6 6 6",
   down: "M6 9l6 6 6-6",
   right: "M9 6l6 6-6 6",
+  left: "M15 6l-6 6 6 6",
   restore: "M4 12a8 8 0 1 0 3-6.2M4 4v4h4",
   select: "M4 4h16v16H4zM8 12l3 3 5-6",
   music: "M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM20 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z",

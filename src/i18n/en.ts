@@ -322,6 +322,13 @@ export const en: Dict = {
     sizeUnits: ["B", "KB", "MB", "GB"],
   },
 
+  gallery: {
+    label: "Photos",
+    of: (i: number, n: number) => `${i} of ${n}`,
+    prev: "Previous photo (←)",
+    next: "Next photo (→)",
+    zoom: "Open full screen",
+  },
   detail: {
     label: "Card",
     prev: "Previous (↑)",

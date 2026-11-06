@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { platform } from "@platform";
-import type { Action, Card, Library, UserFields } from "../lib/types";
+import type { Action, Card, Library, MediaRef, UserFields } from "../lib/types";
 import { ACTIONS, actionLabel } from "../lib/types";
 import { T, locale } from "../i18n";
-import { mediaUrl } from "../lib/importer";
 import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic } from "../lib/library";
 import { Icon } from "./Icon";
 import { coverOf, displayTitle, siteOf } from "./CardView";
 import { Preview } from "./Preview";
+import { Gallery } from "./Gallery";
 import { isImportant } from "../lib/smart";
 import { OPEN_MODES, type OpenMode } from "./nav";
 
@@ -34,7 +34,7 @@ export function Detail(props: {
   const [tags, setTags] = useState(effectiveTags(card).join(", "));
   const [note, setNote] = useState(card.user?.note ?? "");
   const action = effectiveAction(card);
-  const photos = card.kind === "photo" ? [card.media, ...(card.album ?? [])].filter((m) => m?.path) : [];
+  const photos = card.kind === "photo" ? [card.media, ...(card.album ?? [])].filter((m): m is MediaRef => !!m?.path) : [];
   const cover = card.kind !== "photo" ? coverOf(lib, card).src : undefined;
   const site = siteOf(card);
 
@@ -94,11 +94,7 @@ export function Detail(props: {
       <div className="detail-scroll">
         <div className="detail-body">
         {photos.length > 0 && (
-          <div className="detail-photos">
-            {photos.map((m) => (
-              <img key={m!.path} src={mediaUrl(lib, m!.path)} alt="" />
-            ))}
-          </div>
+          <Gallery lib={lib} items={photos} />
         )}
         {cover && <img className="detail-cover" src={cover} alt="" onError={(e) => (e.currentTarget.style.display = "none")} />}
         {site && <div className="detail-site">{site}</div>}
