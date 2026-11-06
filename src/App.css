@@ -1310,7 +1310,8 @@ code {
   background: var(--accent-soft);
   color: var(--ink);
 }
-.banner.update {
+.banner.update,
+.banner.demo {
   background: var(--accent-soft);
   border-bottom-color: var(--accent);
   color: var(--ink);

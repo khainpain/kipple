@@ -38,7 +38,10 @@ export default function App() {
   updatingRef.current = updating;
   const { update, later: updateLater } = useUpdateCheck(() => updatingRef.current !== false);
   const abortRef = useRef<AbortController | null>(null);
-  /** Desktop demo: lives only in memory, so it never mixes with a real import or edit log. */
+  /**
+   * The demo is a sealed sandbox: only in memory, never saved, no import, AI or Telegram,
+   * so nothing done in it can touch the real library. "Exit demo" goes back to the start.
+   */
   const [demo, setDemo] = useState(false);
   const demoRef = useRef(demo);
   demoRef.current = demo;
@@ -239,12 +242,17 @@ export default function App() {
 
   async function openDemo() {
     const next = demoLibrary();
-    // The browser build keeps the demo between visits; the desktop app only shows it, and
-    // the next import replaces it instead of merging into it.
-    if (isWeb) await saveLibrary(next);
-    else setDemo(true);
+    demoRef.current = true;
+    setDemo(true);
     setLib(next);
     setRev((r) => r + 1);
+  }
+
+  function exitDemo() {
+    abortRef.current?.abort();
+    demoRef.current = false;
+    setDemo(false);
+    setLib(null);
   }
 
   const edit = useCallback(
@@ -315,7 +323,7 @@ export default function App() {
   /** Saves the settings, then tags every already tagged card again with the chosen model. */
   async function onRetag(s: Settings, key: string | null) {
     await onSaveSettings(s, key);
-    if (!lib) return;
+    if (!lib || demoRef.current) return;
     const old = new Map<Card, NonNullable<Card["ai"]>>();
     for (const c of lib.cards) {
       if (!c.ai) continue;
@@ -344,13 +352,21 @@ export default function App() {
   if (loading) return <div className="center">{T.common.loading}</div>;
 
   const needAi = lib ? pendingForAi(lib.cards).length + (settings.aiImages ? pendingImages(lib.cards).length : 0) : 0;
-  const settingsDialog = showSettings && <SettingsDialog settings={settings} hasKey={hasKey} version={version} onSave={onSaveSettings} onRetag={onRetag} retagCount={lib ? retagCount(lib.cards) : 0} onWipe={onWipe} onClose={() => setShowSettings(false)} />;
+  const settingsDialog = showSettings && <SettingsDialog settings={settings} hasKey={hasKey} version={version} onSave={onSaveSettings} onRetag={onRetag} retagCount={lib && !demo ? retagCount(lib.cards) : 0} onWipe={onWipe} onClose={() => setShowSettings(false)} />;
 
   const banners = (
     <>
       {isWeb && (
         <div className="banner web">
           {T.app.webBanner(version)}
+        </div>
+      )}
+      {demo && (
+        <div className="banner demo">
+          {T.app.demoBanner}
+          <button className="small" onClick={exitDemo}>
+            {T.app.demoExit}
+          </button>
         </div>
       )}
       {update && (
@@ -398,14 +414,14 @@ export default function App() {
         lib={lib}
         rev={rev}
         job={job}
-        needAi={needAi}
+        needAi={demo ? 0 : needAi}
         aiEnabled={settings.aiEnabled}
-        onImport={doImport}
+        onImport={demo ? undefined : doImport}
         onExport={doExport}
         onSettings={() => setShowSettings(true)}
         onTelegram={platform.telegram && !demo ? () => setShowTelegram(true) : undefined}
         onRunAi={() => processAll(lib)}
-        onNameImage={settings.aiEnabled && hasKey ? nameOne : undefined}
+        onNameImage={settings.aiEnabled && hasKey && !demo ? nameOne : undefined}
         onStop={() => abortRef.current?.abort()}
         onEdit={edit}
       />
