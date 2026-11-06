@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sortCards } from "./nav";
+import { PANEL_WIDTH, clampPanelWidth, sortCards } from "./nav";
 import type { Card } from "../lib/types";
 
 const card = (id: number, text: string, priority?: 1 | 2 | 3): Card => ({
@@ -27,5 +27,19 @@ describe("sortCards", () => {
   });
   it("by priority, unmarked last, newest first within a group", () => {
     expect(ids(sortCards(cards, "priority"))).toEqual([3, 1, 2, 4]);
+  });
+});
+
+describe("clampPanelWidth", () => {
+  it("keeps the wanted width inside the safe zone", () => {
+    expect(clampPanelWidth(500, 1400)).toBe(500);
+    expect(clampPanelWidth(100, 1400)).toBe(PANEL_WIDTH.min);
+    expect(clampPanelWidth(5000, 3000)).toBe(PANEL_WIDTH.max);
+  });
+  it("leaves the board its minimum", () => {
+    expect(clampPanelWidth(900, 1000)).toBe(1000 - PANEL_WIDTH.minBoard);
+  });
+  it("never goes below the panel minimum, even in a tiny window", () => {
+    expect(clampPanelWidth(500, 500)).toBe(PANEL_WIDTH.min);
   });
 });
