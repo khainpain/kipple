@@ -30,7 +30,9 @@ export function demoLibrary(): Library {
       c.link = undefined;
       const [w, h] = i % 2 ? [800, 1000] : [1200, 800];
       c.media = { ...c.media, path: swatch(i * 53, w, h), width: w, height: h, missing: false };
-      c.album = undefined;
+      // Some photos are albums of phone screenshots, to show the carousel.
+      c.album = i % 18 === 2 ? [1, 2, 3, 4].map((k) => ({ path: swatch(i * 53 + k * 40, 390, 844), width: 390, height: 844 })) : undefined;
+      if (c.album) c.media = { ...c.media, path: swatch(i * 53, 390, 844), width: 390, height: 844 };
     }
     if (c.kind === "document") {
       const txt = i % 2 === 1;
@@ -43,7 +45,8 @@ export function demoLibrary(): Library {
       c.ai = {
         title: D.card(i, c.kind),
         summary: D.summary,
-        topic: topics[i % 5],
+        // …and a topic written in lower case, so there's a topic to tidy too.
+        topic: i % 20 === 7 ? topics[i % 5].toLocaleLowerCase() : topics[i % 5],
         // A few cards carry a near-copy of a tag ("reference" next to "references"), for "Tidy up" to find.
         tags: i % 10 === 3 ? [D.tags[0], D.tags[2].slice(0, -1)] : D.tags.slice(0, (i % 3) + 1),
         action: (["read_later", "idea", "reference", "todo"] as const)[i % 4],
@@ -73,6 +76,11 @@ export function demoLibrary(): Library {
     c.date = new Date(Date.now() - 60 * 864e5 + i * 864e5 + (i % 5) * 3_600_000).toISOString();
     return c;
   });
+  // A one-line note, like most real Saved Messages: the AI title and summary say more than the message.
+  const short = structuredClone(base.find((c) => c.kind === "text" && !c.urls.length) ?? base[0]);
+  Object.assign(short, { id: 61, text: D.short.text, urls: [], link: undefined, media: undefined, forwardedFrom: undefined, sensitive: false, autoJunk: false, date: new Date(Date.now() - 3_600_000).toISOString() });
+  short.ai = { title: D.short.title, summary: D.short.summary, topic: D.short.topic, tags: D.short.tags, action: "todo", priority: 2, model: "claude-haiku-5-5", at: "" };
+  cards.push(short);
   cards.reverse(); // the library is kept newest first
   annotateContext(cards);
   // The first topic comes already split into AI subgroups, to show how that looks.

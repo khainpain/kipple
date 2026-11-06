@@ -4,7 +4,7 @@ import type { Card, Library } from "../lib/types";
 import { CardView } from "./CardView";
 import { T } from "../i18n";
 import { instantImage } from "../lib/embeds";
-import type { ViewKey } from "./nav";
+import type { CardLook, ViewKey } from "./nav";
 
 const GAP = 16;
 const MIN_COL: Record<ViewKey, number> = { masonry: 240, grid: 230, list: 0, headlines: 0 };
@@ -38,7 +38,7 @@ export type CardHandlers = {
  * Virtualized board for all four views. Masonry uses the virtualizer's lanes; the uniform
  * grid virtualizes rows so cards line up; list and headlines are a single column.
  */
-export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; /** Instead of the usual "nothing here". */ empty?: { title: string; hint: string } }) {
+export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?: CardLook; /** Instead of the usual "nothing here". */ empty?: { title: string; hint: string } }) {
   const { cards, view } = props;
   const parentRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1000);
@@ -84,6 +84,7 @@ export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; /** I
       lib={props.lib}
       card={c}
       view={view}
+      look={props.look}
       selected={props.selected.has(c.id)}
       selecting={props.selected.size > 0}
       active={props.activeId === c.id}
