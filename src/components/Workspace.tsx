@@ -7,6 +7,7 @@ import { Grid } from "./Grid";
 import { Detail } from "./Detail";
 import { Sidebar } from "./Sidebar";
 import { Icon } from "./Icon";
+import { nextThemePref, setThemePref, THEME_ICONS, THEME_LABELS, useThemePref } from "../lib/theme";
 import {
   SMART_LISTS,
   SORTS,
@@ -45,6 +46,7 @@ export function Workspace(props: {
   const { lib, rev, onEdit } = props;
   const [scope, setScope] = useState<Scope>({ kind: "list", key: "all" });
   const [type, setType] = useState<TypeKey | null>(null);
+  const theme = useThemePref();
   const [tag, setTag] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>(() => loadPref("sort", ["new", "old", "title"] as const, "new"));
@@ -239,6 +241,9 @@ export function Workspace(props: {
               <Icon name="send" />
             </button>
           )}
+          <button className="icon-btn" onClick={() => setThemePref(nextThemePref(theme))} title={`Тема: ${THEME_LABELS[theme].toLowerCase()}. Нажми, чтобы переключить`}>
+            <Icon name={THEME_ICONS[theme]} />
+          </button>
           <button className="icon-btn" onClick={props.onSettings} title="Настройки">
             <Icon name="settings" />
           </button>

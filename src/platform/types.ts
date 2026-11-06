@@ -71,6 +71,8 @@ export interface Platform {
   httpFetch: HttpFetch;
   appVersion(): Promise<string>;
   checkUpdate(): Promise<AvailableUpdate | null>;
+  /** Matches the native title bar to the app theme; null follows the OS. Desktop only. */
+  setWindowTheme?(theme: "light" | "dark" | null): Promise<void>;
   /** Sending the sorted library back to Telegram; only the desktop app can log in to Telegram. */
   telegram?: TelegramApi;
 }

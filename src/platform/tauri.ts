@@ -1,5 +1,6 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { BaseDirectory, exists, mkdir, readTextFile, rename, writeTextFile } from "@tauri-apps/plugin-fs";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
@@ -70,6 +71,7 @@ export const platform: Platform = {
   httpFetch: tauriFetch as HttpFetch,
   telegram,
   appVersion: () => getVersion(),
+  setWindowTheme: (theme) => getCurrentWindow().setTheme(theme),
   async checkUpdate() {
     const update = await check();
     if (!update) return null;
