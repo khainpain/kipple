@@ -34,7 +34,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
+          workspaces: |
+            src-tauri
+            setup-app/src-tauri
       - run: npm ci
       # Signs the update bundle when the signing key secret exists; otherwise builds without update artifacts.
       - name: Build installer
@@ -51,10 +53,14 @@ jobs:
           else
             npx tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}'
           fi
+      - name: Build Kipple Setup (branded first-install window)
+        shell: bash
+        run: setup-app/build.sh
       - uses: actions/upload-artifact@v7
         with:
           name: saved-board-windows
           path: |
             src-tauri/target/release/bundle/nsis/*.exe
             src-tauri/target/release/bundle/msi/*.msi
+            Install-Kipple-*.exe
           if-no-files-found: error
