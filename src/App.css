@@ -1658,3 +1658,59 @@ button.ov-title:hover {
   flex-direction: column;
   gap: 6px;
 }
+
+/* Topics made by hand: "+" in the sidebar, rename/delete from a row's menu */
+.side-row {
+  position: relative;
+}
+.side-row-more {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  transform: translateY(-50%);
+  opacity: 0;
+}
+.side-row:hover .side-row-more,
+.side-row.menu-open .side-row-more,
+.side-row-more:focus-visible {
+  opacity: 1;
+}
+.side-row:hover .side-item small,
+.side-row.menu-open .side-item small {
+  visibility: hidden;
+}
+.side-edit {
+  padding: 2px 6px 2px 10px;
+}
+.side-edit input {
+  padding: 3px 6px;
+  border-radius: 6px;
+}
+.topic-actions button.topic-actions-delete {
+  color: var(--danger);
+}
+.topic-actions button.topic-actions-delete .icon {
+  color: var(--danger);
+}
+.topic-actions-text {
+  margin: 4px 6px 10px;
+  line-height: 1.4;
+}
+.topic-actions-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.topic-actions .topic-actions-row button {
+  padding: 5px 10px;
+}
+.topic-actions .topic-actions-row button.danger {
+  border: 1px solid var(--danger);
+  color: var(--danger);
+}
+.topic-actions .topic-actions-row button.secondary {
+  border: 1px solid var(--line);
+}
