@@ -108,9 +108,11 @@
 .s2-note a {
   color: var(--accent-ink);
 }
-.modal.s2 select {
+.modal.s2 select,
+.s2-row > .select {
   width: auto;
   min-width: 200px;
+  flex: none;
 }
 
 /* Radio groups under AI tagging */
