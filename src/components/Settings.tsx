@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { platform } from "@platform";
 import type { Settings } from "../lib/store";
+import { setThemePref, THEME_ICONS, THEME_LABELS, THEME_PREFS, useThemePref } from "../lib/theme";
+import { Icon } from "./Icon";
 
 export function SettingsDialog(props: {
   settings: Settings;
@@ -12,6 +14,7 @@ export function SettingsDialog(props: {
 }) {
   const [s, setS] = useState(props.settings);
   const [key, setKey] = useState("");
+  const theme = useThemePref();
 
   return (
     <div className="modal-backdrop" onClick={props.onClose}>
@@ -20,6 +23,17 @@ export function SettingsDialog(props: {
           ×
         </button>
         <h2>Настройки</h2>
+
+        <div className="field">
+          <span id="theme-label">Тема</span>
+          <div className="segmented labeled" role="radiogroup" aria-labelledby="theme-label">
+            {THEME_PREFS.map((t) => (
+              <button key={t} role="radio" aria-checked={theme === t} className={theme === t ? "on" : ""} onClick={() => setThemePref(t)}>
+                <Icon name={THEME_ICONS[t]} size={14} /> {THEME_LABELS[t]}
+              </button>
+            ))}
+          </div>
+        </div>
 
         <label>
           Ключ Anthropic API {props.hasKey && <span className="ok">сохранён</span>}
