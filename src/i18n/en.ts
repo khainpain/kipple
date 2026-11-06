@@ -126,8 +126,8 @@ export const en: Dict = {
     keyWhereDesktop: "The key is kept in Windows Credential Manager, not in a file.",
     keyGet: "Get a key:",
     keyCost: ".",
-    aiEnabled:
-      "AI tagging (only message text and page descriptions go to Anthropic, through the Kipple server unless you add your own key; sensitive messages are never sent, media only if turned on below)",
+    aiEnabled: "AI tagging: topics, tags and summaries for cards. Message text goes to Anthropic",
+    aiOff: "No-AI mode: message text goes neither to Anthropic nor to the Kipple server.",
     aiLanguage: "Language of AI topics, tags and summaries",
     aiLanguageUi: "Interface language: one set of topics for the whole library, even if messages are in different languages",
     aiLanguageSource: "Each message's own language: a Russian article gets Russian tags",
@@ -370,6 +370,20 @@ export const en: Dict = {
   exporter: {
     noTopic: "No topic",
     exported: (date, n) => `Exported ${date}, cards: ${num(n)}.`,
+  },
+
+  aiConsent: {
+    title: "Turn on AI tagging?",
+    what: "AI gives cards titles, short summaries, topics and tags. To do that, their content has to be sent to Claude, a model made by Anthropic.",
+    sent: "What goes: message text, links and descriptions of linked pages. No more than tagging needs.",
+    routeBuiltin: "Without your own key, requests go through the Kipple server: it adds the key and passes the text on to Anthropic, keeping nothing itself.",
+    routeOwnKey: "With your own key, requests go from this computer straight to Anthropic, bypassing the Kipple server.",
+    anthropic: "Under its API terms, Anthropic doesn't train models on this data and keeps it only for a limited time. Still, a third party sees the text.",
+    never: "Messages that look like passwords, keys or card numbers are never sent. Pictures go only if you turn that on separately in Settings.",
+    without:
+      "Without AI, message text goes neither to Anthropic nor to the Kipple server: the library, search, filters and export all work, just without topics and summaries. You can change your mind any time in Settings.",
+    allow: "Allow",
+    decline: "No AI",
   },
 
   ai: {
