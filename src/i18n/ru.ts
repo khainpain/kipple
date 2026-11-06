@@ -367,9 +367,15 @@ export const ru = {
     nameImageHint: "Уменьшенная копия этой картинки уйдёт в Anthropic",
     renameImage: "Переназвать по картинке",
     nameImage: "Назвать по картинке (AI)",
+    noStatus: "Без статуса",
+    tagsShort: "Теги",
+    addTag: "Добавить тег",
+    tagPlaceholder: "новый тег",
+    removeTag: (t: string) => `Убрать тег #${t}`,
+    addNote: "Добавить заметку…",
+    cardName: "Название на карточке",
     status: "Статус",
     topic: "Тема",
-    tags: "Теги через запятую",
     note: "Заметка",
     notePlaceholder: "Зачем сохранил, что сделать…",
     links: "Ссылки",
@@ -500,6 +506,8 @@ export const ru = {
     tags: ["css", "идеи", "референсы"],
     textFile: "покупки.txt",
     textBody: "Список покупок\n\n- кофе\n- хлеб\n- лампочка E27\n\nТекстовые файлы видны прямо в карточке.",
+    // A one-line message whose AI title and summary are longer than the message itself.
+    short: { text: "Важно, безопасность", title: "Напоминание: важна безопасность", summary: "Короткая заметка о том, что безопасность важна; вероятно, напоминание что-то сделать.", topic: "Безопасность", tags: ["безопасность", "напоминание", "важное"] },
   },
 };
 

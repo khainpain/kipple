@@ -1509,6 +1509,228 @@ code {
   font-size: 12px;
 }
 
+/* Card: a one-line message is the heading; the AI name drops to a small editable line */
+.detail-lead {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.detail-panel.mode-center .detail-lead,
+.detail-panel.mode-full .detail-lead {
+  font-size: 24px;
+}
+.detail-cardname {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: -8px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.detail-cardname span {
+  flex-shrink: 0;
+}
+.detail-cardname input {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  background: transparent;
+  border-color: transparent;
+  padding: 2px 6px;
+  margin-left: -6px;
+}
+.detail-cardname input:hover {
+  background: var(--hover);
+}
+.detail-cardname input:focus {
+  color: var(--ink);
+}
+.detail-panel.mode-center .detail-summary,
+.detail-panel.mode-full .detail-summary,
+.detail-summary {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+/* Card settings as compact property rows (status, topic, tags, note) */
+.props {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 16px;
+  row-gap: 2px;
+  align-items: start;
+}
+.prop-row {
+  display: contents;
+}
+.prop-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.prop-label .icon {
+  opacity: 0.8;
+}
+.prop-value {
+  display: flex;
+  align-items: center;
+  min-height: 30px;
+  min-width: 0;
+}
+.status-chip .chev {
+  opacity: 0.7;
+}
+.status-chip.ghost {
+  padding-left: 6px;
+}
+.status-menu {
+  left: 0;
+  right: auto;
+  top: calc(100% + 4px);
+  z-index: 40;
+  min-width: 180px;
+}
+.status-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.status-menu .label {
+  flex: 1;
+}
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.prop-btn,
+.prop-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13.5px;
+  padding: 4px 6px;
+  margin-left: -6px;
+  border-radius: 6px;
+}
+.prop-btn:hover,
+.prop-btn.open,
+.prop-add:hover {
+  background: var(--hover);
+}
+.prop-btn > span:not(.topic-dot) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.prop-btn .topic-dot {
+  margin: 0;
+}
+.prop-btn .chev {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.prop-btn .placeholder,
+.prop-add {
+  color: var(--muted);
+}
+.tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 0;
+}
+.tag-chips .prop-add {
+  margin-left: 0;
+  padding: 3px 6px;
+}
+.tag-chips .tag-chip + .prop-add {
+  margin-left: 0;
+}
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12.5px;
+  padding: 2px 4px 2px 8px;
+  border-radius: 999px;
+  background: var(--hover);
+  color: var(--ink);
+}
+.tag-x {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  opacity: 0;
+}
+.tag-chip:hover .tag-x,
+.tag-x:focus-visible {
+  opacity: 1;
+}
+.tag-x:hover {
+  background: var(--hover);
+  color: var(--ink);
+}
+.tag-input {
+  width: 120px;
+  font-size: 12.5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.prop-note {
+  width: 100%;
+  font-size: 13.5px;
+  line-height: 1.45;
+  padding: 4px 6px;
+  margin-left: -6px;
+  border-color: transparent;
+  background: transparent;
+  resize: none;
+  field-sizing: content;
+  min-height: 30px;
+}
+.prop-note:hover {
+  background: var(--hover);
+}
+.detail-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.detail-foot .meta {
+  font-size: 11.5px;
+}
+.detail-foot .link-btn {
+  padding: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.detail-foot .link-btn:hover {
+  color: var(--danger);
+}
+
 /* Modals */
 .modal-backdrop {
   position: fixed;

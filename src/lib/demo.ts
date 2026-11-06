@@ -56,6 +56,11 @@ export function demoLibrary(): Library {
     c.date = new Date(Date.now() - 60 * 864e5 + i * 864e5 + (i % 5) * 3_600_000).toISOString();
     return c;
   });
+  // A one-line note, like most real Saved Messages: the AI title and summary say more than the message.
+  const short = structuredClone(base.find((c) => c.kind === "text" && !c.urls.length) ?? base[0]);
+  Object.assign(short, { id: 61, text: D.short.text, urls: [], link: undefined, media: undefined, forwardedFrom: undefined, sensitive: false, autoJunk: false, date: new Date(Date.now() - 3_600_000).toISOString() });
+  short.ai = { title: D.short.title, summary: D.short.summary, topic: D.short.topic, tags: D.short.tags, action: "todo", priority: 2, model: "claude-haiku-5-5", at: "" };
+  cards.push(short);
   cards.reverse(); // the library is kept newest first
   annotateContext(cards);
   // The first topic comes already split into AI subgroups, to show how that looks.
