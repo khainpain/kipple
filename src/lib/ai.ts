@@ -3,7 +3,7 @@ import { platform } from "@platform";
 import { z } from "zod";
 import type { AiFields, Card } from "./types";
 import { domainOf } from "./rules";
-import { tagName, topicName } from "./library";
+import { effectiveTopic, getOwnTopics, tagName } from "./library";
 import { ItemSchema, groupsFormat, groupsSystemPrompt, imageSystemPrompt, outputFormat, synonymsFormat, synonymsSystemPrompt, systemPrompt, type AiLang } from "./prompts";
 import { T, lang as uiLang } from "../i18n";
 
@@ -121,22 +121,36 @@ export function pendingForAi(cards: Card[]): Card[] {
 /**
  * Topics and tags already in use, so the AI reuses them. In a fixed language only cards tagged
  * in that language count (cards tagged before the language was recorded were mostly Russian),
- * so switching to English doesn't keep pulling in Russian topics.
+ * so switching to English doesn't keep pulling in Russian topics. Topics are counted as shown
+ * (after merges, renames and moves), so a deleted or renamed topic isn't offered again.
+ * The user's own topics come separately and always.
  */
-export function vocabulary(cards: Card[], lang: AiLang = "source"): { topics: string[]; tags: string[] } {
+export function vocabulary(cards: Card[], lang: AiLang = "source"): Vocabulary {
   const topics = new Map<string, number>();
   const tags = new Map<string, number>();
   for (const c of cards) {
-    if (lang !== "source" && (c.ai?.lang ?? "ru") !== lang) continue;
+    const inLang = lang === "source" || (c.ai?.lang ?? "ru") === lang;
+    const t = effectiveTopic(c);
+    // A topic the user picked counts whatever language the AI wrote the card in.
+    if (t && (inLang || c.user?.topic)) topics.set(t, (topics.get(t) ?? 0) + 1);
+    if (!inLang) continue;
     // Merged names count as the name they were merged into, so the AI stops bringing them back.
-    if (c.ai?.topic) topics.set(topicName(c.ai.topic), (topics.get(topicName(c.ai.topic)) ?? 0) + 1);
     for (const t of new Set((c.ai?.tags ?? []).map(tagName))) tags.set(t, (tags.get(t) ?? 0) + 1);
   }
+  const own = getOwnTopics();
+  for (const t of own) topics.delete(t);
   const top = (m: Map<string, number>, n: number) => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, n).map(([k]) => k);
-  return { topics: top(topics, 40), tags: top(tags, 80) };
+  return { own, topics: top(topics, 40), tags: top(tags, 80) };
 }
 
-async function classifyBatch(client: Anthropic, model: AiModel, batch: Card[], vocab: { topics: string[]; tags: string[] }, lang: AiLang) {
+export interface Vocabulary {
+  /** Topics the user made by hand. */
+  own: string[];
+  topics: string[];
+  tags: string[];
+}
+
+async function classifyBatch(client: Anthropic, model: AiModel, batch: Card[], vocab: Vocabulary, lang: AiLang) {
   const input = batch.map((c) => JSON.stringify(describeCard(c))).join("\n");
   const res = await client.messages.parse({
     model,
@@ -154,7 +168,9 @@ async function classifyBatch(client: Anthropic, model: AiModel, batch: Card[], v
   return res.parsed_output?.items ?? [];
 }
 
-const vocabText = (v: { topics: string[]; tags: string[] }) => `Topic vocabulary: ${v.topics.join(", ") || "(empty so far)"}\nTag vocabulary: ${v.tags.join(", ") || "(empty so far)"}`;
+const vocabText = (v: Vocabulary) =>
+  (v.own.length ? `The person's own topics, made by hand: ${v.own.join(", ")}. When an item fits one of them, use it as the topic, exactly as written.\n` : "") +
+  `Topic vocabulary: ${v.topics.join(", ") || "(empty so far)"}\nTag vocabulary: ${v.tags.join(", ") || "(empty so far)"}`;
 
 function toFields(it: z.infer<typeof ItemSchema>, at: string, lang: AiLang, model: AiModel): AiFields {
   return {
@@ -263,7 +279,7 @@ async function toJpegBase64(blob: Blob): Promise<string> {
   }
 }
 
-async function nameImageBatch(client: Anthropic, model: AiModel, batch: Array<{ card: Card; data: string }>, vocab: { topics: string[]; tags: string[] }, lang: AiLang) {
+async function nameImageBatch(client: Anthropic, model: AiModel, batch: Array<{ card: Card; data: string }>, vocab: Vocabulary, lang: AiLang) {
   const content: Anthropic.ContentBlockParam[] = [{ type: "text", text: vocabText(vocab) }];
   for (const { card, data } of batch) {
     const info: Record<string, unknown> = { id: card.id, date: card.date.slice(0, 10) };

@@ -52,6 +52,8 @@ const PATHS: Record<string, string> = {
   home: "M4 11l8-7 8 7v9h-5v-6H9v6H4z",
   merge: "M6 4v4a6 6 0 0 0 6 6h0a6 6 0 0 1 6 6M18 4v4a6 6 0 0 1-6 6M3 7l3-3 3 3M15 7l3-3 3 3",
   plus: "M12 5v14M5 12h14",
+  more: "M5.5 12h.01M12 12h.01M18.5 12h.01",
+  pencil: "M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4",
   copy: "M8 8h12v12H8zM4 16V4h12",
   monitor: "M3 4h18v12H3zM8 20h8M12 16v4",
 };
