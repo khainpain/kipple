@@ -9,6 +9,7 @@ const PATHS: Record<string, string> = {
   trash: "M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3",
   lock: "M6 11h12v9H6zM8 11V8a4 4 0 0 1 8 0v3",
   folder: "M3 6h6l2 2h10v11H3z",
+  globe: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z",
   link: "M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1",
   photo: "M3 5h18v14H3zM3 16l5-5 4 4 3-3 6 6M15.5 9.5a1.5 1.5 0 1 0 0-.01",
   video: "M3 6h13v12H3zM16 10l5-3v10l-5-3",
@@ -53,6 +54,8 @@ const PATHS: Record<string, string> = {
   home: "M4 11l8-7 8 7v9h-5v-6H9v6H4z",
   merge: "M6 4v4a6 6 0 0 0 6 6h0a6 6 0 0 1 6 6M18 4v4a6 6 0 0 1-6 6M3 7l3-3 3 3M15 7l3-3 3 3",
   plus: "M12 5v14M5 12h14",
+  more: "M5.5 12h.01M12 12h.01M18.5 12h.01",
+  pencil: "M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4",
   copy: "M8 8h12v12H8zM4 16V4h12",
   monitor: "M3 4h18v12H3zM8 20h8M12 16v4",
 };

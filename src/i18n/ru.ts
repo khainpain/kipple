@@ -264,6 +264,19 @@ export const ru = {
     clear: "Убрать из темы",
   },
 
+  topics: {
+    add: "Новая тема",
+    namePlaceholder: "Название темы",
+    actions: "Действия с темой",
+    rename: "Переименовать",
+    delete: "Удалить тему",
+    confirmDelete: (name: string, n: number) =>
+      n ? `Удалить тему «${name}»? ${cards(n)} ${plural(n, "останется", "останутся", "останутся")} без темы, сами карточки не пропадут.` : `Удалить тему «${name}»?`,
+    confirm: "Удалить",
+    emptyTitle: "В теме пока пусто",
+    emptyHint: "Переложи сюда карточки: «Переложить в тему» на карточке или выдели несколько и нажми «В тему». AI тоже будет класть сюда подходящие.",
+  },
+
   groups: {
     make: "Разбить на группы",
     redo: "Обновить группы",
@@ -275,7 +288,7 @@ export const ru = {
     signedIn: "Вход в Telegram выполнен",
     topics: "Темы",
     tags: "Теги",
-    topicsHint: "Темы появятся после AI-разметки.",
+    topicsHint: "Темы появятся после AI-разметки, или создай свою кнопкой +.",
     collapse: "Свернуть",
     more: (n: number) => `Ещё ${num(n)}`,
     sensitiveHint: "Похоже на пароли, ключи, номера карт. Не отправляется в AI.",
@@ -299,6 +312,15 @@ export const ru = {
     toJunk: "В мусор",
     sort: "Сортировка",
     view: "Вид",
+    show: "Показывать на карточках",
+    fieldCover: "Обложку",
+    fieldTitle: "Заголовок",
+    fieldExcerpt: "Описание",
+    fieldTags: "Теги и метки",
+    fieldInfo: "Сайт и дату",
+    coverSide: "Обложка в списке",
+    coverLeft: "Слева",
+    coverRight: "Справа",
   },
 
   grid: {
@@ -337,6 +359,7 @@ export const ru = {
     zoom: "Открыть на весь экран",
   },
   detail: {
+    resize: "Потяните, чтобы изменить ширину. Двойной клик — исходная ширина",
     label: "Карточка",
     prev: "Предыдущая (↑)",
     next: "Следующая (↓)",
@@ -351,9 +374,15 @@ export const ru = {
     nameImageHint: "Уменьшенная копия этой картинки уйдёт в Anthropic",
     renameImage: "Переназвать по картинке",
     nameImage: "Назвать по картинке (AI)",
+    noStatus: "Без статуса",
+    tagsShort: "Теги",
+    addTag: "Добавить тег",
+    tagPlaceholder: "новый тег",
+    removeTag: (t: string) => `Убрать тег #${t}`,
+    addNote: "Добавить заметку…",
+    cardName: "Название на карточке",
     status: "Статус",
     topic: "Тема",
-    tags: "Теги через запятую",
     note: "Заметка",
     notePlaceholder: "Зачем сохранил, что сделать…",
     links: "Ссылки",
@@ -484,6 +513,8 @@ export const ru = {
     tags: ["css", "идеи", "референсы"],
     textFile: "покупки.txt",
     textBody: "Список покупок\n\n- кофе\n- хлеб\n- лампочка E27\n\nТекстовые файлы видны прямо в карточке.",
+    // A one-line message whose AI title and summary are longer than the message itself.
+    short: { text: "Важно, безопасность", title: "Напоминание: важна безопасность", summary: "Короткая заметка о том, что безопасность важна; вероятно, напоминание что-то сделать.", topic: "Безопасность", tags: ["безопасность", "напоминание", "важное"] },
   },
 };
 

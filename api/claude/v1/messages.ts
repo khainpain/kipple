@@ -7,7 +7,7 @@
 // no tools, a capped max_tokens. Each install has a daily allowance, and all installs together
 // a global one, so a copied install id or a scripted client can't run up the bill.
 // The SDK in the app calls `${baseURL}/v1/messages`, hence this path.
-import { allowedRequest, checkQuota, chargeUsage, clientIp, env, quotaError, type Usage } from "../../_lib/quota";
+import { allowedRequest, checkQuota, clientIp, env, quotaError, reserveUnits, settleUsage, unitsOf, type Usage } from "../../_lib/quota";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const MAX_BODY = 4_000_000; // Vercel takes 4.5 MB; six shrunk photos are well under 1 MB
@@ -43,8 +43,20 @@ export async function POST(request: Request): Promise<Response> {
   if (problem) return json(400, "invalid_request_error", problem);
 
   const ip = clientIp(request);
-  const verdict = await checkQuota(install, ip);
+  const model = String(body.model);
+  const reserved = reserveUnits(model, body.max_tokens as number, raw.length);
+  let verdict;
+  try {
+    verdict = await checkQuota(install, ip, reserved);
+  } catch (e) {
+    // The counters are unreachable: refuse rather than run without limits.
+    console.error("quota check failed", e);
+    return json(503, "api_error", "Usage counting is unavailable, try again later.", { "x-should-retry": "true", "retry-after": "30" });
+  }
   if (verdict) return quotaError(verdict, json);
+  // From here on the reserved units are replaced with the real cost exactly once.
+  let actual = 0;
+  const settle = () => settleUsage(install, ip, reserved, actual).catch((e) => console.error("usage accounting failed", e));
 
   const res = await fetch(ANTHROPIC_URL, {
     method: "POST",
@@ -52,26 +64,30 @@ export async function POST(request: Request): Promise<Response> {
       "content-type": "application/json",
       "x-api-key": key,
       "anthropic-version": request.headers.get("anthropic-version") ?? "2023-06-01",
-      ...(request.headers.get("anthropic-beta") ? { "anthropic-beta": request.headers.get("anthropic-beta")! } : {}),
     },
     body: raw,
     signal: AbortSignal.timeout(280_000),
   }).catch(() => undefined);
-  if (!res) return json(502, "api_error", "Anthropic did not answer.", { "x-should-retry": "true" });
+  if (!res) {
+    await settle();
+    return json(502, "api_error", "Anthropic did not answer.", { "x-should-retry": "true" });
+  }
 
-  const text = await res.text();
+  const text = await res.text().catch(() => "");
+  if (res.ok) {
+    try {
+      const usage = (JSON.parse(text) as { usage?: Usage }).usage;
+      // No usage in a successful answer shouldn't happen; keep the reservation then.
+      actual = usage ? unitsOf(model, usage) : reserved;
+    } catch {
+      actual = reserved;
+    }
+  }
+  await settle();
   if (res.status === 401 || res.status === 403) {
     // Our key, not the user's: don't let the app tell them their key is wrong.
     console.error("built-in Anthropic key rejected", res.status);
     return json(503, "kipple_unavailable", "The built-in key is not working right now.");
-  }
-  if (res.ok) {
-    try {
-      const usage = (JSON.parse(text) as { usage?: Usage }).usage;
-      if (usage) await chargeUsage(install, ip, String(body.model), usage);
-    } catch (e) {
-      console.error("usage accounting failed", e);
-    }
   }
   const headers = new Headers({ "content-type": res.headers.get("content-type") ?? "application/json" });
   for (const h of ["request-id", "retry-after", "x-should-retry"]) {

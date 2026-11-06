@@ -257,6 +257,18 @@ export const en: Dict = {
     clear: "Remove from topic",
   },
 
+  topics: {
+    add: "New topic",
+    namePlaceholder: "Topic name",
+    actions: "Topic actions",
+    rename: "Rename",
+    delete: "Delete topic",
+    confirmDelete: (name, n) => (n ? `Delete the topic "${name}"? ${cards(n)} will be left without a topic; the cards themselves stay.` : `Delete the topic "${name}"?`),
+    confirm: "Delete",
+    emptyTitle: "This topic is empty so far",
+    emptyHint: "Move cards here: \"Move to topic\" on a card, or select several and press \"To topic\". The AI will put fitting cards here too.",
+  },
+
   groups: {
     make: "Split into groups",
     redo: "Regroup",
@@ -268,7 +280,7 @@ export const en: Dict = {
     signedIn: "Signed in to Telegram",
     topics: "Topics",
     tags: "Tags",
-    topicsHint: "Topics appear after AI tagging.",
+    topicsHint: "Topics appear after AI tagging, or make your own with +.",
     collapse: "Show less",
     more: (n) => `${num(n)} more`,
     sensitiveHint: "Looks like passwords, keys or card numbers. Never sent to the AI.",
@@ -292,6 +304,15 @@ export const en: Dict = {
     toJunk: "Move to junk",
     sort: "Sort",
     view: "View",
+    show: "Show on cards",
+    fieldCover: "Cover",
+    fieldTitle: "Title",
+    fieldExcerpt: "Description",
+    fieldTags: "Tags and labels",
+    fieldInfo: "Site and date",
+    coverSide: "Cover in list",
+    coverLeft: "Left",
+    coverRight: "Right",
   },
 
   grid: {
@@ -330,6 +351,7 @@ export const en: Dict = {
     zoom: "Open full screen",
   },
   detail: {
+    resize: "Drag to resize. Double-click to reset",
     label: "Card",
     prev: "Previous (↑)",
     next: "Next (↓)",
@@ -344,9 +366,15 @@ export const en: Dict = {
     nameImageHint: "A shrunk copy of this picture will go to Anthropic",
     renameImage: "Rename from the picture",
     nameImage: "Name from the picture (AI)",
+    noStatus: "No status",
+    tagsShort: "Tags",
+    addTag: "Add tag",
+    tagPlaceholder: "new tag",
+    removeTag: (t: string) => `Remove tag #${t}`,
+    addNote: "Add a note…",
+    cardName: "Name on the card",
     status: "Status",
     topic: "Topic",
-    tags: "Tags, comma-separated",
     note: "Note",
     notePlaceholder: "Why you saved it, what to do…",
     links: "Links",
@@ -474,5 +502,7 @@ export const en: Dict = {
     tags: ["css", "ideas", "references"],
     textFile: "shopping.txt",
     textBody: "Shopping list\n\n- coffee\n- bread\n- E27 light bulb\n\nText files show right inside the card.",
+    // A one-line message whose AI title and summary are longer than the message itself.
+    short: { text: "Important, safety", title: "Reminder: important safety", summary: "A short note saying safety is important, probably a reminder to act on it.", topic: "Security", tags: ["safety", "reminder", "important"] },
   },
 };
