@@ -8,6 +8,7 @@ import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic } from "
 import { Icon } from "./Icon";
 import { coverOf, displayTitle, siteOf } from "./CardView";
 import { Preview } from "./Preview";
+import { isImportant } from "../lib/smart";
 import { OPEN_MODES, type OpenMode } from "./nav";
 
 /**
@@ -67,6 +68,14 @@ export function Detail(props: {
             </button>
           ))}
         </div>
+        <button
+          className={`icon-btn${isImportant(card) ? " on" : ""}`}
+          onClick={() => props.onEdit({ pinned: !isImportant(card) })}
+          title={isImportant(card) ? T.card.unpin : T.card.pin}
+          aria-pressed={isImportant(card)}
+        >
+          <Icon name="star" />
+        </button>
         {card.media?.path && card.kind !== "photo" && (
           <button className="icon-btn" onClick={() => platform.openFile(lib.sourceDir, card.media!.path!)} title={T.detail.openFile}>
             <Icon name="file" />

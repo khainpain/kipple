@@ -5,6 +5,7 @@ import { AI_MODELS, aiModelOf, builtinUsage, costEstimate } from "../lib/ai";
 import { getInstallId } from "../lib/secrets";
 import { setThemePref, THEME_ICONS, THEME_LABELS, THEME_PREFS, useThemePref } from "../lib/theme";
 import { Icon } from "./Icon";
+import { AiConsentDialog } from "./AiConsent";
 import { LANGS, T, systemLang, type LangPref } from "../i18n";
 import { telegramErrorText } from "../lib/telegram";
 import type { TelegramApi, TelegramStatus } from "../platform/types";
@@ -24,13 +25,17 @@ export function SettingsDialog(props: {
 }) {
   const [s, setS] = useState(props.settings);
   const [key, setKey] = useState("");
+  /** Ticking AI on without an earlier consent first shows the consent dialog. */
+  const [asking, setAsking] = useState(false);
   const theme = useThemePref();
   const L = T.settings;
   const systemName = LANGS.find((l) => l.key === systemLang())?.name ?? "";
-  // How much of today's built-in allowance is used; only asked when there is no own key.
+  // How much of today's built-in allowance is used; only asked when AI is on and there is no own key
+  // (in no-AI mode the app doesn't contact the Kipple server at all).
   const [used, setUsed] = useState<number | null>(null);
+  const aiOn = props.settings.aiEnabled && !!props.settings.aiConsentAt;
   useEffect(() => {
-    if (props.hasKey) return;
+    if (props.hasKey || !aiOn) return;
     let live = true;
     void getInstallId()
       .then(builtinUsage)
@@ -38,9 +43,10 @@ export function SettingsDialog(props: {
     return () => {
       live = false;
     };
-  }, [props.hasKey]);
+  }, [props.hasKey, aiOn]);
 
   return (
+    <>
     <div className="modal-backdrop" onClick={props.onClose}>
       <div className="modal settings" onClick={(e) => e.stopPropagation()}>
         <button className="close" onClick={props.onClose} aria-label={T.common.close}>
@@ -72,9 +78,21 @@ export function SettingsDialog(props: {
         </label>
 
         <label className="check">
-          <input type="checkbox" checked={s.aiEnabled} onChange={(e) => setS({ ...s, aiEnabled: e.target.checked })} />
+          <input
+            type="checkbox"
+            checked={s.aiEnabled}
+            onChange={(e) =>
+              e.target.checked
+                ? s.aiConsentAt
+                  ? setS({ ...s, aiEnabled: true })
+                  : setAsking(true)
+                : // Turning AI off also takes back the consent, so turning it on again asks again.
+                  setS({ ...s, aiEnabled: false, aiImages: false, aiConsentAt: undefined, aiAsked: true })
+            }
+          />
           {L.aiEnabled}
         </label>
+        {!s.aiEnabled && <p className="hint">{L.aiOff}</p>}
         <fieldset className="ai-lang" disabled={!s.aiEnabled}>
           <legend>{L.aiLanguage}</legend>
           <label className="check">
@@ -116,7 +134,7 @@ export function SettingsDialog(props: {
           <input type="checkbox" checked={s.aiImages} disabled={!s.aiEnabled} onChange={(e) => setS({ ...s, aiImages: e.target.checked })} />
           <span>{L.aiImages}</span>
         </label>
-        <p className="hint">
+        <p className="hint" hidden={!s.aiEnabled}>
           {props.hasKey ? L.aiViaOwnKey : L.aiViaBuiltin}
           {!props.hasKey && used !== null && <> {L.builtinUsed(Math.round(used * 100))}</>}
         </p>
@@ -167,6 +185,14 @@ export function SettingsDialog(props: {
         </div>
       </div>
     </div>
+    {asking && (
+      <AiConsentDialog
+        hasKey={props.hasKey}
+        onAllow={() => (setS({ ...s, aiEnabled: true, aiConsentAt: new Date().toISOString(), aiAsked: true }), setAsking(false))}
+        onDecline={() => (setS({ ...s, aiAsked: true }), setAsking(false))}
+      />
+    )}
+    </>
   );
 }
 

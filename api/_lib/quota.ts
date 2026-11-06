@@ -9,7 +9,7 @@
 // KV_REST_API_TOKEN, or UPSTASH_REDIS_REST_URL/_TOKEN). Without it they are kept in the
 // function's memory: fine for a handful of friends, but each instance counts on its own.
 
-import { allSystemPrompts, outputFormat } from "../../src/lib/prompts";
+import { appRequests } from "../../src/lib/prompts";
 
 declare const process: { env: Record<string, string | undefined> };
 export const env = (name: string): string | undefined => process.env[name] || undefined;
@@ -39,11 +39,11 @@ export const MODEL_WEIGHT: Record<string, number> = {
 
 const MAX_TOKENS = 16_000;
 
-// The app's exact system prompts and answer schema (src/lib/prompts.ts). Anything else is not the app:
+// The app's exact system prompts, each with its answer schema (src/lib/prompts.ts). Anything else is not the app:
 // checking only the start of the prompt would let anyone append their own instructions and use the
 // key as a free general-purpose Claude.
-let expected: { prompts: Set<string>; format: string } | null = null;
-const app = () => (expected ??= { prompts: new Set(allSystemPrompts()), format: JSON.stringify(outputFormat()) });
+let expected: Map<string, string> | null = null;
+const app = () => (expected ??= new Map(appRequests().map((r) => [r.system, JSON.stringify(r.format)])));
 
 /** Why the request isn't one the app would send, or null if it is. */
 export function allowedRequest(body: Record<string, unknown>): string | null {
@@ -52,9 +52,10 @@ export function allowedRequest(body: Record<string, unknown>): string | null {
   if (body.stream) return "Streaming is not supported.";
   for (const k of ["tools", "tool_choice", "mcp_servers", "container"]) if (k in body) return `${k} is not supported.`;
   const own = "Only the app's own requests are accepted.";
-  if (typeof body.system !== "string" || !app().prompts.has(body.system)) return own;
+  const format = typeof body.system === "string" ? app().get(body.system) : undefined;
+  if (format === undefined) return own;
   const oc = body.output_config as { format?: unknown } | undefined;
-  if (!oc || typeof oc !== "object" || JSON.stringify(oc.format) !== app().format) return own;
+  if (!oc || typeof oc !== "object" || JSON.stringify(oc.format) !== format) return own;
   if (!Array.isArray(body.messages) || body.messages.length !== 1 || (body.messages[0] as { role?: unknown })?.role !== "user") return own;
   return null;
 }

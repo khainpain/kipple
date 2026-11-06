@@ -3,7 +3,8 @@ import { platform } from "@platform";
 import { z } from "zod";
 import type { AiFields, Card } from "./types";
 import { domainOf } from "./rules";
-import { ItemSchema, imageSystemPrompt, outputFormat, systemPrompt, type AiLang } from "./prompts";
+import { tagName, topicName } from "./library";
+import { ItemSchema, groupsFormat, groupsSystemPrompt, imageSystemPrompt, outputFormat, synonymsFormat, synonymsSystemPrompt, systemPrompt, type AiLang } from "./prompts";
 import { T, lang as uiLang } from "../i18n";
 
 export type { AiLang } from "./prompts";
@@ -127,8 +128,9 @@ export function vocabulary(cards: Card[], lang: AiLang = "source"): { topics: st
   const tags = new Map<string, number>();
   for (const c of cards) {
     if (lang !== "source" && (c.ai?.lang ?? "ru") !== lang) continue;
-    if (c.ai?.topic) topics.set(c.ai.topic, (topics.get(c.ai.topic) ?? 0) + 1);
-    for (const t of c.ai?.tags ?? []) tags.set(t, (tags.get(t) ?? 0) + 1);
+    // Merged names count as the name they were merged into, so the AI stops bringing them back.
+    if (c.ai?.topic) topics.set(topicName(c.ai.topic), (topics.get(topicName(c.ai.topic)) ?? 0) + 1);
+    for (const t of new Set((c.ai?.tags ?? []).map(tagName))) tags.set(t, (tags.get(t) ?? 0) + 1);
   }
   const top = (m: Map<string, number>, n: number) => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, n).map(([k]) => k);
   return { topics: top(topics, 40), tags: top(tags, 80) };
@@ -327,4 +329,74 @@ export async function nameImages(
     onBatch({ ...progress });
   }
   return progress;
+}
+
+/**
+ * Asks the AI which topics or tags mean the same thing: synonyms, translations (AI / ИИ),
+ * abbreviations. Only the names and their counts are sent, no message content.
+ * Returns groups made only of the given names.
+ */
+export async function suggestSynonyms(auth: AiAuth, model: AiModel, kind: "topics" | "tags", counts: Map<string, number>): Promise<Array<{ into: string; from: string[] }>> {
+  const names = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 500);
+  if (names.length < 2) return [];
+  const client = makeClient(auth);
+  try {
+    const res = await client.messages.parse({
+      model,
+      max_tokens: 8000,
+      system: synonymsSystemPrompt(kind),
+      output_config: { effort: "low", format: synonymsFormat() },
+      messages: [{ role: "user", content: `Name (cards):\n${names.map(([n, c]) => `${n} (${c})`).join("\n")}` }],
+    });
+    const known = new Set(counts.keys());
+    const used = new Set<string>();
+    const out: Array<{ into: string; from: string[] }> = [];
+    for (const g of res.parsed_output?.groups ?? []) {
+      if (!known.has(g.into) || used.has(g.into)) continue;
+      const from = [...new Set(g.from)].filter((f) => f !== g.into && known.has(f) && !used.has(f));
+      if (!from.length) continue;
+      for (const n of [g.into, ...from]) used.add(n);
+      out.push({ into: g.into, from });
+    }
+    return out;
+  } catch (e) {
+    throw stopping(e, auth);
+  }
+}
+
+/** At most this many cards go into one grouping request (newest first). */
+export const GROUP_LIMIT = 400;
+
+/**
+ * Splits the cards of one topic into a few subgroups ("34 cards on Mini Apps: monetization,
+ * development, analytics, cases"). Sends the titles, summaries and tags the AI already wrote,
+ * not the messages themselves. Each card ends up in at most one group.
+ */
+export async function groupCards(auth: AiAuth, model: AiModel, lang: AiLang, topic: string, cards: Card[], title: (c: Card) => string, tags: (c: Card) => string[]): Promise<Array<{ name: string; ids: number[] }>> {
+  const items = cards.slice(0, GROUP_LIMIT).map((c) => JSON.stringify({ id: c.id, title: title(c).slice(0, 100), summary: c.ai?.summary?.slice(0, 200), tags: tags(c).slice(0, 6) }));
+  if (items.length < 4) return [];
+  const client = makeClient(auth);
+  try {
+    const res = await client.messages.parse({
+      model,
+      max_tokens: 16000,
+      system: groupsSystemPrompt(lang),
+      output_config: { effort: "low", format: groupsFormat() },
+      // The topic goes with the data, not into the system prompt, so the prompt stays one the built-in key accepts.
+      messages: [{ role: "user", content: `Topic: ${JSON.stringify(topic)}\n\nItems, one JSON line each:\n${items.join("\n")}` }],
+    });
+    const known = new Set(cards.map((c) => c.id));
+    const used = new Set<number>();
+    const out: Array<{ name: string; ids: number[] }> = [];
+    for (const g of res.parsed_output?.groups ?? []) {
+      const ids = [...new Set(g.ids)].filter((id) => known.has(id) && !used.has(id));
+      const name = g.name.trim().slice(0, 40);
+      if (ids.length < 2 || !name) continue;
+      ids.forEach((id) => used.add(id));
+      out.push({ name, ids });
+    }
+    return out;
+  } catch (e) {
+    throw stopping(e, auth);
+  }
 }

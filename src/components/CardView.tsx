@@ -6,6 +6,8 @@ import { mediaUrl } from "../lib/importer";
 import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic } from "../lib/library";
 import { domainOf } from "../lib/rules";
 import { instantImage } from "../lib/embeds";
+import { isImportant } from "../lib/smart";
+import { TopicMenu } from "./TopicMenu";
 import { Icon } from "./Icon";
 import { hueOf, type ViewKey } from "./nav";
 
@@ -145,17 +147,23 @@ export function CardView(props: {
   onOpen: () => void;
   onToggleSelect: (range: boolean) => void;
   onJunk: () => void;
+  onPin: () => void;
+  /** Topics to offer in "Move to topic", and moving there ("" = no topic). */
+  topics: string[];
+  onMove: (topic: string) => void;
   onOpenLink: (url: string) => void;
 }) {
   const { card, lib, view } = props;
+  const [moveAt, setMoveAt] = useState<HTMLElement | null>(null);
   const action = effectiveAction(card);
+  const important = isImportant(card);
   const tags = effectiveTags(card).slice(0, view === "headlines" ? 3 : 4);
   const title = displayTitle(card);
   const excerpt = view === "headlines" ? "" : excerptOf(card);
   const site = siteOf(card);
   const fileMeta = [formatSize(card.media?.size), card.kind === "video" ? "" : formatDuration(card.media?.duration)].filter(Boolean).join(" · ");
 
-  const cls = ["card", `view-${view}`, `kind-${card.kind}`, props.selected && "selected", props.active && "active", action === "junk" && "junk", props.selecting && "selecting"]
+  const cls = ["card", `view-${view}`, `kind-${card.kind}`, props.selected && "selected", props.active && "active", action === "junk" && "junk", props.selecting && "selecting", moveAt && "menu-open"]
     .filter(Boolean)
     .join(" ");
 
@@ -176,8 +184,13 @@ export function CardView(props: {
       <div className="card-body">
         <h3 title={title}>{title}</h3>
         {excerpt && <p className="excerpt">{excerpt}</p>}
-        {(tags.length > 0 || action || card.sensitive) && view !== "headlines" && (
+        {(tags.length > 0 || action || card.sensitive || important) && view !== "headlines" && (
           <div className="tags">
+            {important && (
+              <span className="pill important" title={T.card.important}>
+                <Icon name="star" size={12} />
+              </span>
+            )}
             {action && action !== "junk" && <span className={`pill action-${action}`}>{actionLabel(action)}</span>}
             {card.sensitive && (
               <span className="pill warn" title={T.card.sensitive}>
@@ -206,9 +219,16 @@ export function CardView(props: {
         </div>
       </div>
       <div className="hover-actions" onClick={(e) => e.stopPropagation()}>
-        <button className={`ha${props.selected ? " on" : ""}`} title={T.card.select} onClick={() => props.onToggleSelect(false)}>
+        <button className={`ha sel${props.selected ? " on" : ""}`} title={T.card.select} onClick={() => props.onToggleSelect(false)}>
           <Icon name="select" size={15} />
         </button>
+        <button className={`ha${important ? " on" : ""}`} title={important ? T.card.unpin : T.card.pin} onClick={props.onPin}>
+          <Icon name="star" size={15} />
+        </button>
+        <button className={`ha${moveAt ? " on" : ""}`} title={T.move.button} onClick={(e) => setMoveAt(moveAt ? null : e.currentTarget)}>
+          <Icon name="folder" size={15} />
+        </button>
+        {moveAt && <TopicMenu anchor={moveAt} topics={props.topics} current={effectiveTopic(card)} onPick={props.onMove} onClose={() => setMoveAt(null)} />}
         {card.urls[0] && (
           <button className="ha" title={T.card.openLink} onClick={() => props.onOpenLink(card.urls[0])}>
             <Icon name="external" size={15} />

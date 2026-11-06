@@ -126,8 +126,8 @@ export const en: Dict = {
     keyWhereDesktop: "The key is kept in Windows Credential Manager, not in a file.",
     keyGet: "Get a key:",
     keyCost: ".",
-    aiEnabled:
-      "AI tagging (only message text and page descriptions go to Anthropic, through the Kipple server unless you add your own key; sensitive messages are never sent, media only if turned on below)",
+    aiEnabled: "AI tagging: topics, tags and summaries for cards. Message text goes to Anthropic",
+    aiOff: "No-AI mode: message text goes neither to Anthropic nor to the Kipple server.",
     aiLanguage: "Language of AI topics, tags and summaries",
     aiLanguageUi: "Interface language: one set of topics for the whole library, even if messages are in different languages",
     aiLanguageSource: "Each message's own language: a Russian article gets Russian tags",
@@ -163,6 +163,11 @@ export const en: Dict = {
   },
 
   nav: {
+    home: "Overview",
+    important: "Important",
+    recent: "Recent",
+    unsorted: "To sort",
+    duplicates: "Possible duplicates",
     openCenter: "Open in the center",
     openSide: "Open on the side",
     openFull: "Open full screen",
@@ -210,6 +215,55 @@ export const en: Dict = {
     junk: "Junk",
   },
 
+  overview: {
+    emptyTitle: "Nothing to show yet",
+    emptyHint: "Import your saved messages and what needs attention shows up here.",
+    showAll: "All",
+    unsorted: "No topic or tags yet: tag them with AI or by hand.",
+    important: "Starred by you or marked important by the AI.",
+    readLater: "Articles and videos put off for later.",
+    todo: "Tasks and reminders.",
+    recent: "Saved in the last 30 days.",
+    duplicates: (groups) => `${num(groups)} ${groups === 1 ? "group" : "groups"}: the same link, file or text. Send the extras to the junk.`,
+  },
+
+  tidy: {
+    open: "Tidy up topics and tags",
+    title: "Tidy up",
+    intro: "Merge topics and tags that mean the same thing: cards stay as they are and just show one name. Every merge can be undone.",
+    found: (n) => `${num(n)} similar group${s(n)}.`,
+    none: "No similar names found.",
+    rare: (n) => `${num(n)} tag${s(n)} ${n === 1 ? "is" : "are"} on a single card only: the sidebar tucks them under "more".`,
+    askAi: "Find synonyms with AI",
+    askAiHint: "Sends only the names and how often they're used, no message text. Finds translations and synonyms like ai and ии.",
+    asking: "Looking…",
+    aiNothing: "The AI found no synonyms.",
+    fromAi: "Suggested by the AI",
+    mergeAll: "Merge all",
+    merge: (into) => `Merge into ${into}`,
+    keep: "This name stays",
+    makeMain: "Keep this name",
+    merged: "Already merged",
+    undo: "Undo",
+    notice: (n) => `${num(n)} group${s(n)} of similar topics and tags. Merge them to keep the list short.`,
+    noticeAction: "Tidy up",
+  },
+
+  move: {
+    button: "Move to topic",
+    bulk: "To topic",
+    filter: "Find or create a topic",
+    create: (name) => `Create topic "${name}"`,
+    clear: "Remove from topic",
+  },
+
+  groups: {
+    make: "Split into groups",
+    redo: "Regroup",
+    working: "Grouping…",
+    hint: "The AI splits the topic into a few subgroups by subject. Only card titles, summaries and tags are sent.",
+  },
+
   sidebar: {
     signedIn: "Signed in to Telegram",
     topics: "Topics",
@@ -246,6 +300,9 @@ export const en: Dict = {
   },
 
   card: {
+    important: "Important",
+    pin: "Mark important",
+    unpin: "Remove from important",
     kindPhoto: "Photo",
     kindVideo: "Video",
     kindGif: "GIF",
@@ -372,6 +429,20 @@ export const en: Dict = {
     exported: (date, n) => `Exported ${date}, cards: ${num(n)}.`,
   },
 
+  aiConsent: {
+    title: "Turn on AI tagging?",
+    what: "AI gives cards titles, short summaries, topics and tags. To do that, their content has to be sent to Claude, a model made by Anthropic.",
+    sent: "What goes: message text, links and descriptions of linked pages. No more than tagging needs.",
+    routeBuiltin: "Without your own key, requests go through the Kipple server: it adds the key and passes the text on to Anthropic, keeping nothing itself.",
+    routeOwnKey: "With your own key, requests go from this computer straight to Anthropic, bypassing the Kipple server.",
+    anthropic: "Under its API terms, Anthropic doesn't train models on this data and keeps it only for a limited time. Still, a third party sees the text.",
+    never: "Messages that look like passwords, keys or card numbers are never sent. Pictures go only if you turn that on separately in Settings.",
+    without:
+      "Without AI, message text goes neither to Anthropic nor to the Kipple server: the library, search, filters and export all work, just without topics and summaries. You can change your mind any time in Settings.",
+    allow: "Allow",
+    decline: "No AI",
+  },
+
   ai: {
     keyRejected: "The Anthropic key was rejected. Check it in Settings.",
     quotaUsed: "Today's allowance for the built-in key is used up. Tagging continues tomorrow, or add your own key in Settings.",
@@ -392,6 +463,7 @@ export const en: Dict = {
     article: (i) => `Article number ${i}`,
     card: (i, kind) => `Card ${i}: ${kind}`,
     summary: "A short note on what's saved here and why you'd come back to it.",
+    groups: ["Color and type", "Grids and layout"],
     tags: ["css", "ideas", "references"],
     textFile: "shopping.txt",
     textBody: "Shopping list\n\n- coffee\n- bread\n- E27 light bulb\n\nText files show right inside the card.",

@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { platform } from "@platform";
 import type { Card, Library, UserFields } from "../lib/types";
-import { effectiveAction, effectiveTags, effectiveTopic } from "../lib/library";
+import { effectiveAction, effectiveTags, effectiveTopic, matchesFilter } from "../lib/library";
+import { countDuplicateGroups, findDuplicates, groupDuplicates, isImportant } from "../lib/smart";
+import { Overview, type OverviewSection } from "./Overview";
+import { TidyDialog, type TidyKind } from "./TidyDialog";
+import { TopicMenu } from "./TopicMenu";
+import { suggestMerges } from "../lib/tidy";
+import type { Aliases } from "../lib/library";
 import { buildIndex } from "../lib/search";
 import { Grid } from "./Grid";
 import { Detail } from "./Detail";
@@ -25,12 +31,16 @@ import {
   savePref,
   scopeTitle,
   sortCards,
+  type ListKey,
   type OpenMode,
   type Scope,
   type SortKey,
   type TypeKey,
   type ViewKey,
 } from "./nav";
+
+/** Topics smaller than this aren't worth splitting into subgroups. */
+const GROUP_MIN = 12;
 
 export type Job = { label: string; done: number; total: number } | null;
 
@@ -54,9 +64,16 @@ export function Workspace(props: {
   onNameImage?: (card: Card) => void;
   onStop: () => void;
   onEdit: (ids: number[], patch: UserFields) => void;
+  /** Merged topics and tags, and saving a change to them. */
+  aliases: Aliases;
+  onAliases: (a: Aliases) => void;
+  /** Ask the AI for synonyms among topic or tag names; undefined when AI can't be used. */
+  askSynonyms?: (kind: TidyKind, counts: Map<string, number>) => Promise<Array<{ into: string; from: string[] }>>;
+  /** Split a topic into AI subgroups; undefined when AI can't be used. */
+  onGroupTopic?: (topic: string) => Promise<void>;
 }) {
   const { lib, rev, onEdit } = props;
-  const [scope, setScope] = useState<Scope>({ kind: "list", key: "all" });
+  const [scope, setScope] = useState<Scope>({ kind: "home" });
   const [type, setType] = useState<TypeKey | null>(null);
   const theme = useThemePref();
   const [tag, setTag] = useState<string | null>(null);
@@ -69,6 +86,12 @@ export function Workspace(props: {
   const [openId, setOpenId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [exportOpen, setExportOpen] = useState(false);
+  const [tidy, setTidy] = useState<TidyKind | null>(null);
+  const [bulkMoveAt, setBulkMoveAt] = useState<HTMLElement | null>(null);
+  /** The open subgroup of the topic, by name, and whether the AI is grouping right now. */
+  const [sub, setSub] = useState<string | null>(null);
+  const [grouping, setGrouping] = useState(false);
+  const [groupError, setGroupError] = useState<string | null>(null);
   const lastClicked = useRef<number | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -89,10 +112,13 @@ export function Workspace(props: {
     return list;
   }, [lib, rev, query, index]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Possible duplicates among the cards still in play (junk and hidden ones are already dealt with).
+  const dupes = useMemo(() => findDuplicates(base.filter((c) => matchesFilter(c, "all"))), [base]);
+
   const listCounts = useMemo(() => {
-    const keys = [...SMART_LISTS.map((l) => l.key), "junk", "sensitive"] as const;
-    return Object.fromEntries(keys.map((k) => [k, base.filter((c) => matchesScope(c, { kind: "list", key: k })).length]));
-  }, [base]);
+    const keys: ListKey[] = [...SMART_LISTS.map((l) => l.key), "junk", "sensitive", "recent", "unsorted", "duplicates"];
+    return Object.fromEntries(keys.map((k) => [k, base.filter((c) => matchesScope(c, { kind: "list", key: k }, dupes)).length]));
+  }, [base, dupes]);
 
   const { topics, noTopic } = useMemo(() => {
     const m = new Map<string, number>();
@@ -106,7 +132,27 @@ export function Workspace(props: {
     return { topics: [...m.entries()].sort((a, b) => b[1] - a[1] || compareText(a[0], b[0])), noTopic: none };
   }, [base]);
 
-  const inScope = useMemo(() => base.filter((c) => matchesScope(c, scope)), [base, scope]);
+  // Searching from the overview searches everything, shown as a board.
+  const home = scope.kind === "home" && !query.trim();
+  const shown: Scope = scope.kind === "home" && !home ? { kind: "list", key: "all" } : scope;
+  const isDupes = shown.kind === "list" && shown.key === "duplicates";
+
+  // Every topic and tag in use (search aside), for tidying up.
+  const names = useMemo(() => {
+    const topics = new Map<string, number>();
+    const tags = new Map<string, number>();
+    for (const c of lib.cards) {
+      if (c.removed || !matchesFilter(c, "all")) continue;
+      const t = effectiveTopic(c);
+      if (t) topics.set(t, (topics.get(t) ?? 0) + 1);
+      for (const x of effectiveTags(c)) tags.set(x, (tags.get(x) ?? 0) + 1);
+    }
+    return { topics, tags };
+  }, [lib, rev]); // eslint-disable-line react-hooks/exhaustive-deps
+  const topicNames = useMemo(() => [...names.topics.keys()], [names]);
+  const tidyCount = useMemo(() => suggestMerges(names.topics).length + suggestMerges(names.tags).length, [names]);
+
+  const inScope = useMemo(() => base.filter((c) => matchesScope(c, shown, dupes)), [base, JSON.stringify(shown), dupes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const typeCounts = useMemo(() => Object.fromEntries(TYPES.map((t) => [t.key, inScope.filter((c) => matchesType(c, t.key)).length])) as Record<TypeKey, number>, [inScope]);
 
@@ -118,7 +164,65 @@ export function Workspace(props: {
     return [...m.entries()].sort((a, b) => b[1] - a[1] || compareText(a[0], b[0]));
   }, [inType]);
 
-  const visible = useMemo(() => sortCards(tag ? inType.filter((c) => effectiveTags(c).includes(tag)) : inType, sort), [inType, tag, sort]);
+  // AI subgroups of the open topic, counted among the cards shown now; a group whose cards all left disappears.
+  const groups = useMemo(() => {
+    if (scope.kind !== "topic") return [];
+    const here = new Set(inType.map((c) => c.id));
+    return (lib.subgroups?.[scope.name]?.groups ?? []).map((g) => ({ name: g.name, ids: new Set(g.ids.filter((id) => here.has(id))) })).filter((g) => g.ids.size > 0);
+  }, [lib, rev, scope, inType]); // eslint-disable-line react-hooks/exhaustive-deps
+  const subIds = sub ? groups.find((g) => g.name === sub)?.ids : undefined;
+
+  async function groupTopic() {
+    if (scope.kind !== "topic" || !props.onGroupTopic) return;
+    setGrouping(true);
+    setGroupError(null);
+    try {
+      await props.onGroupTopic(scope.name);
+      setSub(null);
+    } catch (e) {
+      setGroupError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setGrouping(false);
+    }
+  }
+
+  const visible = useMemo(() => {
+    let list = tag ? inType.filter((c) => effectiveTags(c).includes(tag)) : inType;
+    if (subIds) list = list.filter((c) => subIds.has(c.id));
+    // Duplicates stay next to each other so the extras are easy to spot.
+    return isDupes ? groupDuplicates(list, dupes) : sortCards(list, sort);
+  }, [inType, tag, sort, isDupes, dupes, subIds]);
+
+  const sections = useMemo((): OverviewSection[] => {
+    if (!home) return [];
+    const take = (key: ListKey, order?: (cs: Card[]) => Card[]) => {
+      const cs = base.filter((c) => matchesScope(c, { kind: "list", key }, dupes));
+      return (order ? order(cs) : cs).slice(0, 8);
+    };
+    const o = T.overview;
+    return [
+      {
+        key: "unsorted",
+        icon: "inbox",
+        title: T.nav.unsorted,
+        hint: o.unsorted,
+        count: listCounts.unsorted,
+        cards: take("unsorted"),
+      },
+      { key: "important", icon: "star", title: T.nav.important, hint: o.important, count: listCounts.important, cards: take("important") },
+      { key: "read_later", icon: "clock", title: T.nav.readLater, hint: o.readLater, count: listCounts.read_later, cards: take("read_later") },
+      { key: "todo", icon: "check", title: T.nav.todo, hint: o.todo, count: listCounts.todo, cards: take("todo") },
+      { key: "recent", icon: "sortNew", title: T.nav.recent, hint: o.recent, count: listCounts.recent, cards: take("recent") },
+      {
+        key: "duplicates",
+        icon: "copy",
+        title: T.nav.duplicates,
+        hint: o.duplicates(countDuplicateGroups(base, dupes)),
+        count: listCounts.duplicates,
+        cards: take("duplicates", (cs) => groupDuplicates(cs, dupes)),
+      },
+    ];
+  }, [home, base, dupes, listCounts]);
 
   const openIdx = openId == null ? -1 : visible.findIndex((c) => c.id === openId);
   const openCard = openId == null ? null : lib.cards.find((c) => c.id === openId) ?? null;
@@ -126,6 +230,8 @@ export function Workspace(props: {
   function pickScope(s: Scope) {
     setScope(s);
     setTag(null);
+    setSub(null);
+    setGroupError(null);
     setSelected(new Set());
   }
 
@@ -141,6 +247,14 @@ export function Workspace(props: {
       lastClicked.current = c.id;
       return next;
     });
+  }
+
+  function moveTo(c: Card, topic: string) {
+    onEdit([c.id], { topic });
+  }
+
+  function togglePin(c: Card) {
+    onEdit([c.id], { pinned: !isImportant(c) });
   }
 
   function toggleJunk(c: Card) {
@@ -177,8 +291,8 @@ export function Workspace(props: {
   }, [openId, openIdx, visible, selected, exportOpen]);
 
   const exportCards = selected.size ? visible.filter((c) => selected.has(c.id)) : visible;
-  const heading = scopeTitle(scope);
-  const subtitle = [type && TYPES.find((t) => t.key === type)?.label, tag && `#${tag}`].filter(Boolean).join(" · ");
+  const heading = scopeTitle(home ? scope : shown);
+  const subtitle = [sub, type && TYPES.find((t) => t.key === type)?.label, tag && `#${tag}`].filter(Boolean).join(" · ");
 
   return (
     <div className={`workspace${sideOpen ? "" : " side-closed"}${openCard && openMode === "side" ? " with-detail" : ""}`}>
@@ -194,6 +308,8 @@ export function Workspace(props: {
           tags={tags}
           onScope={pickScope}
           onTag={setTag}
+          tidyCount={tidyCount}
+          onTidy={() => setTidy("tags")}
         />
       )}
 
@@ -267,6 +383,23 @@ export function Workspace(props: {
           </button>
         </header>
 
+        {home ? (
+          <Overview
+            lib={lib}
+            sections={sections}
+            topics={topics}
+            tidyCount={tidyCount}
+            onTidy={() => setTidy(suggestMerges(names.topics).length ? "topics" : "tags")}
+            activeId={openId}
+            onScope={pickScope}
+            onOpen={(c) => setOpenId(c.id)}
+            onJunk={toggleJunk}
+            onPin={togglePin}
+            onMove={moveTo}
+            onOpenLink={(u) => void platform.openUrl(u)}
+          />
+        ) : (
+        <>
         <div className="subbar">
           {selected.size > 0 ? (
             <div className="selection">
@@ -274,6 +407,13 @@ export function Workspace(props: {
               <button className="pill" onClick={() => setSelected(new Set(visible.map((c) => c.id)))}>
                 {T.toolbar.selectAll(visible.length)}
               </button>
+              <button className="pill" onClick={() => onEdit([...selected], { pinned: true })}>
+                <Icon name="star" size={13} /> {T.nav.important}
+              </button>
+              <button className={`pill${bulkMoveAt ? " active" : ""}`} onClick={(e) => setBulkMoveAt(bulkMoveAt ? null : e.currentTarget)}>
+                <Icon name="folder" size={13} /> {T.move.bulk}
+              </button>
+              {bulkMoveAt && <TopicMenu anchor={bulkMoveAt} topics={topicNames} onPick={(t) => onEdit([...selected], { topic: t })} onClose={() => setBulkMoveAt(null)} />}
               <button className="pill" onClick={() => onEdit([...selected], { action: "read_later" })}>
                 {actionLabel("read_later")}
               </button>
@@ -296,6 +436,18 @@ export function Workspace(props: {
                   </button>
                 ) : null,
               )}
+              {scope.kind === "topic" && (groups.length > 0 || props.onGroupTopic) && <span className="quick-sep" />}
+              {groups.map((g) => (
+                <button key={g.name} className={`pill${sub === g.name ? " active" : ""}`} onClick={() => setSub(sub === g.name ? null : g.name)}>
+                  {g.name} <small>{formatNumber(g.ids.size)}</small>
+                </button>
+              ))}
+              {scope.kind === "topic" && props.onGroupTopic && inScope.length >= GROUP_MIN && (
+                <button className="pill ghost" onClick={() => void groupTopic()} disabled={grouping} title={groupError ?? T.groups.hint}>
+                  <Icon name="sparkle" size={13} /> {grouping ? T.groups.working : groups.length ? T.groups.redo : T.groups.make}
+                </button>
+              )}
+              {groupError && <span className="quick-error">{groupError}</span>}
               {tag && (
                 <button className="pill active" onClick={() => setTag(null)}>
                   #{tag} <Icon name="close" size={12} />
@@ -315,7 +467,7 @@ export function Workspace(props: {
         </div>
 
         <Grid
-          key={`${JSON.stringify(scope)}|${type}|${tag}|${query}|${sort}|${view}`}
+          key={`${JSON.stringify(shown)}|${sub}|${type}|${tag}|${query}|${sort}|${view}`}
           lib={lib}
           cards={visible}
           view={view}
@@ -324,9 +476,26 @@ export function Workspace(props: {
           onOpen={(c) => setOpenId(c.id)}
           onToggleSelect={toggleSelect}
           onJunk={toggleJunk}
+          onPin={togglePin}
+          topics={topicNames}
+          onMove={moveTo}
           onOpenLink={(u) => void platform.openUrl(u)}
         />
+        </>
+        )}
       </section>
+
+      {tidy && (
+        <TidyDialog
+          topics={names.topics}
+          tags={names.tags}
+          aliases={props.aliases}
+          initial={tidy}
+          askAi={props.askSynonyms}
+          onChange={props.onAliases}
+          onClose={() => setTidy(null)}
+        />
+      )}
 
       {openCard && (
         <Detail

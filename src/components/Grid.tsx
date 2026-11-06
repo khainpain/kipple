@@ -21,13 +21,16 @@ function estimate(c: Card, colW: number, view: ViewKey): number {
   return 100 + Math.min(c.text.length, 320) * 0.45;
 }
 
-type CardHandlers = {
+export type CardHandlers = {
   lib: Library;
   selected: Set<number>;
   activeId: number | null;
   onOpen: (c: Card) => void;
   onToggleSelect: (c: Card, range: boolean) => void;
   onJunk: (c: Card) => void;
+  onPin: (c: Card) => void;
+  topics: string[];
+  onMove: (c: Card, topic: string) => void;
   onOpenLink: (url: string) => void;
 };
 
@@ -87,6 +90,9 @@ export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey }) {
       onOpen={() => props.onOpen(c)}
       onToggleSelect={(range) => props.onToggleSelect(c, range)}
       onJunk={() => props.onJunk(c)}
+      onPin={() => props.onPin(c)}
+      topics={props.topics}
+      onMove={(t) => props.onMove(c, t)}
       onOpenLink={props.onOpenLink}
     />
   );
