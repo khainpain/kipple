@@ -180,10 +180,11 @@ function page(c, other, rel, css, js) {
 </head>
 <body>
 <a class="skip" href="#main">${t(c.skip)}</a>
-<header class="top wrap">
+<header class="top wrap"><div class="brand">
   <a class="logo" href="${c.path}" aria-label="Kipple">
     <picture><source srcset="/img/kipple-logo-dark.svg" media="(prefers-color-scheme: dark)"><img src="/img/kipple-logo-light.svg" alt="Kipple" width="131" height="38"></picture>
   </a>
+  <span class="alpha" title="${t(c.alpha)}" role="img" aria-label="${t(c.alpha)}">α</span></div>
   <details class="langs">
     <summary aria-label="${c.lang === "ru" ? "Язык" : "Language"}">${ICON.globe}<span>${c.lang.toUpperCase()}</span></summary>
     <ul>

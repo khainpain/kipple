@@ -66,6 +66,14 @@ section { padding-block: 72px; }
 /* Header */
 .top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 18px; }
 .logo img { height: 36px; width: auto; }
+.brand { display: flex; align-items: flex-start; gap: 4px; }
+.alpha {
+  display: grid; place-items: center; width: 22px; height: 22px; margin: -4px 0 0 -6px; border-radius: 50%;
+  background: var(--accent-soft); color: var(--accent-ink); font: 700 14px/1 var(--font-display); cursor: help;
+  transform: rotate(-8deg);
+}
+.motion .alpha { animation: alpha-in 600ms cubic-bezier(.34, 1.56, .64, 1) 600ms both; }
+@keyframes alpha-in { from { opacity: 0; transform: scale(0) rotate(-60deg); } }
 .langs { position: relative; }
 .langs summary {
   list-style: none; cursor: pointer; display: flex; align-items: center; gap: 6px;
