@@ -286,6 +286,7 @@ export function telegramErrorText(e: unknown): string {
     [/PHONE_CODE_EMPTY|NO_CODE_REQUESTED/, L.errNoCode],
     [/PASSWORD_HASH_INVALID/, L.errPassword],
     [/SIGN_UP_REQUIRED/, L.errSignUp],
+    [/AUTH_TOKEN_(EXPIRED|INVALID|ALREADY_ACCEPTED)|QR_MIGRATE_LOOP/, L.errQrExpired],
     [/AUTH_KEY|SESSION_REVOKED/, L.errSession],
     [/CHANNELS_TOO_MUCH/, L.errTooMany],
   ];

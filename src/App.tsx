@@ -14,6 +14,7 @@ import { toCsv, toMarkdown } from "./lib/exporters";
 import { deleteApiKey, getApiKey, setApiKey } from "./lib/secrets";
 import { Workspace, type Job } from "./components/Workspace";
 import { SettingsDialog } from "./components/Settings";
+import { Welcome } from "./components/Welcome";
 import { demoLibrary } from "./lib/demo";
 import { T, lang, resolveLang, setLang } from "./i18n";
 import type { AiLang } from "./lib/ai";
@@ -362,35 +363,19 @@ export default function App() {
 
   if (!lib) {
     return (
-      <div className="welcome">
-        {banners}
-        <h1>Saved Board</h1>
-        <p>{T.welcome.intro}</p>
-        <details className="export-help" open>
-          <summary>
-            {T.welcome.howTo} <span className="hint">· {T.welcome.howToTime}</span>
-          </summary>
-          <ol>
-            {T.welcome.steps.map((step, i) => (
-              <li key={i}>{step}</li>
-            ))}
-          </ol>
-        </details>
-        <div className="welcome-buttons">
-          <button onClick={doImport}>{T.welcome.pickFolder}</button>
-          {isWeb && (
-            <button className="secondary" onClick={openDemo}>
-              {T.welcome.demo}
-            </button>
-          )}
-          <button className="secondary" onClick={() => setShowSettings(true)}>
-            {T.welcome.settings}
-          </button>
-        </div>
-        {!hasKey && <p className="hint">{T.welcome.noKeyHint}</p>}
+      <Welcome
+        tg={platform.telegram}
+        showDemo={isWeb}
+        onImport={doImport}
+        onDemo={openDemo}
+        onSettings={() => setShowSettings(true)}
+        onLanguage={(l) => void onSaveSettings({ ...settingsRef.current, language: l }, null)}
+        openUrl={(u) => void platform.openUrl(u)}
+        top={banners}
+      >
         {settingsDialog}
         {toast && <div className="toast">{toast}</div>}
-      </div>
+      </Welcome>
     );
   }
 

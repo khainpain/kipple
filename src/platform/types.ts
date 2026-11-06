@@ -29,6 +29,9 @@ export interface TelegramStatus {
 
 export type SignInResult = { status: "ok"; name: string } | { status: "password"; hint?: string | null };
 
+/** QR sign-in: a `tg://login?token=…` link to show until `expires` (unix seconds), or the outcome. */
+export type QrResult = { status: "qr"; url: string; expires: number } | SignInResult;
+
 /**
  * The user's own Telegram account over MTProto (desktop only). Errors are strings:
  * `FLOOD_WAIT:<seconds>` for rate limits, otherwise Telegram's error name.
@@ -42,6 +45,14 @@ export interface TelegramApi {
   requestCode(phone: string): Promise<void>;
   signIn(code: string): Promise<SignInResult>;
   checkPassword(password: string): Promise<SignInResult>;
+  /**
+   * QR sign-in. Call about every 1.5 s while the code is on screen: returns the current code
+   * (a new one once it expires) or, after the phone confirmed it, the sign-in result.
+   * A "password" result continues with checkPassword().
+   */
+  qrPoll(): Promise<QrResult>;
+  /** Stops QR sign-in (switched to the phone number or left the screen). */
+  qrCancel(): Promise<void>;
   logout(): Promise<void>;
   ensureBoard(prev: { channelId: number; accessHash: string } | null, title: string, about: string): Promise<{ channelId: number; accessHash: string; created: boolean }>;
   createTopic(board: { channelId: number; accessHash: string }, title: string, iconColor?: number): Promise<number>;
