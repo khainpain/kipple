@@ -14,6 +14,7 @@ import { joinPath, type HttpFetch, type Platform, type TelegramApi } from "./typ
 const telegram: TelegramApi = {
   status: () => invoke("tg_status"),
   setApi: (apiId, apiHash) => invoke("tg_set_api", { apiId, apiHash }),
+  clearApi: () => invoke("tg_clear_api"),
   requestCode: (phone) => invoke("tg_request_code", { phone }),
   signIn: (code) => invoke("tg_sign_in", { code }),
   checkPassword: (password) => invoke("tg_check_password", { password }),

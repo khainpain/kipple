@@ -51,6 +51,8 @@ pub struct TgStatus {
     has_api: bool,
     /// This build has api_id / api_hash baked in, so the user never has to enter them.
     built_in_api: bool,
+    /// The user saved their own api_id / api_hash (Settings → Advanced); they win over the built-in ones.
+    custom_api: bool,
     authorized: bool,
     name: Option<String>,
 }
@@ -85,6 +87,10 @@ fn built_in_api() -> Option<(&'static str, &'static str)> {
         (Some(id), Some(hash)) if !id.trim().is_empty() && !hash.trim().is_empty() => Some((id, hash)),
         _ => None,
     }
+}
+
+fn custom_api() -> bool {
+    read_secret(API_ID_KEY).is_some() && read_secret(API_HASH_KEY).is_some()
 }
 
 fn api_credentials() -> Option<(i32, String)> {
@@ -228,17 +234,18 @@ async fn me(client: &Client) -> Result<Option<String>, InvocationError> {
 #[tauri::command]
 pub async fn tg_status(state: tauri::State<'_, TgState>) -> Result<TgStatus, String> {
     let built_in_api = built_in_api().is_some();
+    let custom_api = custom_api();
     if api_credentials().is_none() {
-        return Ok(TgStatus { has_api: false, built_in_api, authorized: false, name: None });
+        return Ok(TgStatus { has_api: false, built_in_api, custom_api, authorized: false, name: None });
     }
     // Without a saved session there's nothing to check, and no reason to connect yet.
     let connected = state.0.lock().await.is_some();
     if read_secret(SESSION_KEY).is_none() && !connected {
-        return Ok(TgStatus { has_api: true, built_in_api, authorized: false, name: None });
+        return Ok(TgStatus { has_api: true, built_in_api, custom_api, authorized: false, name: None });
     }
     let c = conn(&state).await?;
     let name = me(&c.client).await.map_err(err)?;
-    Ok(TgStatus { has_api: true, built_in_api, authorized: name.is_some(), name })
+    Ok(TgStatus { has_api: true, built_in_api, custom_api, authorized: name.is_some(), name })
 }
 
 /// Saves the user's own api_id / api_hash (from my.telegram.org) and reconnects with them.
@@ -251,6 +258,20 @@ pub async fn tg_set_api(state: tauri::State<'_, TgState>, api_id: String, api_ha
     }
     keyring(API_ID_KEY)?.set_password(id).map_err(|e| e.to_string())?;
     keyring(API_HASH_KEY)?.set_password(hash).map_err(|e| e.to_string())?;
+    if let Some(old) = state.0.lock().await.take() {
+        old.client.disconnect();
+    }
+    Ok(())
+}
+
+/// Forgets the user's own api_id / api_hash, so the built-in ones are used again.
+#[tauri::command]
+pub async fn tg_clear_api(state: tauri::State<'_, TgState>) -> Result<(), String> {
+    for name in [API_ID_KEY, API_HASH_KEY] {
+        if let Ok(e) = keyring(name) {
+            let _ = e.delete_credential();
+        }
+    }
     if let Some(old) = state.0.lock().await.take() {
         old.client.disconnect();
     }

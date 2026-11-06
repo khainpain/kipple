@@ -51,6 +51,7 @@ pub fn run() {
             delete_secret,
             telegram::tg_status,
             telegram::tg_set_api,
+            telegram::tg_clear_api,
             telegram::tg_request_code,
             telegram::tg_sign_in,
             telegram::tg_check_password,

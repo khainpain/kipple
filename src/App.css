@@ -1339,3 +1339,36 @@ code {
   margin-bottom: 20px;
 }
 
+
+/* Welcome: step-by-step export help, and collapsible sections in Settings */
+.export-help,
+.modal details.advanced {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 10px 14px;
+  margin: 16px 0 0;
+}
+.export-help summary,
+.modal details.advanced summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.export-help summary .hint {
+  font-weight: 400;
+}
+.export-help ol {
+  margin: 10px 0 4px;
+  padding-left: 22px;
+}
+.export-help li + li {
+  margin-top: 6px;
+}
+.modal details.advanced[open] summary {
+  margin-bottom: 10px;
+}
+.modal details.advanced .tg-api {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
