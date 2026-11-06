@@ -9,7 +9,8 @@ import { Icon } from "./Icon";
 import { coverOf, displayTitle, siteOf } from "./CardView";
 import { Preview } from "./Preview";
 import { isImportant } from "../lib/smart";
-import { OPEN_MODES, PANEL_WIDTH, clampPanelWidth, loadPanelWidth, savePref, type OpenMode } from "./nav";
+import { OPEN_MODES, PANEL_WIDTH, clampPanelWidth, hueOf, loadPanelWidth, savePref, type OpenMode } from "./nav";
+import { TopicMenu } from "./TopicMenu";
 
 /**
  * The full card. Opens the way the user picked: centered over the board (default),
@@ -35,6 +36,7 @@ export function Detail(props: {
   const [dragging, setDragging] = useState(false);
   const [title, setTitle] = useState(effectiveTitle(card));
   const [topic, setTopic] = useState(effectiveTopic(card) ?? "");
+  const [topicAt, setTopicAt] = useState<HTMLElement | null>(null);
   const [tags, setTags] = useState(effectiveTags(card).join(", "));
   const [note, setNote] = useState(card.user?.note ?? "");
   const action = effectiveAction(card);
@@ -229,15 +231,37 @@ export function Detail(props: {
             ))}
           </div>
         </div>
-        <label className="field">
-          <span>{T.detail.topic}</span>
-          <input value={topic} list="topic-options" onChange={(e) => setTopic(e.target.value)} onBlur={saveText} />
-          <datalist id="topic-options">
-            {props.topics.map((t) => (
-              <option key={t} value={t} />
-            ))}
-          </datalist>
-        </label>
+        <div className="field">
+          <span id="detail-topic-label">{T.detail.topic}</span>
+          <button
+            type="button"
+            className={`select-btn${topicAt ? " open" : ""}`}
+            aria-haspopup="listbox"
+            aria-expanded={!!topicAt}
+            aria-labelledby="detail-topic-label"
+            onClick={(e) => setTopicAt(topicAt ? null : e.currentTarget)}
+          >
+            {topic ? <span className="topic-dot" style={{ "--h": hueOf(topic) } as React.CSSProperties} /> : null}
+            <span className={`label${topic ? "" : " placeholder"}`}>{topic || T.nav.noTopic}</span>
+            <Icon name="down" size={12} className="chev" />
+          </button>
+          {topicAt && (
+            <TopicMenu
+              anchor={topicAt}
+              matchAnchor
+              topics={props.topics}
+              current={topic || undefined}
+              onPick={(t) => {
+                setTopic(t);
+                if (t !== (effectiveTopic(card) ?? "")) props.onEdit({ topic: t });
+              }}
+              onClose={() => {
+                setTopicAt(null);
+                topicAt.focus();
+              }}
+            />
+          )}
+        </div>
         <label className="field">
           <span>{T.detail.tags}</span>
           <input value={tags} onChange={(e) => setTags(e.target.value)} onBlur={saveText} />
