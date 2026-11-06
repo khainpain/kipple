@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { platform } from "@platform";
 import type { Card, Library, UserFields } from "../lib/types";
-import { effectiveAction, effectiveTags, effectiveTopic, matchesFilter } from "../lib/library";
+import { effectiveAction, effectiveTags, effectiveTopic, matchesFilter, tagName, topicName } from "../lib/library";
 import { countDuplicateGroups, findDuplicates, groupDuplicates, isImportant } from "../lib/smart";
 import { Overview, type OverviewSection } from "./Overview";
 import { TidyDialog, type TidyKind } from "./TidyDialog";
@@ -94,6 +94,13 @@ export function Workspace(props: {
   const [groupError, setGroupError] = useState<string | null>(null);
   const lastClicked = useRef<number | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  // A merge in "Tidy up" renames topics and tags: follow the open topic and the chosen tag to
+  // their new name, or the board would stay on a name no card has any more and look empty.
+  useEffect(() => {
+    if (scope.kind === "topic" && topicName(scope.name) !== scope.name) setScope({ kind: "topic", name: topicName(scope.name) });
+    if (tag && tagName(tag) !== tag) setTag(tagName(tag));
+  }, [props.aliases]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => savePref("sort", sort), [sort]);
   useEffect(() => savePref("layout", view), [view]);
