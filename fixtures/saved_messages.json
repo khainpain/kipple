@@ -1,0 +1,138 @@
+{
+  "name": "Saved Messages",
+  "type": "saved_messages",
+  "id": 100,
+  "messages": [
+    {
+      "id": 1,
+      "type": "service",
+      "date": "2024-03-01T09:00:00",
+      "date_unixtime": "1709283600",
+      "action": "pin_message",
+      "text": "",
+      "text_entities": []
+    },
+    {
+      "id": 2,
+      "type": "message",
+      "date": "2024-03-01T09:30:00",
+      "date_unixtime": "1709285400",
+      "from": "Mikhail",
+      "from_id": "user1",
+      "text": ["Смотри ", { "type": "text_link", "text": "статью", "href": "https://example.com/masonry" }, " про masonry ", { "type": "hashtag", "text": "#design" }],
+      "text_entities": [
+        { "type": "plain", "text": "Смотри " },
+        { "type": "text_link", "text": "статью", "href": "https://example.com/masonry" },
+        { "type": "plain", "text": " про masonry " },
+        { "type": "hashtag", "text": "#design" }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "message",
+      "date": "2024-03-01T09:40:00",
+      "date_unixtime": "1709286000",
+      "from": "Mikhail",
+      "text": [{ "type": "link", "text": "https://www.youtube.com/watch?v=abc123" }],
+      "text_entities": [{ "type": "link", "text": "https://www.youtube.com/watch?v=abc123" }]
+    },
+    {
+      "id": 4,
+      "type": "message",
+      "date": "2024-03-01T10:00:00",
+      "date_unixtime": "1709287200",
+      "from": "Mikhail",
+      "forwarded_from": "Дизайн-канал",
+      "photo": "photos/photo_1@01-03-2024_10-00-00.jpg",
+      "width": 1280,
+      "height": 960,
+      "text": "Референсы для лендинга",
+      "text_entities": [{ "type": "plain", "text": "Референсы для лендинга" }]
+    },
+    {
+      "id": 5,
+      "type": "message",
+      "date": "2024-03-01T10:00:00",
+      "date_unixtime": "1709287200",
+      "from": "Mikhail",
+      "forwarded_from": "Дизайн-канал",
+      "photo": "photos/photo_2@01-03-2024_10-00-00.jpg",
+      "width": 800,
+      "height": 1200,
+      "text": "",
+      "text_entities": []
+    },
+    {
+      "id": 6,
+      "type": "message",
+      "date": "2024-03-02T12:00:00",
+      "date_unixtime": "1709380800",
+      "from": "Mikhail",
+      "file": "(File not included. Change data exporting settings to download.)",
+      "thumbnail": "(File not included. Change data exporting settings to download.)",
+      "media_type": "video_file",
+      "mime_type": "video/mp4",
+      "duration_seconds": 42,
+      "width": 1920,
+      "height": 1080,
+      "text": "Как делать анимации",
+      "text_entities": [{ "type": "plain", "text": "Как делать анимации" }]
+    },
+    {
+      "id": 7,
+      "type": "message",
+      "date": "2024-03-03T08:00:00",
+      "date_unixtime": "1709452800",
+      "from": "Mikhail",
+      "file": "files/report.pdf",
+      "file_name": "report.pdf",
+      "file_size": 204800,
+      "mime_type": "application/pdf",
+      "text": "",
+      "text_entities": []
+    },
+    {
+      "id": 8,
+      "type": "message",
+      "date": "2024-03-03T08:05:00",
+      "date_unixtime": "1709453100",
+      "from": "Mikhail",
+      "file": "voice_messages/audio_1@03-03-2024_08-05-00.ogg",
+      "media_type": "voice_message",
+      "mime_type": "audio/ogg",
+      "duration_seconds": 7,
+      "text": "",
+      "text_entities": []
+    },
+    {
+      "id": 9,
+      "type": "message",
+      "date": "2024-03-03T08:06:00",
+      "date_unixtime": "1709453160",
+      "from": "Mikhail",
+      "file": "stickers/sticker.webp",
+      "media_type": "sticker",
+      "sticker_emoji": "👍",
+      "text": "",
+      "text_entities": []
+    },
+    {
+      "id": 10,
+      "type": "message",
+      "date": "2024-03-04T20:00:00",
+      "date_unixtime": "1709582400",
+      "from": "Mikhail",
+      "text": "wifi дома пароль: correct-horse-battery",
+      "text_entities": [{ "type": "plain", "text": "wifi дома пароль: correct-horse-battery" }]
+    },
+    {
+      "id": 11,
+      "type": "message",
+      "date": "2024-03-05T20:00:00",
+      "date_unixtime": "1709668800",
+      "from": "Mikhail",
+      "text": "Идея: бот, который раз в неделю присылает три случайные сохранёнки",
+      "text_entities": [{ "type": "plain", "text": "Идея: бот, который раз в неделю присылает три случайные сохранёнки" }]
+    }
+  ]
+}
