@@ -1,39 +1,41 @@
 import { useEffect, useMemo, useState } from "react";
-import { platform } from "@platform";
-import type { TelegramApi, TelegramStatus } from "../platform/types";
+import type { TelegramApi } from "../platform/types";
 import type { Card } from "../lib/types";
 import { BOARD_TITLE, buildPlan, otherTopic, telegramErrorText, type BoardState, type SendOptions } from "../lib/telegram";
 import { loadBoardState } from "../lib/store";
 import { T } from "../i18n";
 
-type Step = "loading" | "api" | "phone" | "code" | "password" | "ready";
+type Step = "loading" | "noApi" | "phone" | "code" | "password" | "ready";
 
 /** Logs in to the user's Telegram account and starts sending the library to the "Saved Board" group. */
-export function TelegramDialog(props: { tg: TelegramApi; cards: Card[]; running: boolean; onStart: (opts: SendOptions) => void; onClose: () => void }) {
+export function TelegramDialog(props: {
+  tg: TelegramApi;
+  cards: Card[];
+  running: boolean;
+  onStart: (opts: SendOptions) => void;
+  /** Only for builds without a built-in Telegram key: the user's own key lives in Settings → Advanced. */
+  onOpenSettings: () => void;
+  onClose: () => void;
+}) {
   const { tg } = props;
   const [step, setStep] = useState<Step>("loading");
-  const [status, setStatus] = useState<TelegramStatus | null>(null);
   const [state, setState] = useState<BoardState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [apiId, setApiId] = useState("");
-  const [apiHash, setApiHash] = useState("");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [hint, setHint] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [opts, setOpts] = useState<SendOptions>({ includeJunk: false, includeSensitive: false });
-  const [showApi, setShowApi] = useState(false);
 
   async function refresh() {
     setError(null);
     try {
       const [s, b] = await Promise.all([tg.status(), loadBoardState()]);
-      setStatus(s);
       setState(b);
       setName(s.name ?? "");
-      setStep(!s.hasApi ? "api" : s.authorized ? "ready" : "phone");
+      setStep(!s.hasApi ? "noApi" : s.authorized ? "ready" : "phone");
     } catch (e) {
       setError(telegramErrorText(e));
       setStep("phone");
@@ -65,12 +67,6 @@ export function TelegramDialog(props: { tg: TelegramApi; cards: Card[]; running:
     return props.cards.filter((c) => ids.has(c.id) && !c.ai && !c.user?.topic).length;
   }, [plan, props.cards]);
 
-  const link = (url: string, text: string) => (
-    <a href="#" onClick={(e) => (e.preventDefault(), platform.openUrl(url))}>
-      {text}
-    </a>
-  );
-
   const L = T.telegram;
 
   return (
@@ -86,60 +82,23 @@ export function TelegramDialog(props: { tg: TelegramApi; cards: Card[]; running:
 
         {step === "loading" && <p className="hint">{L.checking}</p>}
 
-        {(step === "api" || showApi) && (
-          <form
-            className="tg-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void run(async () => {
-                await tg.setApi(apiId, apiHash);
-                setShowApi(false);
-                await refresh();
-              });
-            }}
-          >
-            <p>
-              {L.apiIntro1}
-              {link("https://my.telegram.org/apps", "my.telegram.org")}
-              {L.apiIntro2}
-              <b>api_id</b>
-              {L.apiIntro3}
-              <b>api_hash</b>.
-            </p>
-            <div className="row">
-              <label>
-                api_id
-                <input inputMode="numeric" value={apiId} onChange={(e) => setApiId(e.target.value)} placeholder="1234567" />
-              </label>
-              <label>
-                api_hash
-                <input value={apiHash} onChange={(e) => setApiHash(e.target.value)} placeholder={L.apiHashPlaceholder} />
-              </label>
-            </div>
+        {step === "noApi" && (
+          <>
+            <p>{L.noApi}</p>
             <div className="dialog-buttons">
               <span className="spacer" />
-              {showApi && (
-                <button type="button" className="secondary" onClick={() => setShowApi(false)}>
-                  {T.common.cancel}
-                </button>
-              )}
-              <button disabled={busy || !apiId.trim() || !apiHash.trim()}>{T.common.save}</button>
+              <button onClick={props.onOpenSettings}>{L.openSettings}</button>
             </div>
-          </form>
+          </>
         )}
 
-        {step === "phone" && !showApi && (
+        {step === "phone" && (
           <form className="tg-form" onSubmit={(e) => (e.preventDefault(), void run(async () => (await tg.requestCode(phone), setStep("code"))))}>
             <label>
               {L.phone}
               <input type="tel" autoFocus value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={L.phonePlaceholder} />
             </label>
             <div className="dialog-buttons">
-              {!status?.builtInApi && (
-                <button type="button" className="secondary" onClick={() => setShowApi(true)}>
-                  {L.changeApi}
-                </button>
-              )}
               <span className="spacer" />
               <button disabled={busy || !phone.trim()}>{L.getCode}</button>
             </div>
@@ -200,7 +159,7 @@ export function TelegramDialog(props: { tg: TelegramApi; cards: Card[]; running:
           </form>
         )}
 
-        {step === "ready" && !showApi && (
+        {step === "ready" && (
           <>
             <p>
               {L.signedIn}{name ? <>: <b>{name}</b></> : ""}.{" "}

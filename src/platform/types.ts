@@ -21,6 +21,8 @@ export type HttpFetch = (url: string, init?: RequestInit & { connectTimeout?: nu
 export interface TelegramStatus {
   hasApi: boolean;
   builtInApi: boolean;
+  /** The user saved their own api_id / api_hash in Settings → Advanced. */
+  customApi: boolean;
   authorized: boolean;
   name?: string | null;
 }
@@ -33,7 +35,10 @@ export type SignInResult = { status: "ok"; name: string } | { status: "password"
  */
 export interface TelegramApi {
   status(): Promise<TelegramStatus>;
+  /** The user's own api_id / api_hash from my.telegram.org (Settings → Advanced); wins over the built-in key. */
   setApi(apiId: string, apiHash: string): Promise<void>;
+  /** Forgets the user's own key and goes back to the one built into the app. */
+  clearApi(): Promise<void>;
   requestCode(phone: string): Promise<void>;
   signIn(code: string): Promise<SignInResult>;
   checkPassword(password: string): Promise<SignInResult>;

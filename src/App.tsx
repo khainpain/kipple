@@ -366,19 +366,16 @@ export default function App() {
         {banners}
         <h1>Saved Board</h1>
         <p>{T.welcome.intro}</p>
-        <ol>
-          <li>{T.welcome.step1}</li>
-          <li>
-            {T.welcome.step2a}
-            <b>JSON</b>
-            {T.welcome.step2b}
-          </li>
-          <li>
-            {T.welcome.step3a}
-            <code>result.json</code>
-            {T.welcome.step3b}
-          </li>
-        </ol>
+        <details className="export-help" open>
+          <summary>
+            {T.welcome.howTo} <span className="hint">· {T.welcome.howToTime}</span>
+          </summary>
+          <ol>
+            {T.welcome.steps.map((step, i) => (
+              <li key={i}>{step}</li>
+            ))}
+          </ol>
+        </details>
         <div className="welcome-buttons">
           <button onClick={doImport}>{T.welcome.pickFolder}</button>
           {isWeb && (
@@ -417,7 +414,7 @@ export default function App() {
       />
       {settingsDialog}
       {showTelegram && platform.telegram && (
-        <TelegramDialog tg={platform.telegram} cards={lib.cards} running={sendingTg} onStart={sendTelegram} onClose={() => setShowTelegram(false)} />
+        <TelegramDialog tg={platform.telegram} cards={lib.cards} running={sendingTg} onStart={sendTelegram} onOpenSettings={() => (setShowTelegram(false), setShowSettings(true))} onClose={() => setShowTelegram(false)} />
       )}
       {toast && <div className="toast">{toast}</div>}
     </div>
