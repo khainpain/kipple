@@ -5,7 +5,7 @@ import { useTelegramAccount } from "./useTelegramAccount";
 import "./App.css";
 import type { Card, Library, UserFields } from "./lib/types";
 import { effectiveTags, effectiveTopic, makeEdit, matchesFilter, NO_ALIASES, setAliases, type Aliases } from "./lib/library";
-import { appendEdit, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadSettings, saveBoardState, saveLibrary, saveSettings, wipeAll, type Settings } from "./lib/store";
+import { aiAllowed, appendEdit, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadSettings, saveBoardState, saveLibrary, saveSettings, wipeAll, type Settings } from "./lib/store";
 import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type SendOptions } from "./lib/telegram";
 import { TelegramDialog } from "./components/TelegramDialog";
 import { importFolder, pickExportFolder } from "./lib/importer";
@@ -16,6 +16,7 @@ import { toCsv, toMarkdown } from "./lib/exporters";
 import { deleteApiKey, getAiAuth, getApiKey, setApiKey } from "./lib/secrets";
 import { Workspace, type Job } from "./components/Workspace";
 import { SettingsDialog } from "./components/Settings";
+import { AiConsentDialog } from "./components/AiConsent";
 import { Welcome } from "./components/Welcome";
 import { demoLibrary } from "./lib/demo";
 import { emptyTelegramLibrary, syncSaved } from "./lib/tgImport";
@@ -35,6 +36,8 @@ export default function App() {
   const tgAccount = useTelegramAccount(!showTelegram && lib !== null);
   const [sendingTg, setSendingTg] = useState(false);
   const [job, setJob] = useState<Job>(null);
+  /** The consent dialog is open; resolving it with the answer carries on with what asked. */
+  const [consent, setConsent] = useState<((ok: boolean) => void) | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [version, setVersion] = useState("");
   const [updating, setUpdating] = useState<number | null | false>(false);
@@ -148,6 +151,7 @@ export default function App() {
   }
 
   async function runAi(l: Library, signal: AbortSignal) {
+    if (!aiAllowed(settingsRef.current) || demoRef.current) return; // nothing leaves without consent
     const auth = await getAiAuth();
     if (!(await runTextAi(auth, l, signal))) return;
     if (settingsRef.current.aiImages && !signal.aborted) await runImageAi(auth, l, pendingImages(l.cards), signal);
@@ -180,7 +184,7 @@ export default function App() {
 
   /** One photo, on the user's request from the card: sends just this picture. */
   async function nameOne(card: Card) {
-    if (!lib) return;
+    if (!lib || !aiAllowed(settingsRef.current)) return;
     const auth = await getAiAuth();
     abortRef.current?.abort();
     const ctl = new AbortController();
@@ -232,7 +236,14 @@ export default function App() {
     abortRef.current = ctl;
     try {
       if (settingsRef.current.fetchLinks && platform.canFetchLinks) await enrichLinks(l, ctl.signal);
-      if (settingsRef.current.aiEnabled && !ctl.signal.aborted) await runAi(l, ctl.signal);
+      if (!ctl.signal.aborted && !demoRef.current && !aiAllowed(settingsRef.current) && !settingsRef.current.aiAsked && pendingForAi(l.cards).length) {
+        // The first time there is something to tag, ask once; "No AI" is remembered and not asked again.
+        setJob(null);
+        const ok = await askConsent();
+        const s = settingsRef.current;
+        await applySettings(ok ? { ...s, aiEnabled: true, aiConsentAt: new Date().toISOString(), aiAsked: true } : { ...s, aiAsked: true });
+      }
+      if (aiAllowed(settingsRef.current) && !ctl.signal.aborted) await runAi(l, ctl.signal);
     } finally {
       setJob(null);
       setRev((r) => r + 1);
@@ -360,11 +371,19 @@ export default function App() {
     }
   }
 
-  async function onSaveSettings(s: Settings, key: string | null) {
+  function askConsent(): Promise<boolean> {
+    return new Promise((resolve) => setConsent(() => (ok: boolean) => (setConsent(null), resolve(ok))));
+  }
+
+  async function applySettings(s: Settings) {
     await saveSettings(s);
     setLang(resolveLang(s.language));
     settingsRef.current = s;
     setSettings(s);
+  }
+
+  async function onSaveSettings(s: Settings, key: string | null) {
+    await applySettings(s);
     if (key) {
       try {
         await setApiKey(key);
@@ -437,6 +456,7 @@ export default function App() {
   }
 
   async function askSynonyms(kind: "topics" | "tags", counts: Map<string, number>) {
+    if (!aiAllowed(settingsRef.current) || demoRef.current) return []; // nothing leaves without consent
     try {
       return await suggestSynonyms(await getAiAuth(), aiModelOf(settingsRef.current.aiModel), kind, counts);
     } catch (e) {
@@ -446,7 +466,7 @@ export default function App() {
 
   /** Splits one topic into AI subgroups and keeps them in the library. Errors come back as readable messages. */
   async function groupTopic(topic: string) {
-    if (!lib) return;
+    if (!lib || !aiAllowed(settingsRef.current) || demoRef.current) return; // nothing leaves without consent
     const cards = lib.cards.filter((c) => !c.removed && matchesFilter(c, "all") && effectiveTopic(c) === topic);
     try {
       const groups = await groupCards(await getAiAuth(), aiModelOf(settingsRef.current.aiModel), aiLang(), topic, cards, displayTitle, effectiveTags);
@@ -462,6 +482,8 @@ export default function App() {
 
   const needAi = lib ? pendingForAi(lib.cards).length + (settings.aiImages ? pendingImages(lib.cards).length : 0) : 0;
   const settingsDialog = showSettings && <SettingsDialog settings={settings} hasKey={hasKey} version={version} onSave={onSaveSettings} onRetag={onRetag} retagCount={lib && !demo ? retagCount(lib.cards) : 0} onWipe={onWipe} onForgetKey={onForgetKey} onClose={() => setShowSettings(false)} />;
+
+  const consentDialog = consent && <AiConsentDialog hasKey={hasKey} onAllow={() => consent(true)} onDecline={() => consent(false)} />;
 
   const banners = (
     <>
@@ -517,6 +539,7 @@ export default function App() {
         top={banners}
       >
         {settingsDialog}
+        {consentDialog}
         {toast && <div className="toast">{toast}</div>}
       </Welcome>
     );
@@ -531,21 +554,22 @@ export default function App() {
         tgAccount={tgAccount}
         job={job}
         needAi={demo ? 0 : needAi}
-        aiEnabled={settings.aiEnabled}
+        aiEnabled={aiAllowed(settings)}
         onImport={demo ? undefined : doImport}
         onExport={doExport}
         onSettings={() => setShowSettings(true)}
         onTelegram={platform.telegram && !demo ? () => setShowTelegram(true) : undefined}
         onRunAi={() => processAll(lib)}
-        onNameImage={settings.aiEnabled && !demo ? nameOne : undefined}
+        onNameImage={aiAllowed(settings) && !demo ? nameOne : undefined}
         onStop={() => abortRef.current?.abort()}
         onEdit={edit}
         aliases={aliases}
         onAliases={onAliases}
-        askSynonyms={settings.aiEnabled && !demo ? askSynonyms : undefined}
-        onGroupTopic={settings.aiEnabled && !demo ? groupTopic : undefined}
+        askSynonyms={aiAllowed(settings) && !demo ? askSynonyms : undefined}
+        onGroupTopic={aiAllowed(settings) && !demo ? groupTopic : undefined}
       />
       {settingsDialog}
+      {consentDialog}
       {showTelegram && platform.telegram && (
         <TelegramDialog tg={platform.telegram} cards={lib.cards} running={sendingTg} onStart={sendTelegram} onOpenSettings={() => (setShowTelegram(false), setShowSettings(true))} onClose={() => setShowTelegram(false)} />
       )}

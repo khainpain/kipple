@@ -12,7 +12,15 @@ const SETTINGS = "settings.json";
 const TELEGRAM = "telegram.json";
 
 export interface Settings {
+  /** AI tagging on. Only counts together with aiConsentAt: see aiAllowed. */
   aiEnabled: boolean;
+  /**
+   * When the user agreed, in the consent dialog, that card text goes to Anthropic. Without it
+   * nothing is ever sent, whatever aiEnabled says (older versions saved aiEnabled: true by default).
+   */
+  aiConsentAt?: string;
+  /** The consent dialog was shown once, so the app doesn't offer AI again on its own. */
+  aiAsked?: boolean;
   fetchLinks: boolean;
   /** Send downscaled copies of uncaptioned photos to the AI to name them. Off unless the user turns it on. */
   aiImages: boolean;
@@ -26,7 +34,7 @@ export interface Settings {
   aliases?: Aliases;
 }
 
-export const DEFAULT_SETTINGS: Settings = { aiEnabled: true, fetchLinks: true, aiImages: false, language: "auto", aiLanguage: "ui", aiModel: DEFAULT_AI_MODEL };
+export const DEFAULT_SETTINGS: Settings = { aiEnabled: false, fetchLinks: true, aiImages: false, language: "auto", aiLanguage: "ui", aiModel: DEFAULT_AI_MODEL };
 
 export async function loadLibrary(): Promise<Library | null> {
   if (!(await exists(LIBRARY))) return null;
@@ -62,9 +70,17 @@ export async function appendEdit(ev: EditEvent) {
   await append(EDITS, JSON.stringify(ev) + "\n");
 }
 
+/** Whether anything may go to the AI at all: turned on and agreed to. */
+export const aiAllowed = (s: Settings) => s.aiEnabled && !!s.aiConsentAt;
+
 export async function loadSettings(): Promise<Settings> {
   if (!(await exists(SETTINGS))) return DEFAULT_SETTINGS;
-  return { ...DEFAULT_SETTINGS, ...JSON.parse(await read(SETTINGS)) };
+  return withoutUnconsentedAi({ ...DEFAULT_SETTINGS, ...JSON.parse(await read(SETTINGS)) });
+}
+
+/** Installs from before the consent dialog had AI on by default: off until the user agrees. */
+export function withoutUnconsentedAi(s: Settings): Settings {
+  return s.aiConsentAt ? s : { ...s, aiEnabled: false, aiImages: false };
 }
 
 export async function saveSettings(s: Settings) {
