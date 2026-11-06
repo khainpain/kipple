@@ -38,6 +38,10 @@ export default function App() {
   updatingRef.current = updating;
   const { update, later: updateLater } = useUpdateCheck(() => updatingRef.current !== false);
   const abortRef = useRef<AbortController | null>(null);
+  /** Desktop demo: lives only in memory, so it never mixes with a real import or edit log. */
+  const [demo, setDemo] = useState(false);
+  const demoRef = useRef(demo);
+  demoRef.current = demo;
   /** Settings as of now, for AI runs that start right after a save (state updates later). */
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
@@ -89,6 +93,7 @@ export default function App() {
   }
 
   const persist = useCallback(async (l: Library) => {
+    if (demoRef.current) return;
     try {
       await saveLibrary(l);
     } catch (e) {
@@ -219,8 +224,10 @@ export default function App() {
     const src = await pickExportFolder();
     if (!src) return;
     try {
-      const { lib: next, added, warning } = await importFolder(src, lib);
+      const { lib: next, added, warning } = await importFolder(src, demoRef.current ? null : lib);
       await saveLibrary(next);
+      demoRef.current = false; // before processAll below, which saves as it goes
+      setDemo(false);
       setLib(next);
       setRev((r) => r + 1);
       notify(warning ?? T.app.imported(next.cards.length, added));
@@ -232,7 +239,10 @@ export default function App() {
 
   async function openDemo() {
     const next = demoLibrary();
-    await saveLibrary(next);
+    // The browser build keeps the demo between visits; the desktop app only shows it, and
+    // the next import replaces it instead of merging into it.
+    if (isWeb) await saveLibrary(next);
+    else setDemo(true);
     setLib(next);
     setRev((r) => r + 1);
   }
@@ -243,6 +253,7 @@ export default function App() {
       const set = new Set(ids);
       for (const c of lib.cards) if (set.has(c.id)) c.user = { ...c.user, ...patch };
       setRev((r) => r + 1);
+      if (demoRef.current) return;
       for (const id of ids) void appendEdit(makeEdit(id, patch)).catch((e) => notify(T.app.editFailed(String(e))));
     },
     [lib, notify],
@@ -323,6 +334,7 @@ export default function App() {
     await wipeAll();
     await deleteApiKey().catch(() => undefined);
     await platform.telegram?.logout().catch(() => undefined);
+    setDemo(false);
     setLib(null);
     setHasKey(false);
     setShowSettings(false);
@@ -365,7 +377,7 @@ export default function App() {
     return (
       <Welcome
         tg={platform.telegram}
-        showDemo={isWeb}
+        showDemo
         onImport={doImport}
         onDemo={openDemo}
         onSettings={() => setShowSettings(true)}
@@ -391,7 +403,7 @@ export default function App() {
         onImport={doImport}
         onExport={doExport}
         onSettings={() => setShowSettings(true)}
-        onTelegram={platform.telegram ? () => setShowTelegram(true) : undefined}
+        onTelegram={platform.telegram && !demo ? () => setShowTelegram(true) : undefined}
         onRunAi={() => processAll(lib)}
         onNameImage={settings.aiEnabled && hasKey ? nameOne : undefined}
         onStop={() => abortRef.current?.abort()}

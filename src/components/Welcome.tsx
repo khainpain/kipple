@@ -33,7 +33,7 @@ function rich(text: string, openUrl: (url: string) => void): ReactNode[] {
 export function Welcome(props: {
   /** Undefined in the browser build: no Telegram sign-in there. */
   tg?: TelegramApi;
-  showDemo: boolean;
+  showDemo?: boolean;
   onImport: () => void;
   onDemo: () => void;
   onSettings: () => void;
