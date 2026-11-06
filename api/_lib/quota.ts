@@ -9,6 +9,8 @@
 // KV_REST_API_TOKEN, or UPSTASH_REDIS_REST_URL/_TOKEN). Without it they are kept in the
 // function's memory: fine for a handful of friends, but each instance counts on its own.
 
+import { appRequests } from "../../src/lib/prompts";
+
 declare const process: { env: Record<string, string | undefined> };
 export const env = (name: string): string | undefined => process.env[name] || undefined;
 
@@ -35,9 +37,13 @@ export const MODEL_WEIGHT: Record<string, number> = {
   "claude-opus-5-5": 5,
 };
 
-// The start of the app's two system prompts (src/lib/ai.ts). Anything else is not the app.
-const PROMPTS = ["You are sorting a personal archive of Telegram Saved Messages", "You name pictures without a caption from a personal archive of Telegram Saved Messages"];
 const MAX_TOKENS = 16_000;
+
+// The app's exact system prompts, each with its answer schema (src/lib/prompts.ts). Anything else is not the app:
+// checking only the start of the prompt would let anyone append their own instructions and use the
+// key as a free general-purpose Claude.
+let expected: Map<string, string> | null = null;
+const app = () => (expected ??= new Map(appRequests().map((r) => [r.system, JSON.stringify(r.format)])));
 
 /** Why the request isn't one the app would send, or null if it is. */
 export function allowedRequest(body: Record<string, unknown>): string | null {
@@ -45,8 +51,12 @@ export function allowedRequest(body: Record<string, unknown>): string | null {
   if (typeof body.max_tokens !== "number" || body.max_tokens > MAX_TOKENS) return "max_tokens is too large.";
   if (body.stream) return "Streaming is not supported.";
   for (const k of ["tools", "tool_choice", "mcp_servers", "container"]) if (k in body) return `${k} is not supported.`;
-  if (typeof body.system !== "string" || !PROMPTS.some((p) => (body.system as string).startsWith(p))) return "Only the app's own requests are accepted.";
-  if (!Array.isArray(body.messages) || body.messages.length !== 1) return "Only the app's own requests are accepted.";
+  const own = "Only the app's own requests are accepted.";
+  const format = typeof body.system === "string" ? app().get(body.system) : undefined;
+  if (format === undefined) return own;
+  const oc = body.output_config as { format?: unknown } | undefined;
+  if (!oc || typeof oc !== "object" || JSON.stringify(oc.format) !== format) return own;
+  if (!Array.isArray(body.messages) || body.messages.length !== 1 || (body.messages[0] as { role?: unknown })?.role !== "user") return own;
   return null;
 }
 
@@ -64,6 +74,14 @@ export function unitsOf(model: string, u: Usage): number {
 
 export function clientIp(request: Request): string {
   return (request.headers.get("x-real-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown").trim();
+}
+
+/**
+ * Units set aside while a request runs: its largest possible answer plus a rough guess at the input.
+ * Counted before the request goes out, so many requests sent at once can't all slip under the limit.
+ */
+export function reserveUnits(model: string, maxTokens: number, bodyLength: number): number {
+  return unitsOf(model, { input_tokens: Math.min(Math.ceil(bodyLength / 4), 100_000), output_tokens: maxTokens });
 }
 
 // ---- Counters ---------------------------------------------------------------
@@ -111,27 +129,38 @@ const keys = (install: string, ip: string) => {
 
 export type Verdict = "install" | "ip" | "global" | "minute";
 
-/** Which limit this request would cross, or null. Counts the request toward the per-minute limit. */
-export async function checkQuota(install: string, ip: string): Promise<Verdict | null> {
-  const k = keys(install, ip);
-  try {
-    const [i, a, g, m] = await redis([["GET", k.install], ["GET", k.ip], ["GET", k.global], ["INCRBY", k.minute, 1], ["EXPIRE", k.minute, 120]]);
-    if ((g ?? 0) >= LIMITS.global()) return "global";
-    if ((i ?? 0) >= LIMITS.install()) return "install";
-    if ((a ?? 0) >= LIMITS.ip()) return "ip";
-    if ((m ?? 0) > LIMITS.ipPerMinute()) return "minute";
-  } catch (e) {
-    // Counting is down: let the request through rather than break tagging; the global cap resumes when it's back.
-    console.error("quota check failed", e);
-  }
-  return null;
-}
-
-export async function chargeUsage(install: string, ip: string, model: string, usage: Usage): Promise<void> {
-  const n = unitsOf(model, usage);
+/**
+ * Sets `reserve` units aside on the install, IP and global counters and returns which limit was
+ * already crossed (giving the units back), or null. Also counts the request toward the per-minute
+ * limit. Throws when the counters can't be reached: the caller then refuses the request, so an
+ * outage of the counter store doesn't lift the limits.
+ */
+export async function checkQuota(install: string, ip: string, reserve: number): Promise<Verdict | null> {
   const k = keys(install, ip);
   const ttl = 172_800;
-  await redis([["INCRBY", k.install, n], ["EXPIRE", k.install, ttl], ["INCRBY", k.ip, n], ["EXPIRE", k.ip, ttl], ["INCRBY", k.global, n], ["EXPIRE", k.global, ttl]]);
+  const [i, , a, , g, , m] = await redis([
+    ["INCRBY", k.install, reserve], ["EXPIRE", k.install, ttl],
+    ["INCRBY", k.ip, reserve], ["EXPIRE", k.ip, ttl],
+    ["INCRBY", k.global, reserve], ["EXPIRE", k.global, ttl],
+    ["INCRBY", k.minute, 1], ["EXPIRE", k.minute, 120],
+  ]);
+  const before = (n: number | null) => (n ?? reserve) - reserve;
+  const verdict: Verdict | null =
+    before(g) >= LIMITS.global() ? "global"
+    : before(i) >= LIMITS.install() ? "install"
+    : before(a) >= LIMITS.ip() ? "ip"
+    : (m ?? 0) > LIMITS.ipPerMinute() ? "minute"
+    : null;
+  if (verdict) await settleUsage(install, ip, reserve, 0).catch((e) => console.error("quota refund failed", e));
+  return verdict;
+}
+
+/** Replaces the reserved units with what the request really cost (0 if it failed). */
+export async function settleUsage(install: string, ip: string, reserved: number, actual: number): Promise<void> {
+  const d = actual - reserved;
+  if (!d) return;
+  const k = keys(install, ip);
+  await redis([["INCRBY", k.install, d], ["INCRBY", k.ip, d], ["INCRBY", k.global, d]]);
 }
 
 /** How much of today's allowance this install has used, for the Settings screen. */
