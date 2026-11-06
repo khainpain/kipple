@@ -1408,7 +1408,8 @@ code {
 }
 .ov-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  line-height: 20px;
   gap: 10px;
   margin-bottom: 10px;
   min-width: 0;
@@ -1429,10 +1430,11 @@ button.ov-title:hover {
 }
 .ov-title .icon {
   color: var(--muted);
-  align-self: center;
+  flex-shrink: 0;
 }
 .ov-title h2 {
   margin: 0;
+  line-height: inherit;
   font-size: 15px;
   font-weight: 600;
 }

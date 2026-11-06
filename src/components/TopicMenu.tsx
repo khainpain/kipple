@@ -23,6 +23,7 @@ export function TopicMenu(props: {
   const [q, setQ] = useState("");
   const [pos, setPos] = useState<{ left: number; top: number; up: boolean }>({ left: 0, top: 0, up: false });
   const input = useRef<HTMLInputElement>(null);
+  const box = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     const r = props.anchor.getBoundingClientRect();
@@ -33,11 +34,15 @@ export function TopicMenu(props: {
   useEffect(() => {
     input.current?.focus();
     const close = () => props.onClose();
-    // Scrolling the board would leave the menu floating away from its card.
-    window.addEventListener("scroll", close, true);
+    // Scrolling the board would leave the menu floating away from its card. Scrolling the
+    // menu's own list of topics is the menu working, not the board moving.
+    const onScroll = (e: Event) => {
+      if (!(e.target instanceof Node && box.current?.contains(e.target))) close();
+    };
+    window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", close);
     return () => {
-      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", close);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -55,6 +60,7 @@ export function TopicMenu(props: {
   return createPortal(
     <div className="popover-backdrop" onMouseDown={props.onClose} onClick={(e) => e.stopPropagation()}>
       <div
+        ref={box}
         className={`menu topic-menu${pos.up ? " up" : ""}`}
         style={{ left: pos.left, top: pos.top, width: WIDTH }}
         onMouseDown={(e) => e.stopPropagation()}
