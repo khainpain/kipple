@@ -43,7 +43,8 @@ export function demoLibrary(): Library {
       c.ai = {
         title: D.card(i, c.kind),
         summary: D.summary,
-        topic: topics[i % 5],
+        // …and a topic written in lower case, so there's a topic to tidy too.
+        topic: i % 20 === 7 ? topics[i % 5].toLocaleLowerCase() : topics[i % 5],
         // A few cards carry a near-copy of a tag ("reference" next to "references"), for "Tidy up" to find.
         tags: i % 10 === 3 ? [D.tags[0], D.tags[2].slice(0, -1)] : D.tags.slice(0, (i % 3) + 1),
         action: (["read_later", "idea", "reference", "todo"] as const)[i % 4],

@@ -83,6 +83,28 @@ export function effectiveTopic(c: Card): string | undefined {
   return t ? topicName(t) : t;
 }
 
+/**
+ * Topics the user made by hand (settings.topics). They show even with no cards in them, the AI
+ * is told to use them first, and only the user can rename or delete them.
+ */
+let ownTopics: string[] = [];
+
+export function setOwnTopics(t: string[] | undefined) {
+  ownTopics = t ?? [];
+}
+
+/** The user's own topics as shown now (after merges), without repeats. */
+export function getOwnTopics(): string[] {
+  return [...new Set(ownTopics.map(topicName).filter(Boolean))];
+}
+
+/** The same name in another case, so "дизайн" and "Дизайн" don't become two topics. */
+export function findTopic(names: Iterable<string>, name: string): string | undefined {
+  const lower = name.trim().toLocaleLowerCase();
+  for (const n of names) if (n.toLocaleLowerCase() === lower) return n;
+  return undefined;
+}
+
 export function effectiveTitle(c: Card): string {
   return c.user?.title ?? c.ai?.title ?? c.link?.title ?? "";
 }
