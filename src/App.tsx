@@ -7,7 +7,7 @@ import { makeEdit } from "./lib/library";
 import { appendEdit, DEFAULT_SETTINGS, loadLibrary, loadSettings, saveLibrary, saveSettings, wipeAll, type Settings } from "./lib/store";
 import { importFolder, pickExportFolder } from "./lib/importer";
 import { fetchLinkMeta, needsPreview } from "./lib/linkmeta";
-import { AiKeyMissing, classifyCards, pendingForAi } from "./lib/ai";
+import { AiKeyMissing, classifyCards, nameImages, pendingForAi, pendingImages } from "./lib/ai";
 import { toCsv, toMarkdown } from "./lib/exporters";
 import { deleteApiKey, getApiKey, setApiKey } from "./lib/secrets";
 import { Workspace, type Job } from "./components/Workspace";
@@ -113,6 +113,56 @@ export default function App() {
       notify("Добавь ключ Anthropic в настройках, чтобы включить AI-разметку.");
       return;
     }
+    await runTextAi(key, l, signal);
+    if (settings.aiImages && !signal.aborted) await runImageAi(key, l, pendingImages(l.cards), signal);
+  }
+
+  async function runImageAi(key: string, l: Library, todo: Card[], signal: AbortSignal) {
+    if (!todo.length) return;
+    setJob({ label: "Названия картинок", done: 0, total: todo.length });
+    try {
+      const res = await nameImages(
+        key,
+        l.cards,
+        todo,
+        (c) => platform.readMedia(l.sourceDir, c.media!.path!),
+        (p) => {
+          setJob({ label: "Названия картинок", done: p.done + p.failed, total: p.total });
+          setRev((r) => r + 1);
+          void persist(l);
+        },
+        signal,
+      );
+      if (res.failed) notify(`Не получилось назвать ${res.failed} картинок: файл недоступен или AI не ответил.`);
+    } catch (e) {
+      notify(e instanceof AiKeyMissing ? e.message : `Ошибка AI: ${e}`);
+    }
+    await persist(l);
+  }
+
+  /** One photo, on the user's request from the card: sends just this picture. */
+  async function nameOne(card: Card) {
+    if (!lib) return;
+    const key = await getApiKey().catch(() => null);
+    if (!key) {
+      notify("Добавь ключ Anthropic в настройках, чтобы AI мог назвать картинку.");
+      return;
+    }
+    abortRef.current?.abort();
+    const ctl = new AbortController();
+    abortRef.current = ctl;
+    const saved = card.ai;
+    card.ai = undefined;
+    try {
+      await runImageAi(key, lib, [card], ctl.signal);
+    } finally {
+      if (!card.ai) card.ai = saved;
+      setJob(null);
+      setRev((r) => r + 1);
+    }
+  }
+
+  async function runTextAi(key: string, l: Library, signal: AbortSignal) {
     const total = pendingForAi(l.cards).length;
     if (!total) return;
     setJob({ label: "AI-разметка", done: 0, total });
@@ -216,7 +266,7 @@ export default function App() {
 
   if (loading) return <div className="center">Загрузка…</div>;
 
-  const needAi = lib ? pendingForAi(lib.cards).length : 0;
+  const needAi = lib ? pendingForAi(lib.cards).length + (settings.aiImages ? pendingImages(lib.cards).length : 0) : 0;
   const settingsDialog = showSettings && <SettingsDialog settings={settings} hasKey={hasKey} version={version} onSave={onSaveSettings} onWipe={onWipe} onClose={() => setShowSettings(false)} />;
 
   const banners = (
@@ -288,6 +338,7 @@ export default function App() {
         onExport={doExport}
         onSettings={() => setShowSettings(true)}
         onRunAi={() => processAll(lib)}
+        onNameImage={settings.aiEnabled && hasKey ? nameOne : undefined}
         onStop={() => abortRef.current?.abort()}
         onEdit={edit}
       />

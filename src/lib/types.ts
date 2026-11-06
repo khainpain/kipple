@@ -91,6 +91,8 @@ export interface Card {
   /** Present in an earlier import but missing from the latest one. */
   removed?: boolean;
   link?: LinkMeta;
+  /** Text of a nearby message, for photos and files sent without a caption. Derived, not saved. */
+  context?: string;
   ai?: AiFields;
   user?: UserFields;
 }
