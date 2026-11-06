@@ -4,6 +4,9 @@ import type { Card, Library, UserFields } from "../lib/types";
 import { effectiveAction, effectiveTags, effectiveTopic, matchesFilter } from "../lib/library";
 import { countDuplicateGroups, findDuplicates, groupDuplicates, isImportant } from "../lib/smart";
 import { Overview, type OverviewSection } from "./Overview";
+import { TidyDialog, type TidyKind } from "./TidyDialog";
+import { suggestMerges } from "../lib/tidy";
+import type { Aliases } from "../lib/library";
 import { buildIndex } from "../lib/search";
 import { Grid } from "./Grid";
 import { Detail } from "./Detail";
@@ -57,6 +60,11 @@ export function Workspace(props: {
   onNameImage?: (card: Card) => void;
   onStop: () => void;
   onEdit: (ids: number[], patch: UserFields) => void;
+  /** Merged topics and tags, and saving a change to them. */
+  aliases: Aliases;
+  onAliases: (a: Aliases) => void;
+  /** Ask the AI for synonyms among topic or tag names; undefined when AI can't be used. */
+  askSynonyms?: (kind: TidyKind, counts: Map<string, number>) => Promise<Array<{ into: string; from: string[] }>>;
 }) {
   const { lib, rev, onEdit } = props;
   const [scope, setScope] = useState<Scope>({ kind: "home" });
@@ -72,6 +80,7 @@ export function Workspace(props: {
   const [openId, setOpenId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [exportOpen, setExportOpen] = useState(false);
+  const [tidy, setTidy] = useState<TidyKind | null>(null);
   const lastClicked = useRef<number | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -116,6 +125,20 @@ export function Workspace(props: {
   const home = scope.kind === "home" && !query.trim();
   const shown: Scope = scope.kind === "home" && !home ? { kind: "list", key: "all" } : scope;
   const isDupes = shown.kind === "list" && shown.key === "duplicates";
+
+  // Every topic and tag in use (search aside), for tidying up.
+  const names = useMemo(() => {
+    const topics = new Map<string, number>();
+    const tags = new Map<string, number>();
+    for (const c of lib.cards) {
+      if (c.removed || !matchesFilter(c, "all")) continue;
+      const t = effectiveTopic(c);
+      if (t) topics.set(t, (topics.get(t) ?? 0) + 1);
+      for (const x of effectiveTags(c)) tags.set(x, (tags.get(x) ?? 0) + 1);
+    }
+    return { topics, tags };
+  }, [lib, rev]); // eslint-disable-line react-hooks/exhaustive-deps
+  const tidyCount = useMemo(() => suggestMerges(names.topics).length + suggestMerges(names.tags).length, [names]);
 
   const inScope = useMemo(() => base.filter((c) => matchesScope(c, shown, dupes)), [base, JSON.stringify(shown), dupes]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -244,6 +267,8 @@ export function Workspace(props: {
           tags={tags}
           onScope={pickScope}
           onTag={setTag}
+          tidyCount={tidyCount}
+          onTidy={() => setTidy("tags")}
         />
       )}
 
@@ -322,6 +347,8 @@ export function Workspace(props: {
             lib={lib}
             sections={sections}
             topics={topics}
+            tidyCount={tidyCount}
+            onTidy={() => setTidy(suggestMerges(names.topics).length ? "topics" : "tags")}
             activeId={openId}
             onScope={pickScope}
             onOpen={(c) => setOpenId(c.id)}
@@ -397,6 +424,18 @@ export function Workspace(props: {
         </>
         )}
       </section>
+
+      {tidy && (
+        <TidyDialog
+          topics={names.topics}
+          tags={names.tags}
+          aliases={props.aliases}
+          initial={tidy}
+          askAi={props.askSynonyms}
+          onChange={props.onAliases}
+          onClose={() => setTidy(null)}
+        />
+      )}
 
       {openCard && (
         <Detail

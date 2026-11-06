@@ -1,6 +1,6 @@
 import { platform } from "@platform";
 import type { EditEvent, Library } from "./types";
-import { annotateContext, applyEdits } from "./library";
+import { annotateContext, applyEdits, type Aliases } from "./library";
 import { emptyBoardState, type BoardState } from "./telegram";
 import type { LangPref } from "../i18n";
 import { DEFAULT_AI_MODEL, type AiModel } from "./ai";
@@ -22,6 +22,8 @@ export interface Settings {
   aiLanguage: "ui" | "source";
   /** Which Claude model tags cards and names pictures. */
   aiModel: AiModel;
+  /** Merged topics and tags (see Aliases in library.ts). */
+  aliases?: Aliases;
 }
 
 export const DEFAULT_SETTINGS: Settings = { aiEnabled: true, fetchLinks: true, aiImages: false, language: "auto", aiLanguage: "ui", aiModel: DEFAULT_AI_MODEL };

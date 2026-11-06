@@ -260,6 +260,28 @@ code {
 }
 .side-section h4 {
   margin: 0 0 2px;
+  display: flex;
+  align-items: center;
+}
+.side-section h4 > button:first-child {
+  flex: 1;
+}
+.side-tidy {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  margin-right: 4px;
+  opacity: 0.6;
+}
+.side-tidy.has,
+.side-tidy:hover {
+  opacity: 1;
+}
+.side-tidy.has {
+  color: var(--accent);
+}
+.side-more {
+  padding: 4px 10px;
 }
 .side-section h4 button {
   display: flex;
@@ -1467,4 +1489,85 @@ button.ov-title:hover {
 .ov-shelf small {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+.ov-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+.ov-notice .icon {
+  color: var(--accent);
+}
+.ov-notice span {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Tidy up topics and tags */
+.tidy-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tidy-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.tidy-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.tidy-list li > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.tidy-names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.tidy-name {
+  background: transparent;
+  color: var(--muted);
+  border: 1px dashed var(--line);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 13px;
+}
+.tidy-name small {
+  opacity: 0.7;
+}
+.tidy-name.keep {
+  color: var(--ink);
+  border-style: solid;
+  border-color: var(--muted);
+  font-weight: 600;
+}
+.tidy-ai {
+  color: var(--accent);
+  display: inline-flex;
+}
+.tidy-h {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.tidy-list.merged li {
+  font-size: 13px;
+  padding: 6px 0;
 }

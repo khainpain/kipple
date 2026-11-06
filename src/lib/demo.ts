@@ -44,7 +44,8 @@ export function demoLibrary(): Library {
         title: D.card(i, c.kind),
         summary: D.summary,
         topic: topics[i % 5],
-        tags: D.tags.slice(0, (i % 3) + 1),
+        // A few cards carry a near-copy of a tag ("reference" next to "references"), for "Tidy up" to find.
+        tags: i % 10 === 3 ? [D.tags[0], D.tags[2].slice(0, -1)] : D.tags.slice(0, (i % 3) + 1),
         action: (["read_later", "idea", "reference", "todo"] as const)[i % 4],
         priority: i % 6 === 0 ? 1 : 2,
         model: "demo",

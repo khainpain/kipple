@@ -28,6 +28,9 @@ export function Overview(props: {
   lib: Library;
   sections: OverviewSection[];
   topics: Array<[string, number]>;
+  /** Groups of similar topics and tags that could be merged. */
+  tidyCount: number;
+  onTidy: () => void;
   activeId: number | null;
   onScope: (s: Scope) => void;
   onOpen: (c: Card) => void;
@@ -55,6 +58,16 @@ export function Overview(props: {
         <div className="empty">
           <b>{T.overview.emptyTitle}</b>
           <span>{T.overview.emptyHint}</span>
+        </div>
+      )}
+
+      {props.tidyCount > 0 && (
+        <div className="ov-notice">
+          <Icon name="merge" />
+          <span>{T.tidy.notice(props.tidyCount)}</span>
+          <button className="secondary small-btn" onClick={props.onTidy}>
+            {T.tidy.noticeAction}
+          </button>
         </div>
       )}
 

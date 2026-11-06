@@ -4,6 +4,7 @@ import { platform } from "@platform";
 import { z } from "zod";
 import { ACTIONS, type AiFields, type Card } from "./types";
 import { domainOf } from "./rules";
+import { tagName, topicName } from "./library";
 import { en } from "../i18n/en";
 import { ru } from "../i18n/ru";
 import { T, lang as uiLang, type Lang } from "../i18n";
@@ -160,8 +161,9 @@ export function vocabulary(cards: Card[], lang: AiLang = "source"): { topics: st
   const tags = new Map<string, number>();
   for (const c of cards) {
     if (lang !== "source" && (c.ai?.lang ?? "ru") !== lang) continue;
-    if (c.ai?.topic) topics.set(c.ai.topic, (topics.get(c.ai.topic) ?? 0) + 1);
-    for (const t of c.ai?.tags ?? []) tags.set(t, (tags.get(t) ?? 0) + 1);
+    // Merged names count as the name they were merged into, so the AI stops bringing them back.
+    if (c.ai?.topic) topics.set(topicName(c.ai.topic), (topics.get(topicName(c.ai.topic)) ?? 0) + 1);
+    for (const t of new Set((c.ai?.tags ?? []).map(tagName))) tags.set(t, (tags.get(t) ?? 0) + 1);
   }
   const top = (m: Map<string, number>, n: number) => [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, n).map(([k]) => k);
   return { topics: top(topics, 40), tags: top(tags, 80) };
@@ -370,4 +372,48 @@ export async function nameImages(
     onBatch({ ...progress });
   }
   return progress;
+}
+
+const SynonymSchema = z.object({
+  groups: z.array(
+    z.object({
+      into: z.string().describe("The name to keep: one of the given names, usually the most used"),
+      from: z.array(z.string()).describe("Other given names that mean the same thing"),
+    }),
+  ),
+});
+
+/**
+ * Asks the AI which topics or tags mean the same thing: synonyms, translations (AI / ИИ),
+ * abbreviations. Only the names and their counts are sent, no message content.
+ * Returns groups made only of the given names.
+ */
+export async function suggestSynonyms(auth: AiAuth, model: AiModel, kind: "topics" | "tags", counts: Map<string, number>): Promise<Array<{ into: string; from: string[] }>> {
+  const names = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 500);
+  if (names.length < 2) return [];
+  const client = makeClient(auth);
+  try {
+    const res = await client.messages.parse({
+      model,
+      max_tokens: 8000,
+      system: `You tidy the ${kind} of a personal archive of saved messages. Find ${kind} that mean the same thing and should be one: synonyms, translations between languages (e.g. "ai" and "ии"), abbreviations and their full form, spelling variants, singular and plural.
+Do not group names that are only related or one broader than the other (e.g. "ai" and "machine learning", "games" and "game design" stay apart).
+In each group keep the most used name unless another one is clearly the better known form. Use names exactly as given. Leave out names that have no match.`,
+      output_config: { effort: "low", format: zodOutputFormat(SynonymSchema) },
+      messages: [{ role: "user", content: `Name (cards):\n${names.map(([n, c]) => `${n} (${c})`).join("\n")}` }],
+    });
+    const known = new Set(counts.keys());
+    const used = new Set<string>();
+    const out: Array<{ into: string; from: string[] }> = [];
+    for (const g of res.parsed_output?.groups ?? []) {
+      if (!known.has(g.into) || used.has(g.into)) continue;
+      const from = [...new Set(g.from)].filter((f) => f !== g.into && known.has(f) && !used.has(f));
+      if (!from.length) continue;
+      for (const n of [g.into, ...from]) used.add(n);
+      out.push({ into: g.into, from });
+    }
+    return out;
+  } catch (e) {
+    throw stopping(e, auth);
+  }
 }

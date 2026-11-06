@@ -227,6 +227,28 @@ export const en: Dict = {
     duplicates: (groups) => `${num(groups)} ${groups === 1 ? "group" : "groups"}: the same link, file or text. Send the extras to the junk.`,
   },
 
+  tidy: {
+    open: "Tidy up topics and tags",
+    title: "Tidy up",
+    intro: "Merge topics and tags that mean the same thing: cards stay as they are and just show one name. Every merge can be undone.",
+    found: (n) => `${num(n)} similar group${s(n)}.`,
+    none: "No similar names found.",
+    rare: (n) => `${num(n)} tag${s(n)} ${n === 1 ? "is" : "are"} on a single card only: the sidebar tucks them under "more".`,
+    askAi: "Find synonyms with AI",
+    askAiHint: "Sends only the names and how often they're used, no message text. Finds translations and synonyms like ai and ии.",
+    asking: "Looking…",
+    aiNothing: "The AI found no synonyms.",
+    fromAi: "Suggested by the AI",
+    mergeAll: "Merge all",
+    merge: (into) => `Merge into ${into}`,
+    keep: "This name stays",
+    makeMain: "Keep this name",
+    merged: "Already merged",
+    undo: "Undo",
+    notice: (n) => `${num(n)} group${s(n)} of similar topics and tags. Merge them to keep the list short.`,
+    noticeAction: "Tidy up",
+  },
+
   sidebar: {
     signedIn: "Signed in to Telegram",
     topics: "Topics",
