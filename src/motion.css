@@ -1,0 +1,113 @@
+/* Motion tokens from docs/design/kipple-welcome/MOTION.md. */
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-micro: 180ms;
+  --duration-ui: 400ms;
+  --duration-enter: 700ms;
+  --stagger: 80ms;
+  /* SquishSwitch's off track: the ink at 22%. */
+  --switch-off: color-mix(in srgb, var(--ink) 22%, transparent);
+}
+
+/* React Bits components in Kipple's look. No loud focus rings: a soft accent halo for keyboard only. */
+.k-switch.squish-switch:focus-visible .squish-switch__track,
+.k-check.spring-check:focus-visible .spring-check__box {
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.k-check.spring-check {
+  min-height: 0;
+  padding: 0;
+}
+.k-status {
+  color: var(--ok);
+  font-weight: 600;
+}
+.k-hold {
+  border: 1px solid var(--danger);
+}
+
+.k-stepbar {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+.k-stepbar b {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left center;
+}
+
+.k-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 60;
+  max-width: calc(100vw - 32px);
+}
+
+/*
+ * Board (MOTION.md «Masonry»): cards rise from below as they appear, 50 ms apart for the first
+ * screenful; cards scrolled into view later come in without waiting. The hover lift of 2px and
+ * --shadow-hover are in App.css. The animation sits on a wrapper level the virtualizer measures
+ * by offsetHeight, so the transform doesn't disturb the layout.
+ */
+@keyframes k-card-in {
+  from {
+    opacity: 0;
+    translate: 0 14px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+.grid-scroll > div > div > .card {
+  animation: k-card-in 0.45s var(--ease-out) both;
+}
+.grid-scroll > div > div:nth-child(2) > .card {
+  animation-delay: 50ms;
+}
+.grid-scroll > div > div:nth-child(3) > .card {
+  animation-delay: 100ms;
+}
+.grid-scroll > div > div:nth-child(4) > .card {
+  animation-delay: 150ms;
+}
+.grid-scroll > div > div:nth-child(5) > .card {
+  animation-delay: 200ms;
+}
+.grid-scroll > div > div:nth-child(6) > .card {
+  animation-delay: 250ms;
+}
+.grid-scroll > div > div:nth-child(7) > .card {
+  animation-delay: 300ms;
+}
+.grid-scroll > div > div:nth-child(8) > .card {
+  animation-delay: 350ms;
+}
+.grid-scroll > div > div:nth-child(9) > .card {
+  animation-delay: 400ms;
+}
+.grid-scroll > div > div:nth-child(10) > .card {
+  animation-delay: 450ms;
+}
+.grid-scroll > div > div:nth-child(11) > .card {
+  animation-delay: 500ms;
+}
+.grid-scroll > div > div:nth-child(12) > .card {
+  animation-delay: 550ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .k-stepbar b {
+    transition: none;
+  }
+  .grid-scroll > div > div > .card {
+    animation: none;
+  }
+}

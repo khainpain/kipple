@@ -7,6 +7,8 @@ import { setThemePref, THEME_ICONS, THEME_LABELS, THEME_PREFS, useThemePref } fr
 import { Icon } from "./Icon";
 import { Select } from "./Select";
 import { AiConsentDialog } from "./AiConsent";
+import { Done, HoldToConfirm, Switch } from "./Motion";
+import "./Settings.css";
 import { LANGS, T, systemLang, type LangPref } from "../i18n";
 import { telegramErrorText } from "../lib/telegram";
 import type { TelegramApi, TelegramStatus } from "../platform/types";
@@ -46,142 +48,223 @@ export function SettingsDialog(props: {
     };
   }, [props.hasKey, aiOn]);
 
+  const model = aiModelOf(s.aiModel);
+
   return (
     <>
     <div className="modal-backdrop" onClick={props.onClose}>
-      <div className="modal settings" onClick={(e) => e.stopPropagation()}>
-        <button className="close" onClick={props.onClose} aria-label={T.common.close}>
-          ×
-        </button>
-        <h2>{L.title}</h2>
-
-        <div className="field">
-          <span id="theme-label">{T.theme.label}</span>
-          <div className="segmented labeled" role="radiogroup" aria-labelledby="theme-label">
-            {THEME_PREFS.map((t) => (
-              <button key={t} role="radio" aria-checked={theme === t} className={theme === t ? "on" : ""} onClick={() => setThemePref(t)}>
-                <Icon name={THEME_ICONS[t]} size={14} /> {THEME_LABELS[t]}
-              </button>
-            ))}
+      <div className="modal settings s2" onClick={(e) => e.stopPropagation()}>
+        <header className="s2-head">
+          <span className="s2-head-icon">
+            <Icon name="settings" size={18} />
+          </span>
+          <div>
+            <h2>{L.title}</h2>
+            <p>{platform.kind === "web" ? L.subtitleWeb : L.subtitle}</p>
           </div>
-        </div>
-
-        <div className="field">
-          <span id="language-label">{L.language}</span>
-          <Select<LangPref>
-            labelledBy="language-label"
-            value={s.language}
-            options={[{ value: "auto", label: L.languageAuto(systemName) }, ...LANGS.map((l) => ({ value: l.key as LangPref, label: l.name }))]}
-            onChange={(v) => setS({ ...s, language: v })}
-          />
-        </div>
-
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={s.aiEnabled}
-            onChange={(e) =>
-              e.target.checked
-                ? s.aiConsentAt
-                  ? setS({ ...s, aiEnabled: true })
-                  : setAsking(true)
-                : // Turning AI off also takes back the consent, so turning it on again asks again.
-                  setS({ ...s, aiEnabled: false, aiImages: false, aiConsentAt: undefined, aiAsked: true })
-            }
-          />
-          {L.aiEnabled}
-        </label>
-        {!s.aiEnabled && <p className="hint">{L.aiOff}</p>}
-        <fieldset className="ai-lang" disabled={!s.aiEnabled}>
-          <legend>{L.aiLanguage}</legend>
-          <label className="check">
-            <input type="radio" name="ai-lang" checked={s.aiLanguage === "ui"} onChange={() => setS({ ...s, aiLanguage: "ui" })} />
-            {L.aiLanguageUi}
-          </label>
-          <label className="check">
-            <input type="radio" name="ai-lang" checked={s.aiLanguage === "source"} onChange={() => setS({ ...s, aiLanguage: "source" })} />
-            {L.aiLanguageSource}
-          </label>
-          {s.aiLanguage !== props.settings.aiLanguage && <p className="hint">{L.aiLanguageNote}</p>}
-        </fieldset>
-        <fieldset className="ai-lang" disabled={!s.aiEnabled}>
-          <legend>{L.aiModel}</legend>
-          {AI_MODELS.map((m) => (
-            <label key={m} className="check">
-              <input type="radio" name="ai-model" checked={aiModelOf(s.aiModel) === m} onChange={() => setS({ ...s, aiModel: m })} />
-              <span>
-                <b>{L.aiModels[m].name}</b> · {L.aiModels[m].hint}
-              </span>
-            </label>
-          ))}
-          {aiModelOf(s.aiModel) !== aiModelOf(props.settings.aiModel) && <p className="hint">{L.aiModelNote}</p>}
-          {props.retagCount > 0 && (
-            <div>
-              <button
-                className="secondary small"
-                onClick={() => {
-                  const m = aiModelOf(s.aiModel);
-                  if (confirm(L.retagConfirm(props.retagCount, L.aiModels[m].name, costEstimate(props.retagCount, m)))) props.onRetag(s, key.trim() || null);
-                }}
-              >
-                {L.retag}
-              </button>
-            </div>
-          )}
-        </fieldset>
-        <label className="check">
-          <input type="checkbox" checked={s.aiImages} disabled={!s.aiEnabled} onChange={(e) => setS({ ...s, aiImages: e.target.checked })} />
-          <span>{L.aiImages}</span>
-        </label>
-        <p className="hint" hidden={!s.aiEnabled}>
-          {props.hasKey ? L.aiViaOwnKey : L.aiViaBuiltin}
-          {!props.hasKey && used !== null && <> {L.builtinUsed(Math.round(used * 100))}</>}
-        </p>
-        <details className="own-key" open={props.hasKey || undefined}>
-          <summary>{L.ownKey}</summary>
-          <p className="hint">{L.ownKeyWhy}</p>
-          <label>
-            {L.apiKey} {props.hasKey && <span className="ok">{L.keySaved}</span>}
-            <input type="password" placeholder={props.hasKey ? L.keyKeep : "sk-ant-..."} value={key} onChange={(e) => setKey(e.target.value)} />
-          </label>
-          <p className="hint">
-            {platform.kind === "web" ? L.keyWhereWeb : L.keyWhereDesktop} {L.keyGet}{" "}
-            <a href="#" onClick={(e) => (e.preventDefault(), platform.openUrl("https://console.anthropic.com/settings/keys"))}>
-              console.anthropic.com
-            </a>
-            {L.keyCost}
-          </p>
-          {props.hasKey && (
-            <button className="secondary small" onClick={() => confirm(L.forgetKeyConfirm) && props.onForgetKey()}>
-              {L.forgetKey}
-            </button>
-          )}
-        </details>
-        <label className="check" hidden={!platform.canFetchLinks}>
-          <input type="checkbox" checked={s.fetchLinks} onChange={(e) => setS({ ...s, fetchLinks: e.target.checked })} />
-          {L.fetchLinks}
-          {platform.kind === "web" ? L.fetchLinksWeb : ""}
-        </label>
-
-        {platform.telegram && (
-          <details className="advanced">
-            <summary>{L.advanced}</summary>
-            <TelegramKey tg={platform.telegram} />
-          </details>
-        )}
-
-        {props.version && <p className="hint">{L.version(props.version)}</p>}
-
-        <div className="dialog-buttons">
-          <button className="danger" onClick={() => confirm(L.wipeConfirm) && props.onWipe()}>
-            {L.wipe}
+          <button className="close" onClick={props.onClose} aria-label={T.common.close}>
+            <Icon name="close" size={16} />
           </button>
+        </header>
+
+        <div className="s2-body">
+          <h3 className="s2-sec">{L.secAppearance}</h3>
+          <div className="s2-panel">
+            <div className="s2-row">
+              <div className="s2-text">
+                <b id="theme-label">{T.theme.label}</b>
+              </div>
+              <div className="segmented labeled" role="radiogroup" aria-labelledby="theme-label">
+                {THEME_PREFS.map((t) => (
+                  <button key={t} role="radio" aria-checked={theme === t} className={theme === t ? "on" : ""} onClick={() => setThemePref(t)}>
+                    <Icon name={THEME_ICONS[t]} size={14} /> {THEME_LABELS[t]}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="s2-row">
+              <div className="s2-text">
+                <b id="s2-lang-label">{L.language}</b>
+              </div>
+              <Select<LangPref>
+                labelledBy="s2-lang-label"
+                value={s.language}
+                options={[{ value: "auto", label: L.languageAuto(systemName) }, ...LANGS.map((l) => ({ value: l.key as LangPref, label: l.name }))]}
+                onChange={(v) => setS({ ...s, language: v })}
+              />
+            </div>
+          </div>
+
+          <h3 className="s2-sec">{L.secAi}</h3>
+          <div className="s2-panel">
+            <div className="s2-row">
+              <div className="s2-text">
+                <b>{L.aiTitle}</b>
+                <small>{s.aiEnabled ? L.aiDesc : L.aiOff}</small>
+              </div>
+              <Switch
+                label={L.aiTitle}
+                checked={s.aiEnabled}
+                onChange={(on) =>
+                  on
+                    ? s.aiConsentAt
+                      ? setS({ ...s, aiEnabled: true })
+                      : setAsking(true)
+                    : // Turning AI off also takes back the consent, so turning it on again asks again.
+                      setS({ ...s, aiEnabled: false, aiImages: false, aiConsentAt: undefined, aiAsked: true })
+                }
+              />
+            </div>
+            {s.aiEnabled && (
+              <>
+                <fieldset className="s2-row s2-choice">
+                  <legend>{L.aiLanguage}</legend>
+                  <label className="check">
+                    <input type="radio" name="ai-lang" checked={s.aiLanguage === "ui"} onChange={() => setS({ ...s, aiLanguage: "ui" })} />
+                    {L.aiLanguageUi}
+                  </label>
+                  <label className="check">
+                    <input type="radio" name="ai-lang" checked={s.aiLanguage === "source"} onChange={() => setS({ ...s, aiLanguage: "source" })} />
+                    {L.aiLanguageSource}
+                  </label>
+                  {s.aiLanguage !== props.settings.aiLanguage && <p className="hint">{L.aiLanguageNote}</p>}
+                </fieldset>
+                <fieldset className="s2-row s2-choice">
+                  <legend>{L.aiModel}</legend>
+                  {AI_MODELS.map((m) => (
+                    <label key={m} className="check">
+                      <input type="radio" name="ai-model" checked={model === m} onChange={() => setS({ ...s, aiModel: m })} />
+                      <span>
+                        <b>{L.aiModels[m].name}</b> · {L.aiModels[m].hint}
+                      </span>
+                    </label>
+                  ))}
+                  {model !== aiModelOf(props.settings.aiModel) && <p className="hint">{L.aiModelNote}</p>}
+                  {props.retagCount > 0 && (
+                    <div>
+                      <button
+                        className="secondary small"
+                        onClick={() => {
+                          if (confirm(L.retagConfirm(props.retagCount, L.aiModels[model].name, costEstimate(props.retagCount, model)))) props.onRetag(s, key.trim() || null);
+                        }}
+                      >
+                        {L.retag}
+                      </button>
+                    </div>
+                  )}
+                </fieldset>
+                <div className="s2-row">
+                  <div className="s2-text">
+                    <b>{L.aiImagesTitle}</b>
+                    <small>{L.aiImages}</small>
+                  </div>
+                  <Switch label={L.aiImagesTitle} checked={s.aiImages} onChange={(on) => setS({ ...s, aiImages: on })} />
+                </div>
+              </>
+            )}
+            <div className="s2-row s2-key">
+              <div className="s2-text">
+                <b>
+                  {L.apiKey} {props.hasKey && <Done label={L.keySaved} />}
+                </b>
+                <small>{L.ownKeyWhy}</small>
+              </div>
+              <div className="s2-key-input">
+                <Icon name="lock" size={14} />
+                <input type="password" aria-label={L.apiKey} placeholder={props.hasKey ? L.keyKeep : "sk-ant-..."} value={key} onChange={(e) => setKey(e.target.value)} />
+                {props.hasKey && (
+                  <button className="secondary small" onClick={() => confirm(L.forgetKeyConfirm) && props.onForgetKey()}>
+                    {L.forgetKey}
+                  </button>
+                )}
+              </div>
+              <small className="s2-note">
+                {platform.kind === "web" ? L.keyWhereWeb : L.keyWhereDesktop} {L.keyGet}{" "}
+                <a href="#" onClick={(e) => (e.preventDefault(), platform.openUrl("https://console.anthropic.com/settings/keys"))}>
+                  console.anthropic.com
+                </a>
+                {L.keyCost}
+              </small>
+            </div>
+            {s.aiEnabled && (
+              <div className="s2-row s2-foot">
+                <Icon name="sparkle" size={15} />
+                <span>
+                  {L.aiModelLine(L.aiModels[model].name, L.aiModels[model].hint)}
+                  {". "}
+                  {props.hasKey ? L.aiViaOwnKey : L.aiViaBuiltin}
+                  {!props.hasKey && used !== null && <> {L.builtinUsed(Math.round(used * 100))}</>}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {platform.canFetchLinks && (
+            <>
+              <h3 className="s2-sec">{L.secLinks}</h3>
+              <div className="s2-panel">
+                <div className="s2-row">
+                  <div className="s2-text">
+                    <b>{L.fetchLinksTitle}</b>
+                    <small>
+                      {L.fetchLinksDesc}
+                      {platform.kind === "web" ? L.fetchLinksWeb : ""}
+                    </small>
+                  </div>
+                  <Switch label={L.fetchLinksTitle} checked={s.fetchLinks} onChange={(on) => setS({ ...s, fetchLinks: on })} />
+                </div>
+              </div>
+            </>
+          )}
+
+          <h3 className="s2-sec">{L.secData}</h3>
+          <div className="s2-panel">
+            <div className="s2-row s2-icon-row">
+              <Icon name="folder" size={16} />
+              <div className="s2-text">
+                <b>{L.dataLibrary}</b>
+                {platform.kind === "web" ? <small>{L.dataWhereWeb}</small> : <code>%APPDATA%\com.khainpain.savedboard</code>}
+              </div>
+            </div>
+            <div className="s2-row s2-icon-row">
+              <Icon name="photo" size={16} />
+              <div className="s2-text">
+                <b>{L.dataMedia}</b>
+                <small>{L.dataMediaDesc}</small>
+              </div>
+            </div>
+            <div className="s2-row s2-icon-row danger">
+              <Icon name="trash" size={16} />
+              <div className="s2-text">
+                <b>{L.wipe}</b>
+                <small>{L.wipeDesc}</small>
+              </div>
+              <HoldToConfirm doneLabel={L.wipeDone} onHold={props.onWipe}>
+                {L.wipeHold}
+              </HoldToConfirm>
+            </div>
+          </div>
+
+          {platform.telegram && (
+            <details className="s2-advanced">
+              <summary>
+                <Icon name="right" size={14} className="s2-chev" />
+                <b>{L.advanced}</b>
+                <small>{L.advancedHint}</small>
+              </summary>
+              <TelegramKey tg={platform.telegram} />
+            </details>
+          )}
+        </div>
+
+        <footer className="s2-buttons">
+          <span className="s2-version">{props.version ? L.version(props.version) : ""}</span>
           <span className="spacer" />
           <button onClick={props.onClose} className="secondary">
             {T.common.cancel}
           </button>
           <button onClick={() => props.onSave(s, key.trim() || null)}>{T.common.save}</button>
-        </div>
+        </footer>
       </div>
     </div>
     {asking && (
@@ -240,8 +323,8 @@ function TelegramKey(props: { tg: TelegramApi }) {
         void run(async () => (await tg.setApi(apiId, apiHash), setApiId(""), setApiHash("")), L.tgApiSaved);
       }}
     >
-      <span>
-        <b>{L.tgApi}</b> {status?.customApi && <span className="ok">{L.tgApiCustom}</span>}
+      <span className="s2-tg-title">
+        <b>{L.tgApi}</b> {status?.customApi && <Done label={L.tgApiCustom} />}
       </span>
       <p className="hint">
         {noBuiltIn ? L.tgApiWhyNoBuiltIn : L.tgApiWhy} {L.tgApiHow1}
@@ -267,7 +350,7 @@ function TelegramKey(props: { tg: TelegramApi }) {
           </button>
         )}
         <span className="spacer" />
-        <button className="secondary small" disabled={busy || !apiId.trim() || !apiHash.trim()}>
+        <button className="small" disabled={busy || !apiId.trim() || !apiHash.trim()}>
           {L.tgApiSave}
         </button>
       </div>

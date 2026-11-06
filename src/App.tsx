@@ -22,6 +22,7 @@ import { demoLibrary } from "./lib/demo";
 import { emptyTelegramLibrary, syncSaved } from "./lib/tgImport";
 import { T, lang, resolveLang, setLang } from "./i18n";
 import type { AiLang } from "./lib/ai";
+import { Toast } from "./components/Motion";
 
 const isWeb = platform.kind === "web";
 
@@ -609,7 +610,7 @@ export default function App() {
       >
         {settingsDialog}
         {consentDialog}
-        {toast && <div className="toast">{toast}</div>}
+        <Toast text={toast} onClose={() => setToast(null)} />
       </Welcome>
     );
   }
@@ -645,7 +646,7 @@ export default function App() {
       {showTelegram && platform.telegram && (
         <TelegramDialog tg={platform.telegram} cards={lib.cards} running={sendingTg} onStart={sendTelegram} onOpenSettings={() => (setShowTelegram(false), setShowSettings(true))} onClose={() => setShowTelegram(false)} />
       )}
-      {toast && <div className="toast">{toast}</div>}
+      <Toast text={toast} onClose={() => setToast(null)} />
     </div>
   );
 }
