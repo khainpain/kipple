@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Icon } from "./Icon";
+import { T, formatNumber } from "../i18n";
 import { SMART_LISTS, hueOf, sameScope, type Scope } from "./nav";
 
 function Item(props: { icon?: string; dot?: number; label: string; count?: number; active: boolean; onClick: () => void; title?: string }) {
@@ -7,7 +8,7 @@ function Item(props: { icon?: string; dot?: number; label: string; count?: numbe
     <button className={`side-item${props.active ? " active" : ""}`} onClick={props.onClick} title={props.title ?? props.label}>
       {props.dot !== undefined ? <span className="topic-dot" style={{ "--h": props.dot } as React.CSSProperties} /> : <Icon name={props.icon ?? "folder"} />}
       <span className="label">{props.label}</span>
-      {props.count !== undefined && <small>{props.count}</small>}
+      {props.count !== undefined && <small>{formatNumber(props.count)}</small>}
     </button>
   );
 }
@@ -59,26 +60,26 @@ export function Sidebar(props: {
         ))}
       </nav>
 
-      <Section title="Темы">
+      <Section title={T.sidebar.topics}>
         {props.topics.map(([t, n]) => (
           <Item key={t} dot={hueOf(t)} label={t} count={n} active={is({ kind: "topic", name: t })} onClick={() => props.onScope({ kind: "topic", name: t })} />
         ))}
-        {props.noTopic > 0 && <Item icon="inbox" label="Без темы" count={props.noTopic} active={is({ kind: "notopic" })} onClick={() => props.onScope({ kind: "notopic" })} />}
-        {props.topics.length === 0 && <p className="hint side-hint">Темы появятся после AI-разметки.</p>}
+        {props.noTopic > 0 && <Item icon="inbox" label={T.nav.noTopic} count={props.noTopic} active={is({ kind: "notopic" })} onClick={() => props.onScope({ kind: "notopic" })} />}
+        {props.topics.length === 0 && <p className="hint side-hint">{T.sidebar.topicsHint}</p>}
       </Section>
 
       {props.tags.length > 0 && (
-        <Section title="Теги">
+        <Section title={T.sidebar.tags}>
           <div className="side-tags">
             {tags.map(([t, n]) => (
               <button key={t} className={`side-tag${props.tag === t ? " active" : ""}`} onClick={() => props.onTag(props.tag === t ? null : t)}>
-                #{t} <small>{n}</small>
+                #{t} <small>{formatNumber(n)}</small>
               </button>
             ))}
           </div>
           {props.tags.length > 15 && (
             <button className="link-btn" onClick={() => setShowAllTags(!showAllTags)}>
-              {showAllTags ? "Свернуть" : `Ещё ${props.tags.length - 15}`}
+              {showAllTags ? T.sidebar.collapse : T.sidebar.more(props.tags.length - 15)}
             </button>
           )}
         </Section>
@@ -88,14 +89,14 @@ export function Sidebar(props: {
         {props.listCounts.sensitive > 0 && (
           <Item
             icon="lock"
-            label="Чувствительное"
+            label={T.nav.sensitive}
             count={props.listCounts.sensitive}
             active={is({ kind: "list", key: "sensitive" })}
             onClick={() => props.onScope({ kind: "list", key: "sensitive" })}
-            title="Похоже на пароли, ключи, номера карт. Не отправляется в AI."
+            title={T.sidebar.sensitiveHint}
           />
         )}
-        <Item icon="trash" label="Мусор" count={props.listCounts.junk} active={is({ kind: "list", key: "junk" })} onClick={() => props.onScope({ kind: "list", key: "junk" })} />
+        <Item icon="trash" label={T.nav.junk} count={props.listCounts.junk} active={is({ kind: "list", key: "junk" })} onClick={() => props.onScope({ kind: "list", key: "junk" })} />
       </nav>
     </aside>
   );

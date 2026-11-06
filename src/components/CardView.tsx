@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Card, Library } from "../lib/types";
-import { ACTION_LABELS } from "../lib/types";
+import { actionLabel } from "../lib/types";
+import { T, formatNumber, locale } from "../i18n";
 import { mediaUrl } from "../lib/importer";
 import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic } from "../lib/library";
 import { domainOf } from "../lib/rules";
@@ -24,24 +25,22 @@ const KIND_ICON: Record<string, string> = {
   text: "text",
 };
 
-const KIND_NAME: Record<string, string> = {
-  photo: "Фото",
-  video: "Видео",
-  animation: "GIF",
-  document: "Файл",
-  audio: "Аудио",
-};
+function kindName(kind: string): string | undefined {
+  const k = T.card;
+  return ({ photo: k.kindPhoto, video: k.kindVideo, animation: k.kindGif, document: k.kindFile, audio: k.kindAudio } as Record<string, string>)[kind];
+}
 
 export function formatSize(bytes?: number): string {
   if (!bytes) return "";
-  const units = ["Б", "КБ", "МБ", "ГБ"];
+  const units = T.card.sizeUnits;
   let v = bytes;
   let i = 0;
   while (v >= 1024 && i < units.length - 1) {
     v /= 1024;
     i++;
   }
-  return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
+  const digits = v < 10 && i > 0 ? 1 : 0;
+  return `${v.toLocaleString(locale(), { minimumFractionDigits: digits, maximumFractionDigits: digits })} ${units[i]}`;
 }
 
 export function formatDuration(s?: number): string {
@@ -53,15 +52,15 @@ export function formatDuration(s?: number): string {
 export function formatDate(iso: string): string {
   const d = new Date(iso);
   const sameYear = d.getFullYear() === new Date().getFullYear();
-  return d.toLocaleDateString("ru-RU", sameYear ? { day: "numeric", month: "short" } : { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString(locale(), sameYear ? { day: "numeric", month: "short" } : { day: "numeric", month: "short", year: "numeric" });
 }
 
 /** The picture a card can show, if any: photo, video thumbnail or link preview image. */
 export function coverOf(lib: Library, card: Card): { src?: string; ratio?: number; missing?: string } {
   const m = card.media;
   const ratio = m?.width && m?.height ? m.width / m.height : undefined;
-  if (card.kind === "photo") return m?.missing ? { missing: "Фото не было в экспорте" } : { src: mediaUrl(lib, m?.path), ratio };
-  if (card.kind === "video" || card.kind === "animation") return { src: mediaUrl(lib, m?.thumb), ratio, missing: m?.missing ? "Видео не было в экспорте" : undefined };
+  if (card.kind === "photo") return m?.missing ? { missing: T.card.photoMissing } : { src: mediaUrl(lib, m?.path), ratio };
+  if (card.kind === "video" || card.kind === "animation") return { src: mediaUrl(lib, m?.thumb), ratio, missing: m?.missing ? T.card.videoMissing : undefined };
   if (card.kind === "link") {
     const src = card.link?.image ?? instantImage(card.urls[0]);
     if (src) return { src };
@@ -81,15 +80,15 @@ export function displayTitle(card: Card): string {
   if (t) return t;
   if (card.context) return card.context;
   if (card.media?.fileName) return card.media.fileName;
-  if (card.kind === "voice") return "Голосовое сообщение";
-  if (card.kind === "video_note") return "Видеосообщение";
-  if (card.kind === "sticker") return `Стикер ${card.text}`;
+  if (card.kind === "voice") return T.card.voice;
+  if (card.kind === "video_note") return T.card.videoNote;
+  if (card.kind === "sticker") return T.card.sticker(card.text);
   const line = card.text.split("\n").find((l) => l.trim());
   if (line) return line.slice(0, 120);
   const site = siteOf(card);
   if (site) return site;
-  const kind = KIND_NAME[card.kind];
-  return kind ? `${kind}, ${formatDate(card.date)}` : "Без названия";
+  const kind = kindName(card.kind);
+  return kind ? `${kind}, ${formatDate(card.date)}` : T.common.untitled;
 }
 
 function excerptOf(card: Card): string {
@@ -117,7 +116,7 @@ function Cover({ lib, card, view }: { lib: Library; card: Card; view: ViewKey })
   const fixed = view !== "masonry";
   if (!c.src || failed) {
     if (fixed) return <div className="cover">{<Tile card={card} compact={view === "list"} />}</div>;
-    if (c.missing || (card.kind === "photo" && failed)) return <div className="cover-note">{c.missing ?? "Файл фото не найден в папке экспорта"}</div>;
+    if (c.missing || (card.kind === "photo" && failed)) return <div className="cover-note">{c.missing ?? T.card.photoNotFound}</div>;
     return null;
   }
   return (
@@ -130,7 +129,7 @@ function Cover({ lib, card, view }: { lib: Library; card: Card; view: ViewKey })
         style={!fixed && c.ratio ? { aspectRatio: String(Math.max(c.ratio, 1 / 1.6)) } : undefined}
         onError={() => setFailed(true)}
       />
-      {card.album && <span className="badge-corner">+{card.album.length}</span>}
+      {card.album && <span className="badge-corner">+{formatNumber(card.album.length)}</span>}
       {card.media?.duration && (card.kind === "video" || card.kind === "animation") ? <span className="badge-corner">{formatDuration(card.media.duration)}</span> : null}
     </div>
   );
@@ -179,9 +178,9 @@ export function CardView(props: {
         {excerpt && <p className="excerpt">{excerpt}</p>}
         {(tags.length > 0 || action || card.sensitive) && view !== "headlines" && (
           <div className="tags">
-            {action && action !== "junk" && <span className={`pill action-${action}`}>{ACTION_LABELS[action]}</span>}
+            {action && action !== "junk" && <span className={`pill action-${action}`}>{actionLabel(action)}</span>}
             {card.sensitive && (
-              <span className="pill warn" title="Похоже на пароль, ключ или номер карты. Не отправляется в AI.">
+              <span className="pill warn" title={T.card.sensitive}>
                 <Icon name="lock" size={12} />
               </span>
             )}
@@ -207,15 +206,15 @@ export function CardView(props: {
         </div>
       </div>
       <div className="hover-actions" onClick={(e) => e.stopPropagation()}>
-        <button className={`ha${props.selected ? " on" : ""}`} title="Выбрать (Ctrl+клик)" onClick={() => props.onToggleSelect(false)}>
+        <button className={`ha${props.selected ? " on" : ""}`} title={T.card.select} onClick={() => props.onToggleSelect(false)}>
           <Icon name="select" size={15} />
         </button>
         {card.urls[0] && (
-          <button className="ha" title="Открыть ссылку" onClick={() => props.onOpenLink(card.urls[0])}>
+          <button className="ha" title={T.card.openLink} onClick={() => props.onOpenLink(card.urls[0])}>
             <Icon name="external" size={15} />
           </button>
         )}
-        <button className="ha" title={action === "junk" ? "Вернуть из мусора" : "В мусор"} onClick={props.onJunk}>
+        <button className="ha" title={action === "junk" ? T.card.restore : T.card.toJunk} onClick={props.onJunk}>
           <Icon name={action === "junk" ? "restore" : "trash"} size={15} />
         </button>
       </div>

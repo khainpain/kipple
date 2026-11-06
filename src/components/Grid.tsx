@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Card, Library } from "../lib/types";
 import { CardView } from "./CardView";
+import { T } from "../i18n";
 import { instantImage } from "../lib/embeds";
 import type { ViewKey } from "./nav";
 
@@ -94,8 +95,8 @@ export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey }) {
     return (
       <div className="grid-scroll" ref={parentRef}>
         <div className="empty">
-          <b>Здесь пусто</b>
-          <span>Попробуй другой раздел, тип или запрос.</span>
+          <b>{T.grid.emptyTitle}</b>
+          <span>{T.grid.emptyHint}</span>
         </div>
       </div>
     );

@@ -1,3 +1,4 @@
+import { T } from "../i18n";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { open, save } from "@tauri-apps/plugin-dialog";
@@ -54,7 +55,7 @@ export const platform: Platform = {
     delete: (name) => invoke<void>("delete_secret", { name }),
   },
   async pickExport() {
-    const dir = await open({ directory: true, title: "Папка экспорта Telegram (с файлом result.json)" });
+    const dir = await open({ directory: true, title: T.importer.pickTitle });
     if (typeof dir !== "string") return null;
     return { dir, readText: (rel) => readTextFile(joinPath(dir, rel)) };
   },
@@ -63,7 +64,7 @@ export const platform: Platform = {
   openUrl: (url) => openUrl(url),
   openFile: (sourceDir, rel) => openPath(joinPath(sourceDir, rel)),
   async saveTextFile(defaultName, filter, content) {
-    const path = await save({ title: "Экспорт карточек", defaultPath: defaultName, filters: [{ name: filter.name, extensions: [filter.ext] }] });
+    const path = await save({ title: T.importer.saveTitle, defaultPath: defaultName, filters: [{ name: filter.name, extensions: [filter.ext] }] });
     if (!path) return null;
     await writeTextFile(path, content);
     return path;

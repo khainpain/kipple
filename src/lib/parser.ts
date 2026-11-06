@@ -1,3 +1,4 @@
+import { T } from "../i18n";
 import type { Card, CardKind, MediaRef } from "./types";
 import { isAutoJunk, isSensitive } from "./rules";
 
@@ -56,16 +57,16 @@ export class ExportFormatError extends Error {}
 
 /** Finds the Saved Messages chat in either a single-chat export or a full account export. */
 export function findChat(json: unknown): RawChat {
-  if (!json || typeof json !== "object") throw new ExportFormatError("Файл не похож на экспорт Telegram (ожидался JSON-объект).");
+  if (!json || typeof json !== "object") throw new ExportFormatError(T.importer.notExport);
   const obj = json as Record<string, unknown>;
   if (Array.isArray(obj.messages)) return obj as RawChat;
   const list = (obj.chats as { list?: RawChat[] } | undefined)?.list;
   if (Array.isArray(list)) {
     const saved = list.find((c) => c.type === "saved_messages");
     if (saved) return saved;
-    throw new ExportFormatError("В полном экспорте не нашлось чата «Избранное». Отметь его при экспорте.");
+    throw new ExportFormatError(T.importer.noSavedChat);
   }
-  throw new ExportFormatError("В файле нет списка сообщений. Нужен result.json из экспорта Telegram Desktop в формате JSON.");
+  throw new ExportFormatError(T.importer.noMessages);
 }
 
 function entitiesOf(msg: RawMessage): RawEntity[] {
@@ -219,7 +220,7 @@ export function parseExport(json: unknown): ParseResult {
     else skipped++;
   }
   return {
-    chatName: chat.name ?? "Избранное",
+    chatName: chat.name ?? T.importer.savedMessages,
     chatType: chat.type ?? "unknown",
     cards: groupAlbums(cards),
     skipped,

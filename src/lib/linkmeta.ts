@@ -1,3 +1,4 @@
+import { T } from "../i18n";
 import { platform } from "@platform";
 
 const fetch = platform.httpFetch;
@@ -98,7 +99,7 @@ async function instagram(url: string, code: string): Promise<Omit<LinkMeta, "fet
       const img = doc.querySelector("img.EmbeddedMediaImage, .EmbeddedMedia img")?.getAttribute("src") ?? undefined;
       const caption = doc.querySelector(".Caption")?.textContent?.replace(/\s+/g, " ").trim();
       const author = doc.querySelector(".UsernameText, .Username")?.textContent?.trim();
-      meta = { ...meta, image: img, title: meta.title ?? (author ? `${author} в Instagram` : undefined), description: meta.description ?? caption?.slice(0, 500) };
+      meta = { ...meta, image: img, title: meta.title ?? (author ? T.linkmeta.onInstagram(author) : undefined), description: meta.description ?? caption?.slice(0, 500) };
     }
   }
   if (meta.image) meta.image = await inlineImage(meta.image);

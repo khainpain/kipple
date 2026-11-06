@@ -1,4 +1,5 @@
 import type { Card } from "../lib/types";
+import { T, compareText, locale } from "../i18n";
 import { effectiveAction, effectiveTitle, effectiveTopic, matchesFilter } from "../lib/library";
 
 /** What the sidebar points at: a smart list, one topic, or cards without a topic. */
@@ -12,39 +13,39 @@ export type SortKey = "new" | "old" | "title";
 export type ViewKey = "masonry" | "grid" | "list" | "headlines";
 export type OpenMode = "center" | "side" | "full";
 
-/** How a card opens, like Notion's peek modes. */
+/** How a card opens, like Notion's peek modes. Labels are getters so they follow the interface language. */
 export const OPEN_MODES: Array<{ key: OpenMode; label: string; icon: string }> = [
-  { key: "center", label: "Открывать по центру", icon: "peekCenter" },
-  { key: "side", label: "Открывать сбоку", icon: "peekSide" },
-  { key: "full", label: "Открывать на весь экран", icon: "peekFull" },
+  { key: "center", get label() { return T.nav.openCenter; }, icon: "peekCenter" },
+  { key: "side", get label() { return T.nav.openSide; }, icon: "peekSide" },
+  { key: "full", get label() { return T.nav.openFull; }, icon: "peekFull" },
 ];
 
 export const SMART_LISTS: Array<{ key: Extract<Scope, { kind: "list" }>["key"]; label: string; icon: string }> = [
-  { key: "all", label: "Все карточки", icon: "all" },
-  { key: "read_later", label: "Прочитать позже", icon: "clock" },
-  { key: "ideas", label: "Идеи", icon: "bulb" },
-  { key: "todo", label: "Сделать", icon: "check" },
+  { key: "all", get label() { return T.nav.all; }, icon: "all" },
+  { key: "read_later", get label() { return T.nav.readLater; }, icon: "clock" },
+  { key: "ideas", get label() { return T.nav.ideas; }, icon: "bulb" },
+  { key: "todo", get label() { return T.nav.todo; }, icon: "check" },
 ];
 
 export const TYPES: Array<{ key: TypeKey; label: string; icon: string }> = [
-  { key: "links", label: "Ссылки", icon: "link" },
-  { key: "photos", label: "Фото", icon: "photo" },
-  { key: "videos", label: "Видео", icon: "video" },
-  { key: "docs", label: "Файлы и аудио", icon: "file" },
-  { key: "notes", label: "Заметки", icon: "text" },
+  { key: "links", get label() { return T.nav.links; }, icon: "link" },
+  { key: "photos", get label() { return T.nav.photos; }, icon: "photo" },
+  { key: "videos", get label() { return T.nav.videos; }, icon: "video" },
+  { key: "docs", get label() { return T.nav.docs; }, icon: "file" },
+  { key: "notes", get label() { return T.nav.notes; }, icon: "text" },
 ];
 
 export const VIEWS: Array<{ key: ViewKey; label: string; icon: string }> = [
-  { key: "masonry", label: "Плитка", icon: "masonry" },
-  { key: "grid", label: "Сетка", icon: "grid" },
-  { key: "list", label: "Список", icon: "list" },
-  { key: "headlines", label: "Заголовки", icon: "rows" },
+  { key: "masonry", get label() { return T.nav.viewMasonry; }, icon: "masonry" },
+  { key: "grid", get label() { return T.nav.viewGrid; }, icon: "grid" },
+  { key: "list", get label() { return T.nav.viewList; }, icon: "list" },
+  { key: "headlines", get label() { return T.nav.viewHeadlines; }, icon: "rows" },
 ];
 
 export const SORTS: Array<{ key: SortKey; label: string }> = [
-  { key: "new", label: "Сначала новые" },
-  { key: "old", label: "Сначала старые" },
-  { key: "title", label: "По названию" },
+  { key: "new", get label() { return T.nav.sortNew; } },
+  { key: "old", get label() { return T.nav.sortOld; } },
+  { key: "title", get label() { return T.nav.sortTitle; } },
 ];
 
 export function matchesScope(c: Card, s: Scope): boolean {
@@ -72,21 +73,21 @@ export function sameScope(a: Scope, b: Scope): boolean {
 
 export function scopeTitle(s: Scope): string {
   if (s.kind === "topic") return s.name;
-  if (s.kind === "notopic") return "Без темы";
-  if (s.key === "junk") return "Мусор";
-  if (s.key === "sensitive") return "Чувствительное";
+  if (s.kind === "notopic") return T.nav.noTopic;
+  if (s.key === "junk") return T.nav.junk;
+  if (s.key === "sensitive") return T.nav.sensitive;
   return SMART_LISTS.find((x) => x.key === s.key)?.label ?? "";
 }
 
 export function sortCards(cards: Card[], sort: SortKey): Card[] {
   if (sort === "new") return cards; // the library is stored newest first
   if (sort === "old") return [...cards].reverse();
-  const key = (c: Card) => (effectiveTitle(c) || c.text || c.link?.siteName || "").trim().toLocaleLowerCase("ru");
+  const key = (c: Card) => (effectiveTitle(c) || c.text || c.link?.siteName || "").trim().toLocaleLowerCase(locale());
   return [...cards].sort((a, b) => {
     const ka = key(a);
     const kb = key(b);
     if (!ka !== !kb) return ka ? -1 : 1;
-    return ka.localeCompare(kb, "ru");
+    return compareText(ka, kb);
   });
 }
 

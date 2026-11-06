@@ -5,7 +5,7 @@ import "./App.css";
 import type { Card, Library, UserFields } from "./lib/types";
 import { makeEdit } from "./lib/library";
 import { appendEdit, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadSettings, saveBoardState, saveLibrary, saveSettings, wipeAll, type Settings } from "./lib/store";
-import { sendToTelegram, TelegramAuthError, telegramErrorText, type SendOptions } from "./lib/telegram";
+import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type SendOptions } from "./lib/telegram";
 import { TelegramDialog } from "./components/TelegramDialog";
 import { importFolder, pickExportFolder } from "./lib/importer";
 import { fetchLinkMeta, needsPreview } from "./lib/linkmeta";
@@ -15,6 +15,8 @@ import { deleteApiKey, getApiKey, setApiKey } from "./lib/secrets";
 import { Workspace, type Job } from "./components/Workspace";
 import { SettingsDialog } from "./components/Settings";
 import { demoLibrary } from "./lib/demo";
+import { T, lang, resolveLang, setLang } from "./i18n";
+import type { AiLang } from "./lib/ai";
 
 const isWeb = platform.kind === "web";
 
@@ -43,6 +45,7 @@ export default function App() {
     (async () => {
       try {
         const [l, s, k] = await Promise.all([loadLibrary(), loadSettings(), getApiKey().catch(() => null)]);
+        setLang(resolveLang(s.language));
         setLib(l);
         setSettings(s);
         setHasKey(!!k);
@@ -56,7 +59,7 @@ export default function App() {
           });
         }
       } catch (e) {
-        notify(`Не удалось загрузить библиотеку: ${e}`);
+        notify(T.app.loadFailed(String(e)));
       } finally {
         setLoading(false);
       }
@@ -77,7 +80,7 @@ export default function App() {
       await update.install((p) => setUpdating(p));
     } catch (e) {
       setUpdating(false);
-      notify(`Не удалось обновиться: ${e}`);
+      notify(T.app.updateFailed(String(e)));
     }
   }
 
@@ -85,15 +88,18 @@ export default function App() {
     try {
       await saveLibrary(l);
     } catch (e) {
-      notify(`Не удалось сохранить: ${e}`);
+      notify(T.app.saveFailed(String(e)));
     }
   }, []);
+
+  /** Default: the interface language, so all topics in the sidebar are in one language. */
+  const aiLang = (): AiLang => (settings.aiLanguage === "source" ? "source" : lang());
 
   async function enrichLinks(l: Library, signal: AbortSignal) {
     const todo = l.cards.filter(needsPreview);
     if (!todo.length) return;
     let done = 0;
-    setJob({ label: "Превью ссылок", done, total: todo.length });
+    setJob({ label: T.app.jobLinks, done, total: todo.length });
     let next = 0;
     const worker = async () => {
       while (next < todo.length && !signal.aborted) {
@@ -101,7 +107,7 @@ export default function App() {
         c.link = await fetchLinkMeta(c.urls[0]);
         done++;
         if (done % 10 === 0 || done === todo.length) {
-          setJob({ label: "Превью ссылок", done, total: todo.length });
+          setJob({ label: T.app.jobLinks, done, total: todo.length });
           setRev((r) => r + 1);
         }
         if (done % 50 === 0) await persist(l);
@@ -114,7 +120,7 @@ export default function App() {
   async function runAi(l: Library, signal: AbortSignal) {
     const key = await getApiKey().catch(() => null);
     if (!key) {
-      notify("Добавь ключ Anthropic в настройках, чтобы включить AI-разметку.");
+      notify(T.app.needKeyAi);
       return;
     }
     await runTextAi(key, l, signal);
@@ -123,23 +129,24 @@ export default function App() {
 
   async function runImageAi(key: string, l: Library, todo: Card[], signal: AbortSignal) {
     if (!todo.length) return;
-    setJob({ label: "Названия картинок", done: 0, total: todo.length });
+    setJob({ label: T.app.jobImages, done: 0, total: todo.length });
     try {
       const res = await nameImages(
         key,
         l.cards,
         todo,
+        aiLang(),
         (c) => platform.readMedia(l.sourceDir, c.media!.path!),
         (p) => {
-          setJob({ label: "Названия картинок", done: p.done + p.failed, total: p.total });
+          setJob({ label: T.app.jobImages, done: p.done + p.failed, total: p.total });
           setRev((r) => r + 1);
           void persist(l);
         },
         signal,
       );
-      if (res.failed) notify(`Не получилось назвать ${res.failed} картинок: файл недоступен или AI не ответил.`);
+      if (res.failed) notify(T.app.imagesFailed(res.failed));
     } catch (e) {
-      notify(e instanceof AiKeyMissing ? e.message : `Ошибка AI: ${e}`);
+      notify(e instanceof AiKeyMissing ? e.message : T.app.aiError(String(e)));
     }
     await persist(l);
   }
@@ -149,7 +156,7 @@ export default function App() {
     if (!lib) return;
     const key = await getApiKey().catch(() => null);
     if (!key) {
-      notify("Добавь ключ Anthropic в настройках, чтобы AI мог назвать картинку.");
+      notify(T.app.needKeyImage);
       return;
     }
     abortRef.current?.abort();
@@ -169,21 +176,22 @@ export default function App() {
   async function runTextAi(key: string, l: Library, signal: AbortSignal) {
     const total = pendingForAi(l.cards).length;
     if (!total) return;
-    setJob({ label: "AI-разметка", done: 0, total });
+    setJob({ label: T.app.jobAi, done: 0, total });
     try {
       const res = await classifyCards(
         key,
         l.cards,
+        aiLang(),
         (p) => {
-          setJob({ label: "AI-разметка", done: p.done + p.failed, total: p.total });
+          setJob({ label: T.app.jobAi, done: p.done + p.failed, total: p.total });
           setRev((r) => r + 1);
           void persist(l);
         },
         signal,
       );
-      if (res.failed) notify(`AI не смог разметить ${res.failed} карточек, можно запустить ещё раз.`);
+      if (res.failed) notify(T.app.aiFailed(res.failed));
     } catch (e) {
-      notify(e instanceof AiKeyMissing ? e.message : `Ошибка AI: ${e}`);
+      notify(e instanceof AiKeyMissing ? e.message : T.app.aiError(String(e)));
     }
     await persist(l);
   }
@@ -209,7 +217,7 @@ export default function App() {
       await saveLibrary(next);
       setLib(next);
       setRev((r) => r + 1);
-      notify(warning ?? `Импорт готов: ${next.cards.length} карточек, новых ${added}.`);
+      notify(warning ?? T.app.imported(next.cards.length, added));
       void processAll(next);
     } catch (e) {
       notify(e instanceof Error ? e.message : String(e));
@@ -229,7 +237,7 @@ export default function App() {
       const set = new Set(ids);
       for (const c of lib.cards) if (set.has(c.id)) c.user = { ...c.user, ...patch };
       setRev((r) => r + 1);
-      for (const id of ids) void appendEdit(makeEdit(id, patch)).catch((e) => notify(`Правка не сохранилась: ${e}`));
+      for (const id of ids) void appendEdit(makeEdit(id, patch)).catch((e) => notify(T.app.editFailed(String(e))));
     },
     [lib, notify],
   );
@@ -241,7 +249,7 @@ export default function App() {
       kind === "csv" ? toCsv(cards) : toMarkdown(cards, lib?.chatName),
     );
     if (!path) return;
-    notify(`Сохранено ${cards.length} карточек в ${path}`);
+    notify(T.app.exported(cards.length, path));
   }
 
   async function sendTelegram(opts: SendOptions) {
@@ -252,17 +260,16 @@ export default function App() {
     const ctl = new AbortController();
     abortRef.current = ctl;
     setSendingTg(true);
-    const label = "В Telegram";
     try {
       const state = await loadBoardState();
       const res = await sendToTelegram(lib.cards, state, opts, {
         tg,
         save: saveBoardState,
         signal: ctl.signal,
-        onProgress: (p) => setJob({ label: p.waitSeconds ? `${label}, пауза ${p.waitSeconds} с` : label, done: p.done, total: p.total }),
+        onProgress: (p) => setJob({ label: p.waitSeconds ? T.app.jobTelegramPause(p.waitSeconds) : T.app.jobTelegram, done: p.done, total: p.total }),
       });
-      const missing = res.missing ? ` ${res.missing} сообщений уже нет в «Избранном», они пропущены.` : "";
-      notify(ctl.signal.aborted ? `Остановлено: отправлено ${res.done} из ${res.total}. Нажми «Отправить» ещё раз, чтобы продолжить.` : `Готово: ${res.done - res.missing} карточек в группе «Saved Board».${missing}`);
+      const missing = res.missing ? T.app.tgMissing(res.missing) : "";
+      notify(ctl.signal.aborted ? T.app.tgStopped(res.done, res.total) : T.app.tgDone(res.done - res.missing, BOARD_TITLE) + missing);
     } catch (e) {
       notify(telegramErrorText(e));
       if (e instanceof TelegramAuthError) setShowTelegram(true);
@@ -274,13 +281,14 @@ export default function App() {
 
   async function onSaveSettings(s: Settings, key: string | null) {
     await saveSettings(s);
+    setLang(resolveLang(s.language));
     setSettings(s);
     if (key) {
       try {
         await setApiKey(key);
         setHasKey(true);
       } catch (e) {
-        notify(`Не удалось сохранить ключ: ${e}`);
+        notify(T.app.keyFailed(String(e)));
       }
     }
     setShowSettings(false);
@@ -294,10 +302,10 @@ export default function App() {
     setLib(null);
     setHasKey(false);
     setShowSettings(false);
-    notify("Все данные удалены с этого компьютера.");
+    notify(T.app.wiped);
   }
 
-  if (loading) return <div className="center">Загрузка…</div>;
+  if (loading) return <div className="center">{T.common.loading}</div>;
 
   const needAi = lib ? pendingForAi(lib.cards).length + (settings.aiImages ? pendingImages(lib.cards).length : 0) : 0;
   const settingsDialog = showSettings && <SettingsDialog settings={settings} hasKey={hasKey} version={version} onSave={onSaveSettings} onWipe={onWipe} onClose={() => setShowSettings(false)} />;
@@ -306,23 +314,23 @@ export default function App() {
     <>
       {isWeb && (
         <div className="banner web">
-          Веб-версия для проверки интерфейса{version ? ` (${version})` : ""}. Данные хранятся только в этом браузере, превью ссылок не загружаются, фото видны до перезагрузки страницы.
+          {T.app.webBanner(version)}
         </div>
       )}
       {update && (
         <div className="banner update">
           {updating === false ? (
             <>
-              Доступна версия {update.version}.
+              {T.app.updateAvailable(update.version)}
               <button className="small" onClick={installUpdate}>
-                Обновить и перезапустить
+                {T.app.updateInstall}
               </button>
               <button className="secondary small" onClick={() => setUpdate(null)}>
-                Позже
+                {T.app.updateLater}
               </button>
             </>
           ) : (
-            <>Скачиваю обновление{updating !== null ? ` ${updating}%` : ""}…</>
+            <>{T.app.updateDownloading(updating)}</>
           )}
         </div>
       )}
@@ -334,24 +342,32 @@ export default function App() {
       <div className="welcome">
         {banners}
         <h1>Saved Board</h1>
-        <p>Превращает «Избранное» Telegram в визуальную библиотеку с темами, тегами и поиском. Всё хранится на этом компьютере.</p>
+        <p>{T.welcome.intro}</p>
         <ol>
-          <li>Открой Telegram Desktop → «Избранное» → ⋮ → «Экспорт истории чата».</li>
-          <li>Формат: <b>JSON</b>. Отметь «Фотографии» (видео и файлы — по желанию, с ограничением размера).</li>
-          <li>Дождись окончания экспорта и выбери получившуюся папку (в ней лежит <code>result.json</code>).</li>
+          <li>{T.welcome.step1}</li>
+          <li>
+            {T.welcome.step2a}
+            <b>JSON</b>
+            {T.welcome.step2b}
+          </li>
+          <li>
+            {T.welcome.step3a}
+            <code>result.json</code>
+            {T.welcome.step3b}
+          </li>
         </ol>
         <div className="welcome-buttons">
-          <button onClick={doImport}>Выбрать папку экспорта</button>
+          <button onClick={doImport}>{T.welcome.pickFolder}</button>
           {isWeb && (
             <button className="secondary" onClick={openDemo}>
-              Открыть демо
+              {T.welcome.demo}
             </button>
           )}
           <button className="secondary" onClick={() => setShowSettings(true)}>
-            Настройки и ключ AI
+            {T.welcome.settings}
           </button>
         </div>
-        {!hasKey && <p className="hint">Без ключа Anthropic будут работать сетка, фильтры по типу и поиск; темы и описания появятся, когда добавишь ключ.</p>}
+        {!hasKey && <p className="hint">{T.welcome.noKeyHint}</p>}
         {settingsDialog}
         {toast && <div className="toast">{toast}</div>}
       </div>
