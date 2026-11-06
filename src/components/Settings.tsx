@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { platform } from "@platform";
 import type { Settings } from "../lib/store";
 
 export function SettingsDialog(props: {
   settings: Settings;
   hasKey: boolean;
+  version: string;
   onSave: (s: Settings, apiKey: string | null) => void;
   onWipe: () => void;
   onClose: () => void;
@@ -25,8 +26,8 @@ export function SettingsDialog(props: {
           <input type="password" placeholder={props.hasKey ? "•••••••• (оставь пустым, чтобы не менять)" : "sk-ant-..."} value={key} onChange={(e) => setKey(e.target.value)} />
         </label>
         <p className="hint">
-          Ключ хранится в диспетчере учётных данных Windows, не в файле. Получить ключ:{" "}
-          <a href="#" onClick={(e) => (e.preventDefault(), openUrl("https://console.anthropic.com/settings/keys"))}>
+          {platform.kind === "web" ? "В веб-версии ключ хранится в этом браузере." : "Ключ хранится в диспетчере учётных данных Windows, не в файле."} Получить ключ:{" "}
+          <a href="#" onClick={(e) => (e.preventDefault(), platform.openUrl("https://console.anthropic.com/settings/keys"))}>
             console.anthropic.com
           </a>
           . Разметка 10 тыс. сообщений стоит примерно $1–2.
@@ -36,10 +37,12 @@ export function SettingsDialog(props: {
           <input type="checkbox" checked={s.aiEnabled} onChange={(e) => setS({ ...s, aiEnabled: e.target.checked })} />
           AI-разметка (в Anthropic уходит только текст сообщений и описания страниц; медиа и «чувствительные» сообщения не отправляются)
         </label>
-        <label className="check">
+        <label className="check" hidden={!platform.canFetchLinks}>
           <input type="checkbox" checked={s.fetchLinks} onChange={(e) => setS({ ...s, fetchLinks: e.target.checked })} />
           Загружать превью ссылок (заголовок, картинка, описание страницы)
         </label>
+
+        {props.version && <p className="hint">Версия {props.version}</p>}
 
         <div className="dialog-buttons">
           <button className="danger" onClick={() => confirm("Удалить библиотеку и все правки с этого компьютера? Сам экспорт Telegram не пострадает.") && props.onWipe()}>

@@ -1,0 +1,51 @@
+name: release
+
+# Every push to main publishes a new signed Windows release (v0.1.<run number>).
+# Installed apps find it through latest.json and offer to update themselves.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - run: npm test
+      - name: Set version
+        shell: bash
+        run: |
+          VERSION="0.1.${{ github.run_number }}"
+          node -e "const f='src-tauri/tauri.conf.json',fs=require('fs'),c=JSON.parse(fs.readFileSync(f));c.version='$VERSION';fs.writeFileSync(f,JSON.stringify(c,null,2))"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: v__VERSION__
+          releaseName: Saved Board v__VERSION__
+          releaseBody: |
+            Автоматическая сборка из ${{ github.sha }}.
+            Уже установленное приложение предложит обновиться само. Для первой установки скачай `Saved.Board_${{ env.VERSION }}_x64-setup.exe` ниже.
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true

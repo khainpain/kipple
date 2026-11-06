@@ -13,6 +13,8 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
+    /* Desktop or browser implementation, picked in vite.config.ts; type-checked against the desktop one */
+    "paths": { "@platform": ["./src/platform/tauri.ts"] },
 
     /* Linting */
     "strict": true,

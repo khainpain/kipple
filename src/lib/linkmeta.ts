@@ -1,4 +1,6 @@
-import { fetch } from "@tauri-apps/plugin-http";
+import { platform } from "@platform";
+
+const fetch = platform.httpFetch;
 import type { LinkMeta } from "./types";
 
 const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|0\.|\[?::1\]?$|.*\.local$)/i;

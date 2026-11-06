@@ -1,12 +1,24 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { fileURLToPath } from "node:url";
 // @ts-expect-error type error without @types/node package
 import process from "node:process";
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
-export default defineConfig(() => ({
+const buildId = (process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || "local").slice(0, 7);
+
+// `vite build --mode web` makes the browser build (deployed to Vercel for quick UI checks);
+// every other mode is the desktop app inside Tauri.
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
+  base: "./",
+  resolve: {
+    alias: {
+      "@platform": fileURLToPath(new URL(mode === "web" ? "./src/platform/web.ts" : "./src/platform/tauri.ts", import.meta.url)),
+    },
+  },
+  define: { __BUILD_ID__: JSON.stringify(buildId) },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

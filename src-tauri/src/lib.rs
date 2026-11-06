@@ -34,6 +34,14 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_process::init())
+        .setup(|app| {
+            // Checks GitHub Releases for a newer signed build; the UI asks before installing.
+            #[cfg(desktop)]
+            app.handle().plugin(tauri_plugin_updater::Builder::new().build())?;
+            let _ = app;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![get_secret, set_secret, delete_secret])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

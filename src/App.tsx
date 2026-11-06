@@ -1,21 +1,20 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { save } from "@tauri-apps/plugin-dialog";
-import { writeTextFile } from "@tauri-apps/plugin-fs";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { platform } from "@platform";
+import type { AvailableUpdate } from "./platform/types";
 import "./App.css";
 import type { Card, Library, UserFields } from "./lib/types";
-import { FILTERS, type FilterKey, effectiveTags, effectiveTopic, makeEdit, matchesFilter } from "./lib/library";
+import { makeEdit } from "./lib/library";
 import { appendEdit, DEFAULT_SETTINGS, loadLibrary, loadSettings, saveLibrary, saveSettings, wipeAll, type Settings } from "./lib/store";
 import { importFolder, pickExportFolder } from "./lib/importer";
 import { fetchLinkMeta } from "./lib/linkmeta";
 import { AiKeyMissing, classifyCards, pendingForAi } from "./lib/ai";
-import { buildIndex } from "./lib/search";
 import { toCsv, toMarkdown } from "./lib/exporters";
 import { deleteApiKey, getApiKey, setApiKey } from "./lib/secrets";
-import { Grid } from "./components/Grid";
-import { Detail } from "./components/Detail";
+import { Workspace, type Job } from "./components/Workspace";
 import { SettingsDialog } from "./components/Settings";
+import { demoLibrary } from "./lib/demo";
 
-type Job = { label: string; done: number; total: number } | null;
+const isWeb = platform.kind === "web";
 
 export default function App() {
   const [lib, setLib] = useState<Library | null>(null);
@@ -23,17 +22,13 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [hasKey, setHasKey] = useState(false);
-  const [filter, setFilter] = useState<FilterKey>("all");
-  const [topic, setTopic] = useState<string | null>(null);
-  const [tag, setTag] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
-  const [open, setOpen] = useState<Card | null>(null);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
   const [showSettings, setShowSettings] = useState(false);
   const [job, setJob] = useState<Job>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [version, setVersion] = useState("");
+  const [update, setUpdate] = useState<AvailableUpdate | null>(null);
+  const [updating, setUpdating] = useState<number | null | false>(false);
   const abortRef = useRef<AbortController | null>(null);
-  const lastClicked = useRef<number | null>(null);
 
   const notify = useCallback((msg: string) => {
     setToast(msg);
@@ -54,6 +49,24 @@ export default function App() {
       }
     })();
   }, [notify]);
+
+  useEffect(() => {
+    platform.appVersion().then(setVersion, () => undefined);
+    // Desktop only: a new release on GitHub shows a banner; installing it restarts the app.
+    platform.checkUpdate().then(setUpdate, (e) => console.warn("update check failed", e));
+  }, []);
+
+  async function installUpdate() {
+    if (!update) return;
+    abortRef.current?.abort();
+    setUpdating(null);
+    try {
+      await update.install((p) => setUpdating(p));
+    } catch (e) {
+      setUpdating(false);
+      notify(`Не удалось обновиться: ${e}`);
+    }
+  }
 
   const persist = useCallback(async (l: Library) => {
     try {
@@ -117,7 +130,7 @@ export default function App() {
     const ctl = new AbortController();
     abortRef.current = ctl;
     try {
-      if (settings.fetchLinks) await enrichLinks(l, ctl.signal);
+      if (settings.fetchLinks && platform.canFetchLinks) await enrichLinks(l, ctl.signal);
       if (settings.aiEnabled && !ctl.signal.aborted) await runAi(l, ctl.signal);
     } finally {
       setJob(null);
@@ -126,10 +139,10 @@ export default function App() {
   }
 
   async function doImport() {
-    const dir = await pickExportFolder();
-    if (!dir) return;
+    const src = await pickExportFolder();
+    if (!src) return;
     try {
-      const { lib: next, added, warning } = await importFolder(dir, lib);
+      const { lib: next, added, warning } = await importFolder(src, lib);
       await saveLibrary(next);
       setLib(next);
       setRev((r) => r + 1);
@@ -138,6 +151,13 @@ export default function App() {
     } catch (e) {
       notify(e instanceof Error ? e.message : String(e));
     }
+  }
+
+  async function openDemo() {
+    const next = demoLibrary();
+    await saveLibrary(next);
+    setLib(next);
+    setRev((r) => r + 1);
   }
 
   const edit = useCallback(
@@ -151,65 +171,13 @@ export default function App() {
     [lib, notify],
   );
 
-  const index = useMemo(() => (lib ? buildIndex(lib.cards) : null), [lib, rev]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const base = useMemo(() => {
-    if (!lib) return [];
-    let list = lib.cards.filter((c) => !c.removed);
-    if (query.trim() && index) {
-      const hits = new Set(index.search(query.trim()).map((h) => h.id as number));
-      list = list.filter((c) => hits.has(c.id));
-    }
-    return list;
-  }, [lib, rev, query, index]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const counts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.key, base.filter((c) => matchesFilter(c, f.key)).length])), [base]);
-
-  const inFilter = useMemo(() => base.filter((c) => matchesFilter(c, filter)), [base, filter]);
-
-  const topics = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const c of inFilter) {
-      const t = effectiveTopic(c);
-      if (t) m.set(t, (m.get(t) ?? 0) + 1);
-    }
-    return [...m.entries()].sort((a, b) => b[1] - a[1]);
-  }, [inFilter]);
-
-  const topTags = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const c of inFilter) if (!topic || effectiveTopic(c) === topic) for (const t of effectiveTags(c)) m.set(t, (m.get(t) ?? 0) + 1);
-    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 24);
-  }, [inFilter, topic]);
-
-  const visible = useMemo(
-    () => inFilter.filter((c) => (!topic || effectiveTopic(c) === topic) && (!tag || effectiveTags(c).includes(tag))),
-    [inFilter, topic, tag],
-  );
-
-  function toggleSelect(c: Card, range: boolean) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (range && lastClicked.current !== null) {
-        const a = visible.findIndex((x) => x.id === lastClicked.current);
-        const b = visible.findIndex((x) => x.id === c.id);
-        if (a >= 0 && b >= 0) for (const x of visible.slice(Math.min(a, b), Math.max(a, b) + 1)) next.add(x.id);
-      } else if (next.has(c.id)) next.delete(c.id);
-      else next.add(c.id);
-      lastClicked.current = c.id;
-      return next;
-    });
-  }
-
-  async function doExport(kind: "csv" | "md") {
-    const cards = selected.size ? visible.filter((c) => selected.has(c.id)) : visible;
-    const path = await save({
-      title: "Экспорт карточек",
-      defaultPath: kind === "csv" ? "saved-board.csv" : "saved-board.md",
-      filters: [kind === "csv" ? { name: "CSV", extensions: ["csv"] } : { name: "Markdown", extensions: ["md"] }],
-    });
+  async function doExport(kind: "csv" | "md", cards: Card[]) {
+    const path = await platform.saveTextFile(
+      kind === "csv" ? "saved-board.csv" : "saved-board.md",
+      kind === "csv" ? { name: "CSV", ext: "csv" } : { name: "Markdown", ext: "md" },
+      kind === "csv" ? toCsv(cards) : toMarkdown(cards, lib?.chatName),
+    );
     if (!path) return;
-    await writeTextFile(path, kind === "csv" ? toCsv(cards) : toMarkdown(cards, lib?.chatName));
     notify(`Сохранено ${cards.length} карточек в ${path}`);
   }
 
@@ -239,13 +207,40 @@ export default function App() {
 
   if (loading) return <div className="center">Загрузка…</div>;
 
-  const openCard = open && lib ? lib.cards.find((c) => c.id === open.id) ?? null : null;
   const needAi = lib ? pendingForAi(lib.cards).length : 0;
-  const settingsDialog = showSettings && <SettingsDialog settings={settings} hasKey={hasKey} onSave={onSaveSettings} onWipe={onWipe} onClose={() => setShowSettings(false)} />;
+  const settingsDialog = showSettings && <SettingsDialog settings={settings} hasKey={hasKey} version={version} onSave={onSaveSettings} onWipe={onWipe} onClose={() => setShowSettings(false)} />;
+
+  const banners = (
+    <>
+      {isWeb && (
+        <div className="banner web">
+          Веб-версия для проверки интерфейса{version ? ` (${version})` : ""}. Данные хранятся только в этом браузере, превью ссылок не загружаются, фото видны до перезагрузки страницы.
+        </div>
+      )}
+      {update && (
+        <div className="banner update">
+          {updating === false ? (
+            <>
+              Доступна версия {update.version}.
+              <button className="small" onClick={installUpdate}>
+                Обновить и перезапустить
+              </button>
+              <button className="secondary small" onClick={() => setUpdate(null)}>
+                Позже
+              </button>
+            </>
+          ) : (
+            <>Скачиваю обновление{updating !== null ? ` ${updating}%` : ""}…</>
+          )}
+        </div>
+      )}
+    </>
+  );
 
   if (!lib) {
     return (
       <div className="welcome">
+        {banners}
         <h1>Saved Board</h1>
         <p>Превращает «Избранное» Telegram в визуальную библиотеку с темами, тегами и поиском. Всё хранится на этом компьютере.</p>
         <ol>
@@ -255,6 +250,11 @@ export default function App() {
         </ol>
         <div className="welcome-buttons">
           <button onClick={doImport}>Выбрать папку экспорта</button>
+          {isWeb && (
+            <button className="secondary" onClick={openDemo}>
+              Открыть демо
+            </button>
+          )}
           <button className="secondary" onClick={() => setShowSettings(true)}>
             Настройки и ключ AI
           </button>
@@ -268,99 +268,20 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="toolbar">
-        <strong className="brand">Saved Board</strong>
-        <input className="search" placeholder="Поиск по тексту, тегам, сайтам…" value={query} onChange={(e) => setQuery(e.target.value)} />
-        <div className="spacer" />
-        {job ? (
-          <span className="job">
-            {job.label}: {job.done}/{job.total}
-            <button className="secondary small" onClick={() => abortRef.current?.abort()}>
-              Стоп
-            </button>
-          </span>
-        ) : (
-          needAi > 0 && settings.aiEnabled && (
-            <button className="secondary" onClick={() => processAll(lib)} title="Разметить карточки без тем и описаний">
-              AI-разметка ({needAi})
-            </button>
-          )
-        )}
-        <button className="secondary" onClick={doImport} title="Импортировать новый экспорт: правки и разметка сохранятся">
-          Импорт
-        </button>
-        <button className="secondary" onClick={() => doExport("md")}>
-          Markdown
-        </button>
-        <button className="secondary" onClick={() => doExport("csv")}>
-          CSV
-        </button>
-        <button className="secondary" onClick={() => setShowSettings(true)} aria-label="Настройки">
-          ⚙
-        </button>
-      </header>
-
-      <nav className="filters">
-        {FILTERS.map((f) =>
-          f.key === "sensitive" && !counts.sensitive ? null : (
-            <button key={f.key} className={`chip${filter === f.key ? " active" : ""}`} onClick={() => (setFilter(f.key), setTopic(null), setTag(null))}>
-              {f.label} <small>{counts[f.key]}</small>
-            </button>
-          ),
-        )}
-        {selected.size > 0 && (
-          <span className="selection">
-            Выбрано {selected.size}:
-            <button className="chip" onClick={() => edit([...selected], { action: "junk" })}>
-              В мусор
-            </button>
-            <button className="chip" onClick={() => edit([...selected], { action: "read_later" })}>
-              Прочитать позже
-            </button>
-            <button className="chip" onClick={() => setSelected(new Set())}>
-              Снять выделение
-            </button>
-          </span>
-        )}
-      </nav>
-
-      <div className="main">
-        <aside className="sidebar">
-          <h4>Темы</h4>
-          <button className={`side-item${!topic ? " active" : ""}`} onClick={() => (setTopic(null), setTag(null))}>
-            Все темы <small>{inFilter.length}</small>
-          </button>
-          {topics.map(([t, n]) => (
-            <button key={t} className={`side-item${topic === t ? " active" : ""}`} onClick={() => (setTopic(t), setTag(null))}>
-              {t} <small>{n}</small>
-            </button>
-          ))}
-          {topics.length === 0 && <p className="hint">Темы появятся после AI-разметки.</p>}
-          {topTags.length > 0 && (
-            <>
-              <h4>Теги</h4>
-              <div className="tag-cloud">
-                {topTags.map(([t, n]) => (
-                  <button key={t} className={`chip tag${tag === t ? " active" : ""}`} onClick={() => setTag(tag === t ? null : t)}>
-                    #{t} <small>{n}</small>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </aside>
-        <Grid
-          key={`${filter}|${topic}|${tag}|${query}`}
-          lib={lib}
-          cards={visible}
-          selected={selected}
-          onOpen={(c) => setOpen(c)}
-          onToggleSelect={toggleSelect}
-          onJunk={(c) => edit([c.id], { action: c.user?.action === "junk" || (!c.user?.action && (c.autoJunk || c.ai?.action === "junk")) ? (c.ai?.action && c.ai.action !== "junk" ? c.ai.action : "reference") : "junk" })}
-        />
-      </div>
-
-      {openCard && <Detail key={openCard.id} lib={lib} card={openCard} onClose={() => setOpen(null)} onEdit={(p) => edit([openCard.id], p)} />}
+      {banners}
+      <Workspace
+        lib={lib}
+        rev={rev}
+        job={job}
+        needAi={needAi}
+        aiEnabled={settings.aiEnabled}
+        onImport={doImport}
+        onExport={doExport}
+        onSettings={() => setShowSettings(true)}
+        onRunAi={() => processAll(lib)}
+        onStop={() => abortRef.current?.abort()}
+        onEdit={edit}
+      />
       {settingsDialog}
       {toast && <div className="toast">{toast}</div>}
     </div>

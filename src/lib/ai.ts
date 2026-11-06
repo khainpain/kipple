@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
+import { platform } from "@platform";
 import { z } from "zod";
 import { ACTIONS, type AiFields, type Card } from "./types";
 import { domainOf } from "./rules";
@@ -34,8 +34,8 @@ export class AiKeyMissing extends Error {}
 export function makeClient(apiKey: string) {
   return new Anthropic({
     apiKey,
-    dangerouslyAllowBrowser: true, // the key stays on this computer; requests go out through Tauri's HTTP client
-    fetch: tauriFetch as unknown as typeof globalThis.fetch,
+    dangerouslyAllowBrowser: true, // the key stays on this computer; desktop requests go out through Tauri's HTTP client
+    fetch: platform.httpFetch as unknown as typeof globalThis.fetch,
     maxRetries: 3,
   });
 }
