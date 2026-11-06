@@ -25,7 +25,7 @@ export function TopicMenu(props: {
   const [q, setQ] = useState("");
   const [pos, setPos] = useState<{ left: number; top: number; up: boolean; width: number }>({ left: 0, top: 0, up: false, width: WIDTH });
   const input = useRef<HTMLInputElement>(null);
-  const menu = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     const r = props.anchor.getBoundingClientRect();
@@ -37,16 +37,16 @@ export function TopicMenu(props: {
 
   useEffect(() => {
     input.current?.focus();
-    // Scrolling the list inside the menu is fine; anything else closes it.
-    const close = (e: Event) => {
-      if (e.type === "scroll" && menu.current?.contains(e.target as Node)) return;
-      props.onClose();
+    const close = () => props.onClose();
+    // Scrolling the board would leave the menu floating away from its card. Scrolling the
+    // menu's own list of topics is the menu working, not the board moving.
+    const onScroll = (e: Event) => {
+      if (!(e.target instanceof Node && box.current?.contains(e.target))) close();
     };
-    // Scrolling the board would leave the menu floating away from its card.
-    window.addEventListener("scroll", close, true);
+    window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", close);
     return () => {
-      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", close);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -64,7 +64,7 @@ export function TopicMenu(props: {
   return createPortal(
     <div className="popover-backdrop" onMouseDown={props.onClose} onClick={(e) => e.stopPropagation()}>
       <div
-        ref={menu}
+        ref={box}
         className={`menu topic-menu${pos.up ? " up" : ""}`}
         style={{ left: pos.left, top: pos.top, width: pos.width }}
         onMouseDown={(e) => e.stopPropagation()}
@@ -73,7 +73,7 @@ export function TopicMenu(props: {
           if (e.key === "Escape") props.onClose();
           // ↑/↓ walk the filter field and the options.
           if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-          const els = [input.current, ...Array.from(menu.current?.querySelectorAll<HTMLButtonElement>("button") ?? [])].filter(Boolean) as HTMLElement[];
+          const els = [input.current, ...Array.from(box.current?.querySelectorAll<HTMLButtonElement>("button") ?? [])].filter(Boolean) as HTMLElement[];
           const i = els.indexOf(document.activeElement as HTMLElement);
           e.preventDefault();
           els[(i + (e.key === "ArrowDown" ? 1 : -1) + els.length) % els.length]?.focus();
