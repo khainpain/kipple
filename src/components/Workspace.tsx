@@ -8,6 +8,7 @@ import { Detail } from "./Detail";
 import { Sidebar } from "./Sidebar";
 import { Icon } from "./Icon";
 import {
+  OPEN_MODES,
   SMART_LISTS,
   SORTS,
   TYPES,
@@ -18,6 +19,7 @@ import {
   savePref,
   scopeTitle,
   sortCards,
+  type OpenMode,
   type Scope,
   type SortKey,
   type TypeKey,
@@ -39,6 +41,8 @@ export function Workspace(props: {
   /** Desktop only: opens «Отправить в Telegram». */
   onTelegram?: () => void;
   onRunAi: () => void;
+  /** Ask the AI to name one photo from its content (sends that picture). */
+  onNameImage?: (card: Card) => void;
   onStop: () => void;
   onEdit: (ids: number[], patch: UserFields) => void;
 }) {
@@ -50,6 +54,7 @@ export function Workspace(props: {
   const [sort, setSort] = useState<SortKey>(() => loadPref("sort", ["new", "old", "title"] as const, "new"));
   const [view, setView] = useState<ViewKey>(() => loadPref("view", ["masonry", "grid", "list", "headlines"] as const, "masonry"));
   const [sideOpen, setSideOpen] = useState(() => loadPref("sidebar", ["open", "closed"] as const, "open") === "open");
+  const [openMode, setOpenMode] = useState<OpenMode>(() => loadPref("open", OPEN_MODES.map((m) => m.key), "center"));
   const [openId, setOpenId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [exportOpen, setExportOpen] = useState(false);
@@ -59,6 +64,7 @@ export function Workspace(props: {
   useEffect(() => savePref("sort", sort), [sort]);
   useEffect(() => savePref("view", view), [view]);
   useEffect(() => savePref("sidebar", sideOpen ? "open" : "closed"), [sideOpen]);
+  useEffect(() => savePref("open", openMode), [openMode]);
 
   const index = useMemo(() => buildIndex(lib.cards), [lib, rev]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -164,7 +170,7 @@ export function Workspace(props: {
   const subtitle = [type && TYPES.find((t) => t.key === type)?.label, tag && `#${tag}`].filter(Boolean).join(" · ");
 
   return (
-    <div className={`workspace${sideOpen ? "" : " side-closed"}${openCard ? " with-detail" : ""}`}>
+    <div className={`workspace${sideOpen ? "" : " side-closed"}${openCard && openMode === "side" ? " with-detail" : ""}`}>
       {sideOpen && (
         <Sidebar
           chatName={lib.chatName}
@@ -313,10 +319,13 @@ export function Workspace(props: {
 
       {openCard && (
         <Detail
-          key={openCard.id}
+          key={`${openCard.id}:${openCard.ai?.at ?? ""}`}
           lib={lib}
           card={openCard}
           topics={topics.map(([t]) => t)}
+          mode={openMode}
+          onNameImage={props.onNameImage && openCard.kind === "photo" && !props.job ? () => props.onNameImage!(openCard) : undefined}
+          onMode={setOpenMode}
           onClose={() => setOpenId(null)}
           onEdit={(p) => onEdit([openCard.id], p)}
           onPrev={openIdx > 0 ? () => setOpenId(visible[openIdx - 1].id) : undefined}

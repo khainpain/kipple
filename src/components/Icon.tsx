@@ -36,6 +36,9 @@ const PATHS: Record<string, string> = {
   user: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0",
   chart: "M4 20V10M10 20V4M16 20v-7M22 20H2",
   text: "M5 6h14M5 12h14M5 18h9",
+  peekCenter: "M3 4h18v16H3zM7 8h10v8H7z",
+  peekSide: "M3 4h18v16H3zM13 4v16",
+  peekFull: "M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5",
   send: "M21 3L10 14M21 3l-7 18-4-7-7-4z",
 };
 

@@ -91,6 +91,12 @@ export const platform: Platform = {
     objectUrls.set(k, url);
     return url;
   },
+  async readMedia(_sourceDir, rel) {
+    if (rel.startsWith("data:")) return (await fetch(rel)).blob();
+    const f = media.get(key(rel));
+    if (!f) throw new Error(`Файл ${rel} недоступен: выбери папку экспорта ещё раз.`);
+    return f;
+  },
   async openUrl(url) {
     window.open(url, "_blank", "noopener");
   },
