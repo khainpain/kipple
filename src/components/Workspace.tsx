@@ -40,7 +40,8 @@ export function Workspace(props: {
   job: Job;
   needAi: number;
   aiEnabled: boolean;
-  onImport: () => void;
+  /** Undefined in the demo, which can't take a real import. */
+  onImport?: () => void;
   onExport: (kind: "csv" | "md", cards: Card[]) => void;
   onSettings: () => void;
   /** Desktop only: opens "Send to Telegram". */
@@ -232,9 +233,11 @@ export function Workspace(props: {
               </button>
             )
           )}
-          <button className="icon-btn" onClick={props.onImport} title={T.toolbar.import}>
-            <Icon name="import" />
-          </button>
+          {props.onImport && (
+            <button className="icon-btn" onClick={props.onImport} title={T.toolbar.import}>
+              <Icon name="import" />
+            </button>
+          )}
           <div className="menu-wrap">
             <button className="icon-btn" onClick={() => setExportOpen(!exportOpen)} title={T.toolbar.export}>
               <Icon name="export" />

@@ -144,23 +144,6 @@ code {
   flex: 1;
 }
 
-/* Welcome */
-.welcome {
-  max-width: 640px;
-  margin: 10vh auto;
-  padding: 0 24px;
-  line-height: 1.55;
-}
-.welcome h1 {
-  font-size: 30px;
-  margin-bottom: 4px;
-}
-.welcome-buttons {
-  display: flex;
-  gap: 10px;
-  margin: 20px 0 8px;
-}
-
 /* Layout */
 .app {
   display: flex;
@@ -1327,21 +1310,16 @@ code {
   background: var(--accent-soft);
   color: var(--ink);
 }
-.banner.update {
+.banner.update,
+.banner.demo {
   background: var(--accent-soft);
   border-bottom-color: var(--accent);
   color: var(--ink);
   font-weight: 500;
 }
-.welcome .banner {
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  margin-bottom: 20px;
-}
 
 
-/* Welcome: step-by-step export help, and collapsible sections in Settings */
-.export-help,
+/* Collapsible sections in Settings */
 .modal details.advanced {
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -1349,20 +1327,9 @@ code {
   padding: 10px 14px;
   margin: 16px 0 0;
 }
-.export-help summary,
 .modal details.advanced summary {
   cursor: pointer;
   font-weight: 600;
-}
-.export-help summary .hint {
-  font-weight: 400;
-}
-.export-help ol {
-  margin: 10px 0 4px;
-  padding-left: 22px;
-}
-.export-help li + li {
-  margin-top: 6px;
 }
 .modal details.advanced[open] summary {
   margin-bottom: 10px;

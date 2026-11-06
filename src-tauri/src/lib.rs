@@ -55,6 +55,8 @@ pub fn run() {
             telegram::tg_request_code,
             telegram::tg_sign_in,
             telegram::tg_check_password,
+            telegram::tg_qr_poll,
+            telegram::tg_qr_cancel,
             telegram::tg_logout,
             telegram::tg_ensure_board,
             telegram::tg_create_topic,
