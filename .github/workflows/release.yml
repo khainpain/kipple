@@ -55,10 +55,10 @@ jobs:
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
         with:
           tagName: v__VERSION__
-          releaseName: Saved Board v__VERSION__
+          releaseName: Kipple v__VERSION__
           releaseBody: |
             Сборка из ${{ github.ref_name }} @ ${{ github.sha }}.
-            Уже установленное приложение предложит обновиться само. Для первой установки скачай `Saved.Board_${{ env.VERSION }}_x64-setup.exe` ниже.
+            Уже установленное приложение предложит обновиться само. Для первой установки скачай `Kipple_${{ env.VERSION }}_x64-setup.exe` ниже.
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true

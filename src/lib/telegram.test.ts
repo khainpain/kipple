@@ -87,6 +87,7 @@ function fakeTg(opts: { floodOnce?: boolean; missing?: number[] } = {}) {
   let flooded = false;
   const tg: TelegramApi = {
     status: async () => ({ hasApi: true, builtInApi: true, customApi: false, authorized: true, name: "Me" }),
+    account: async () => ({ name: "Me" }),
     setApi: async () => undefined,
     clearApi: async () => undefined,
     requestCode: async () => undefined,

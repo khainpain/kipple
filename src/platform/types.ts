@@ -27,6 +27,14 @@ export interface TelegramStatus {
   name?: string | null;
 }
 
+/** The signed-in Telegram account, shown in the sidebar header. */
+export interface TelegramAccount {
+  name: string;
+  username?: string | null;
+  /** Small profile photo, JPEG bytes. */
+  photo?: number[] | null;
+}
+
 export type SignInResult = { status: "ok"; name: string } | { status: "password"; hint?: string | null };
 
 /** QR sign-in: a `tg://login?token=…` link to show until `expires` (unix seconds), or the outcome. */
@@ -38,6 +46,8 @@ export type QrResult = { status: "qr"; url: string; expires: number } | SignInRe
  */
 export interface TelegramApi {
   status(): Promise<TelegramStatus>;
+  /** Who is signed in (name, @username, avatar), or null. */
+  account(): Promise<TelegramAccount | null>;
   /** The user's own api_id / api_hash from my.telegram.org (Settings → Advanced); wins over the built-in key. */
   setApi(apiId: string, apiHash: string): Promise<void>;
   /** Forgets the user's own key and goes back to the one built into the app. */

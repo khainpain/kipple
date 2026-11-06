@@ -197,6 +197,7 @@ export const en: Dict = {
   },
 
   sidebar: {
+    signedIn: "Signed in to Telegram",
     topics: "Topics",
     tags: "Tags",
     topicsHint: "Topics appear after AI tagging.",

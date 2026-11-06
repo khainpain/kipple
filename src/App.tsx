@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { platform } from "@platform";
 import { useUpdateCheck } from "./useUpdateCheck";
+import { useTelegramAccount } from "./useTelegramAccount";
 import "./App.css";
 import type { Card, Library, UserFields } from "./lib/types";
 import { makeEdit } from "./lib/library";
@@ -29,6 +30,7 @@ export default function App() {
   const [hasKey, setHasKey] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showTelegram, setShowTelegram] = useState(false);
+  const tgAccount = useTelegramAccount(!showTelegram && lib !== null);
   const [sendingTg, setSendingTg] = useState(false);
   const [job, setJob] = useState<Job>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -413,6 +415,7 @@ export default function App() {
       <Workspace
         lib={lib}
         rev={rev}
+        tgAccount={tgAccount}
         job={job}
         needAi={demo ? 0 : needAi}
         aiEnabled={settings.aiEnabled}

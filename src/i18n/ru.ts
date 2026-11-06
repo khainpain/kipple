@@ -203,6 +203,7 @@ export const ru = {
   },
 
   sidebar: {
+    signedIn: "Вход в Telegram выполнен",
     topics: "Темы",
     tags: "Теги",
     topicsHint: "Темы появятся после AI-разметки.",
