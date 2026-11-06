@@ -1363,3 +1363,19 @@ code {
   cursor: pointer;
   margin: 4px 0 8px;
 }
+
+/* Consent before AI tagging */
+.modal.ai-consent {
+  width: min(560px, 92vw);
+}
+.modal.ai-consent h2,
+.modal.ai-consent p {
+  margin: 0;
+}
+.modal.ai-consent ul {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
