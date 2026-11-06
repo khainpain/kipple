@@ -40,6 +40,43 @@ export type SignInResult = { status: "ok"; name: string } | { status: "password"
 /** QR sign-in: a `tg://login?token=…` link to show until `expires` (unix seconds), or the outcome. */
 export type QrResult = { status: "qr"; url: string; expires: number } | SignInResult;
 
+/** One message from Saved Messages, as src-tauri/src/telegram.rs reads it. */
+export interface SavedMessage {
+  id: number;
+  /** Unix seconds. */
+  date: number;
+  text: string;
+  /** Links and hashtags; offsets count UTF-16 units, like JavaScript strings. */
+  entities: Array<{ kind: "url" | "text_url" | "hashtag"; offset: number; length: number; url?: string | null }>;
+  forwardedFrom?: string | null;
+  groupedId?: string | null;
+  media?: {
+    /** photo, video_file, animation, voice_message, video_message, audio_file, sticker, document, poll, location, contact */
+    kind: string;
+    width?: number | null;
+    height?: number | null;
+    mime?: string | null;
+    size?: number | null;
+    duration?: number | null;
+    fileName?: string | null;
+    emoji?: string | null;
+    pollQuestion?: string | null;
+    pollAnswers?: string[] | null;
+    latitude?: number | null;
+    longitude?: number | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    phone?: string | null;
+  } | null;
+}
+
+export interface SavedPage {
+  messages: SavedMessage[];
+  /** Offset for the next (older) page; null when there is nothing more. */
+  nextOffset: number | null;
+  total: number | null;
+}
+
 /**
  * The user's own Telegram account over MTProto (desktop only). Errors are strings:
  * `FLOOD_WAIT:<seconds>` for rate limits, otherwise Telegram's error name.
@@ -64,6 +101,12 @@ export interface TelegramApi {
   /** Stops QR sign-in (switched to the phone number or left the screen). */
   qrCancel(): Promise<void>;
   logout(): Promise<void>;
+  /** Up to 100 Saved Messages older than offsetId (0: from the newest) and newer than minId. */
+  savedPage(offsetId: number, minId: number): Promise<SavedPage>;
+  /** Downloads these messages' photos into the app's folder; returns absolute paths. Skips ones already there. */
+  savedPhotos(ids: number[]): Promise<Array<{ id: number; path: string }>>;
+  /** Deletes the downloaded photos. */
+  forgetMedia(): Promise<void>;
   ensureBoard(prev: { channelId: number; accessHash: string } | null, title: string, about: string): Promise<{ channelId: number; accessHash: string; created: boolean }>;
   createTopic(board: { channelId: number; accessHash: string }, title: string, iconColor?: number): Promise<number>;
   /** Returns the new message ids; empty when the originals no longer exist in Saved Messages. */
@@ -106,6 +149,8 @@ export interface Platform {
 }
 
 export function joinPath(dir: string, rel: string): string {
+  // Photos loaded straight from Telegram are stored with absolute paths.
+  if (/^([a-zA-Z]:[\\/]|\/|\\\\)/.test(rel) || !dir) return rel;
   const sep = dir.includes("\\") ? "\\" : "/";
   const trimmed = dir.replace(/[\\/]+$/, "");
   return `${trimmed}${sep}${rel.replace(/[\\/]+/g, sep)}`;

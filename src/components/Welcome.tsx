@@ -35,6 +35,11 @@ export function Welcome(props: {
   tg?: TelegramApi;
   showDemo?: boolean;
   onImport: () => void;
+  /**
+   * Signed in: load Saved Messages straight from Telegram. `auto` is true when the card calls it
+   * by itself on reaching the signed-in state; false from the button.
+   */
+  onSignedIn?: (auto: boolean) => void;
   onDemo: () => void;
   onSettings: () => void;
   onLanguage: (l: Lang) => void;
@@ -83,7 +88,7 @@ export function Welcome(props: {
                 </span>
                 {props.tg && (
                   <>
-                    <SignInCard tg={props.tg} active={screen === 0} onSettings={props.onSettings} onExport={() => setScreen(1)} />
+                    <SignInCard tg={props.tg} active={screen === 0} onSettings={props.onSettings} onExport={() => setScreen(1)} onSignedIn={props.onSignedIn} />
                     <div className="w-or">{L.orWithout}</div>
                   </>
                 )}
@@ -153,7 +158,7 @@ export function Welcome(props: {
 
 type Step = "loading" | "noApi" | "qr" | "phone" | "code" | "password" | "done";
 
-function SignInCard(props: { tg: TelegramApi; active: boolean; onSettings: () => void; onExport: () => void }) {
+function SignInCard(props: { tg: TelegramApi; active: boolean; onSettings: () => void; onExport: () => void; onSignedIn?: (auto: boolean) => void }) {
   const { tg } = props;
   const L = T.welcome;
   const TL = T.telegram;
@@ -185,6 +190,12 @@ function SignInCard(props: { tg: TelegramApi; active: boolean; onSettings: () =>
   useEffect(() => {
     void refresh();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Signed in: the messages start loading by themselves, no export needed.
+  const onSignedIn = props.onSignedIn;
+  useEffect(() => {
+    if (step === "done") onSignedIn?.(true);
+  }, [step, onSignedIn]);
 
   // QR: poll while the code is on screen. Each call returns the current code, a fresh one
   // when it expires, or the result once the phone confirmed it.
@@ -379,9 +390,18 @@ function SignInCard(props: { tg: TelegramApi; active: boolean; onSettings: () =>
             <p>
               <b>{L.signedIn(name)}</b>
             </p>
-            <p className="hint">{L.signedInNext}</p>
+            <p className="hint">{props.onSignedIn ? L.signedInLoad : L.signedInNext}</p>
             <div className="w-inline">
-              <button onClick={props.onExport}>{L.toExport}</button>
+              {props.onSignedIn ? (
+                <>
+                  <button onClick={() => props.onSignedIn?.(false)}>{L.loadSaved}</button>
+                  <button className="link-btn w-small-link" onClick={props.onExport}>
+                    {L.orExport}
+                  </button>
+                </>
+              ) : (
+                <button onClick={props.onExport}>{L.toExport}</button>
+              )}
               <button className="link-btn w-small-link" onClick={() => void run(async () => (await tg.logout(), switchMode("qr")))}>
                 {L.signOut}
               </button>
