@@ -6,8 +6,8 @@ Everything stays on your computer. The only things that leave it are message tex
 
 ## How to use
 
-1. In Telegram Desktop open «Избранное» → ⋮ → «Экспорт истории чата», format **JSON**, tick «Фотографии» (videos and files are optional).
-2. Start Kipple and pick the export folder (the one with `result.json`).
+1. Start Kipple and sign in to Telegram (QR code or phone number). The app then loads «Избранное» by itself: messages page by page, then photos (about 800 px, kept in the app's folder). Videos and files stay in Telegram; their cards show the name, size and length. Closing the app mid-way is safe, the next launch carries on, and later launches only load what's new.
+2. Or, without signing in: in Telegram Desktop open «Избранное» → ⋮ → «Экспорт истории чата», format **JSON**, tick «Фотографии» (videos and files are optional), then pick the export folder (the one with `result.json`) in Kipple.
 3. AI tagging works out of the box with the built-in key, within a daily allowance. Optionally add your own Anthropic API key in Settings → «Свой ключ Anthropic» (stored in Windows Credential Manager / macOS Keychain): requests then go straight to Anthropic, with no allowance. Tagging ~10k messages with Claude Haiku 5.5 costs about $1–2.
 4. Filter, search, mark junk (hover a card → 🗑, or Ctrl/Shift-click to select several), and export to Markdown or CSV.
 
@@ -30,11 +30,12 @@ The paper-plane button in the toolbar lays the library out inside Telegram: the 
 | Your edits (append-only log, replayed on load) | `%APPDATA%\com.khainpain.savedboard\edits.jsonl` |
 | Your Anthropic API key (if any), install id for the built-in allowance, Telegram session and api_id/api_hash | OS credential store |
 | What was sent to the Telegram group | `%APPDATA%\com.khainpain.savedboard\telegram.json` |
-| Photos and files | Read in place from the Telegram export folder, never copied |
+| Photos and files from an export | Read in place from the Telegram export folder, never copied |
+| Photos loaded from Telegram | `%APPDATA%\com.khainpain.savedboard\telegram-media\<message id>.jpg` |
 
 The folder and credential-store entries are named after the app identifier `com.khainpain.savedboard`, from before the app was called Kipple. It stays as is on purpose: changing it would make the app lose the library, the keys and the Telegram session on update.
 
-Settings → «Удалить все данные» removes the library, edits and the key.
+Settings → «Удалить все данные» removes the library, edits, downloaded photos and the key, and signs out of Telegram.
 
 ## Built-in Anthropic key
 

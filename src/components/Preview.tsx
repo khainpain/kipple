@@ -108,7 +108,7 @@ export function Preview({ lib, card }: { lib: Library; card: Card }) {
   );
 
   if (m.missing || !m.path) {
-    return fileRow(T.preview.notExported);
+    return fileRow(m.inTelegram && !m.missing ? T.preview.inTelegram : T.preview.notExported);
   }
   if (failed || error) return fileRow(T.preview.cannotShow);
 

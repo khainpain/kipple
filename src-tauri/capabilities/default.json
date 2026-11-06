@@ -58,6 +58,9 @@
         },
         {
           "path": "$DESKTOP/**"
+        },
+        {
+          "path": "$APPDATA/telegram-media/**"
         }
       ]
     },

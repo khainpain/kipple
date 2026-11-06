@@ -62,7 +62,10 @@ pub fn run() {
             telegram::tg_ensure_board,
             telegram::tg_create_topic,
             telegram::tg_forward,
-            telegram::tg_send_note
+            telegram::tg_send_note,
+            telegram::tg_saved_page,
+            telegram::tg_saved_photos,
+            telegram::tg_forget_media
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

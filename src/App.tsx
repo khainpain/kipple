@@ -17,6 +17,7 @@ import { Workspace, type Job } from "./components/Workspace";
 import { SettingsDialog } from "./components/Settings";
 import { Welcome } from "./components/Welcome";
 import { demoLibrary } from "./lib/demo";
+import { emptyTelegramLibrary, syncSaved } from "./lib/tgImport";
 import { T, lang, resolveLang, setLang } from "./i18n";
 import type { AiLang } from "./lib/ai";
 
@@ -47,6 +48,8 @@ export default function App() {
   const [demo, setDemo] = useState(false);
   const demoRef = useRef(demo);
   demoRef.current = demo;
+  /** Loading from Telegram already started by itself after sign-in in this launch. */
+  const tgAutoRef = useRef(false);
   /** Settings as of now, for AI runs that start right after a save (state updates later). */
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
@@ -64,15 +67,25 @@ export default function App() {
         setLib(l);
         setSettings(s);
         setHasKey(!!k);
+        if (!l) return;
         // Libraries imported before previews worked here (or by an older version) catch up in the background.
-        if (l && s.fetchLinks && platform.canFetchLinks && l.cards.some(needsPreview)) {
+        const catchUp = () => {
+          if (!s.fetchLinks || !platform.canFetchLinks || !l.cards.some(needsPreview)) return;
           const ctl = new AbortController();
           abortRef.current = ctl;
           void enrichLinks(l, ctl.signal).finally(() => {
             setJob(null);
             setRev((r) => r + 1);
           });
-        }
+        };
+        // Signed in to Telegram: bring in what was saved since last time (and finish an interrupted
+        // load). That ends with previews and AI anyway; otherwise just catch up on previews.
+        const tg = platform.telegram;
+        if (!tg) return catchUp();
+        void tg.status().then(
+          (st) => (st.authorized ? void syncTelegram(l, false, catchUp) : catchUp()),
+          catchUp,
+        );
       } catch (e) {
         notify(T.app.loadFailed(String(e)));
       } finally {
@@ -240,6 +253,46 @@ export default function App() {
     }
   }
 
+  /**
+   * Loads Saved Messages straight from Telegram into `l` (a fresh library after sign-in, or the
+   * current one to fetch what's new), then downloads photos and runs previews and AI as after an import.
+   * Stopping it keeps what was loaded; the next launch carries on.
+   */
+  async function syncTelegram(l: Library, fresh: boolean, nothingNew?: () => void) {
+    const tg = platform.telegram;
+    if (!tg || demoRef.current) return;
+    abortRef.current?.abort();
+    const ctl = new AbortController();
+    abortRef.current = ctl;
+    if (fresh) {
+      setLib(l);
+      setRev((r) => r + 1);
+    }
+    let added = 0;
+    try {
+      const res = await syncSaved(l, {
+        tg,
+        save: persist,
+        signal: ctl.signal,
+        onProgress: (p) => setJob({ label: p.phase === "messages" ? T.app.jobTgLoad : T.app.jobTgPhotos, done: p.done, total: p.total }),
+        onChange: () => setRev((r) => r + 1),
+      });
+      added = res.added;
+      if (fresh || added) notify(T.app.tgLoaded(l.cards.length, added));
+    } catch (e) {
+      notify(T.app.tgLoadFailed(telegramErrorText(e)));
+      // Nothing came in on the first load: back to the start, where the export file still works.
+      if (fresh && !l.cards.length) setLib(null);
+    } finally {
+      setJob(null);
+      setRev((r) => r + 1);
+    }
+    if (ctl.signal.aborted || abortRef.current !== ctl) return;
+    // AI only runs on its own after something new arrived, as after an import.
+    if (fresh || added) await processAll(l);
+    else nothingNew?.();
+  }
+
   async function openDemo() {
     const next = demoLibrary();
     demoRef.current = true;
@@ -351,7 +404,9 @@ export default function App() {
     abortRef.current?.abort();
     await wipeAll();
     await deleteApiKey().catch(() => undefined);
+    await platform.telegram?.forgetMedia().catch(() => undefined);
     await platform.telegram?.logout().catch(() => undefined);
+    tgAutoRef.current = false;
     setDemo(false);
     setLib(null);
     setHasKey(false);
@@ -405,6 +460,12 @@ export default function App() {
         tg={platform.telegram}
         showDemo
         onImport={doImport}
+        onSignedIn={(auto) => {
+          // On its own only once per launch, so a failed load doesn't loop back here and retry forever.
+          if (auto && tgAutoRef.current) return;
+          tgAutoRef.current = true;
+          void syncTelegram(emptyTelegramLibrary(), true);
+        }}
         onDemo={openDemo}
         onSettings={() => setShowSettings(true)}
         onLanguage={(l) => void onSaveSettings({ ...settingsRef.current, language: l }, null)}

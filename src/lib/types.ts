@@ -24,8 +24,13 @@ export function actionLabel(a: Action): string {
 }
 
 export interface MediaRef {
-  /** Path relative to the export folder; undefined when the file was not exported. */
+  /**
+   * Path relative to the export folder (an absolute one for photos loaded straight from
+   * Telegram); undefined when the file was not exported or not downloaded.
+   */
   path?: string;
+  /** Loaded straight from Telegram: the file itself stays there unless it's a photo. */
+  inTelegram?: boolean;
   /** Telegram reported the file but it was not included in the export. */
   missing?: boolean;
   thumb?: string;
@@ -104,6 +109,23 @@ export interface Library {
   sourceDir: string;
   importedAt: string;
   cards: Card[];
+  /** Where loading straight from Telegram got to (src/lib/tgImport.ts). */
+  telegram?: TelegramSync;
+}
+
+/**
+ * Loading Saved Messages from Telegram goes newest first, page by page. A pass reads
+ * everything newer than `top`; if it's interrupted, `cursor` says where to carry on.
+ */
+export interface TelegramSync {
+  /** Every message up to this id has been read. */
+  top: number;
+  /** The unfinished pass: next page starts below this id. */
+  cursor?: number;
+  /** The newest id seen in the unfinished pass; becomes `top` when it completes. */
+  passTop?: number;
+  /** Photos Telegram no longer has (the message was deleted), so they aren't asked for again. */
+  noPhoto?: number[];
 }
 
 /** One user edit; the edit log is replayed on load and is what a future sync would carry. */

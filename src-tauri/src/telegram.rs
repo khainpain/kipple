@@ -741,6 +741,382 @@ pub async fn tg_send_note(
     }
 }
 
+// ---- Loading Saved Messages straight from Telegram -------------------------------------
+//
+// The import used to need a Telegram Desktop export (result.json). After signing in, the app
+// can read Saved Messages itself: tg_saved_page pages through the history (newest first) and
+// tg_saved_photos downloads the pictures into the app's folder. Turning these messages into
+// cards happens in TypeScript (src/lib/tgImport.ts), with the same parser as the export.
+
+/// A link-ish piece of a message's text. Offsets count UTF-16 units, like JavaScript strings.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedEntity {
+    /// "url", "text_url" or "hashtag"; other formatting is dropped.
+    kind: &'static str,
+    offset: i32,
+    length: i32,
+    url: Option<String>,
+}
+
+#[derive(Serialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedMedia {
+    /// photo, video_file, animation, voice_message, video_message, audio_file, sticker,
+    /// document, poll, location or contact (the names Telegram Desktop's export uses).
+    kind: String,
+    width: Option<i32>,
+    height: Option<i32>,
+    mime: Option<String>,
+    size: Option<i64>,
+    duration: Option<f64>,
+    file_name: Option<String>,
+    emoji: Option<String>,
+    poll_question: Option<String>,
+    poll_answers: Option<Vec<String>>,
+    latitude: Option<f64>,
+    longitude: Option<f64>,
+    first_name: Option<String>,
+    last_name: Option<String>,
+    phone: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedMessage {
+    id: i32,
+    /// Unix seconds.
+    date: i32,
+    text: String,
+    entities: Vec<SavedEntity>,
+    forwarded_from: Option<String>,
+    /// Messages sent together as an album share this id.
+    grouped_id: Option<String>,
+    media: Option<SavedMedia>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedPage {
+    messages: Vec<SavedMessage>,
+    /// The lowest message id on this page (service messages included): the offset for the next
+    /// page. None when the page is empty, i.e. everything down to min_id has been read.
+    next_offset: Option<i32>,
+    /// Roughly how many messages there are in total (above min_id), for the progress bar.
+    total: Option<i32>,
+}
+
+fn entity(e: &tl::enums::MessageEntity) -> Option<SavedEntity> {
+    use tl::enums::MessageEntity as E;
+    match e {
+        E::Url(u) => Some(SavedEntity { kind: "url", offset: u.offset, length: u.length, url: None }),
+        E::TextUrl(u) => Some(SavedEntity { kind: "text_url", offset: u.offset, length: u.length, url: Some(u.url.clone()) }),
+        E::Hashtag(h) => Some(SavedEntity { kind: "hashtag", offset: h.offset, length: h.length, url: None }),
+        _ => None,
+    }
+}
+
+fn text_of(t: &tl::enums::TextWithEntities) -> String {
+    let tl::enums::TextWithEntities::Entities(t) = t;
+    t.text.clone()
+}
+
+fn largest_size(sizes: &[tl::enums::PhotoSize]) -> Option<(String, i32, i32)> {
+    sizes
+        .iter()
+        .filter_map(|s| match s {
+            tl::enums::PhotoSize::Size(s) => Some((s.r#type.clone(), s.w, s.h)),
+            tl::enums::PhotoSize::Progressive(s) => Some((s.r#type.clone(), s.w, s.h)),
+            _ => None,
+        })
+        .max_by_key(|(_, w, h)| w * h)
+}
+
+fn document_media(d: &tl::types::Document, round: bool, voice: bool) -> SavedMedia {
+    use tl::enums::DocumentAttribute as A;
+    let mut m = SavedMedia { kind: "document".into(), mime: Some(d.mime_type.clone()), size: Some(d.size), ..Default::default() };
+    let mut animated = false;
+    for a in &d.attributes {
+        match a {
+            A::Filename(f) => m.file_name = Some(f.file_name.clone()),
+            A::ImageSize(s) => {
+                m.width = Some(s.w);
+                m.height = Some(s.h);
+            }
+            A::Animated => animated = true,
+            A::Sticker(s) => {
+                m.kind = "sticker".into();
+                m.emoji = Some(s.alt.clone()).filter(|a| !a.is_empty());
+            }
+            A::Video(v) => {
+                m.width = Some(v.w);
+                m.height = Some(v.h);
+                m.duration = Some(v.duration);
+                if m.kind == "document" {
+                    m.kind = if v.round_message || round { "video_message" } else { "video_file" }.into();
+                }
+            }
+            A::Audio(a) => {
+                m.duration = Some(a.duration as f64);
+                if m.kind == "document" {
+                    m.kind = if a.voice || voice { "voice_message" } else { "audio_file" }.into();
+                }
+            }
+            _ => {}
+        }
+    }
+    if animated && m.kind != "sticker" {
+        m.kind = "animation".into();
+    }
+    m
+}
+
+fn media_of(media: &tl::enums::MessageMedia) -> Option<SavedMedia> {
+    use tl::enums::MessageMedia as M;
+    match media {
+        M::Photo(p) => {
+            let (width, height) = match &p.photo {
+                Some(tl::enums::Photo::Photo(ph)) => largest_size(&ph.sizes).map(|(_, w, h)| (Some(w), Some(h))).unwrap_or((None, None)),
+                _ => (None, None),
+            };
+            Some(SavedMedia { kind: "photo".into(), width, height, ..Default::default() })
+        }
+        M::Document(d) => match &d.document {
+            Some(tl::enums::Document::Document(doc)) => Some(document_media(doc, d.round, d.voice)),
+            _ => None,
+        },
+        M::Poll(p) => {
+            let tl::enums::Poll::Poll(poll) = &p.poll;
+            Some(SavedMedia {
+                kind: "poll".into(),
+                poll_question: Some(text_of(&poll.question)),
+                poll_answers: Some(poll.answers.iter().map(|a| text_of(&a.text())).collect()),
+                ..Default::default()
+            })
+        }
+        M::Geo(g) => geo(&g.geo),
+        M::GeoLive(g) => geo(&g.geo),
+        M::Venue(v) => geo(&v.geo),
+        M::Contact(c) => Some(SavedMedia {
+            kind: "contact".into(),
+            first_name: Some(c.first_name.clone()),
+            last_name: Some(c.last_name.clone()),
+            phone: Some(c.phone_number.clone()),
+            ..Default::default()
+        }),
+        _ => None,
+    }
+}
+
+fn geo(g: &tl::enums::GeoPoint) -> Option<SavedMedia> {
+    match g {
+        tl::enums::GeoPoint::Point(p) => Some(SavedMedia { kind: "location".into(), latitude: Some(p.lat), longitude: Some(p.long), ..Default::default() }),
+        _ => None,
+    }
+}
+
+/// Who the message was forwarded (or saved) from, by name.
+fn forwarded_from(h: &tl::enums::MessageFwdHeader, names: &HashMap<i64, String>) -> Option<String> {
+    let tl::enums::MessageFwdHeader::Header(h) = h;
+    let peer_name = |p: &Option<tl::enums::Peer>| -> Option<String> {
+        let id = match p.as_ref()? {
+            tl::enums::Peer::User(u) => u.user_id,
+            tl::enums::Peer::Chat(c) => c.chat_id,
+            tl::enums::Peer::Channel(c) => c.channel_id,
+        };
+        names.get(&id).cloned()
+    };
+    h.from_name.clone().or_else(|| peer_name(&h.from_id)).or_else(|| h.saved_from_name.clone()).or_else(|| peer_name(&h.saved_from_id))
+}
+
+fn chat_title(c: &tl::enums::Chat) -> Option<(i64, String)> {
+    match c {
+        tl::enums::Chat::Chat(c) => Some((c.id, c.title.clone())),
+        tl::enums::Chat::Channel(c) => Some((c.id, c.title.clone())),
+        tl::enums::Chat::Forbidden(c) => Some((c.id, c.title.clone())),
+        tl::enums::Chat::ChannelForbidden(c) => Some((c.id, c.title.clone())),
+        _ => None,
+    }
+}
+
+fn saved_message(m: &tl::types::Message, names: &HashMap<i64, String>) -> SavedMessage {
+    SavedMessage {
+        id: m.id,
+        date: m.date,
+        text: m.message.clone(),
+        entities: m.entities.iter().flatten().filter_map(entity).collect(),
+        forwarded_from: m.fwd_from.as_ref().and_then(|h| forwarded_from(h, names)),
+        grouped_id: m.grouped_id.map(|g| g.to_string()),
+        media: m.media.as_ref().and_then(media_of),
+    }
+}
+
+/// One page (up to 100) of Saved Messages, newest first, older than `offset_id` (0 = from the
+/// newest) and newer than `min_id` (0 = all the way back).
+#[tauri::command]
+pub async fn tg_saved_page(state: tauri::State<'_, TgState>, offset_id: i32, min_id: i32) -> Result<SavedPage, String> {
+    let c = conn(&state).await?;
+    let req = tl::functions::messages::GetHistory {
+        peer: tl::enums::InputPeer::PeerSelf,
+        offset_id,
+        offset_date: 0,
+        add_offset: 0,
+        limit: 100,
+        max_id: 0,
+        min_id,
+        hash: 0,
+    };
+    use tl::enums::messages::Messages as R;
+    let (messages, users, chats, total) = match c.client.invoke(&req).await.map_err(err)? {
+        R::Messages(m) => {
+            let n = m.messages.len() as i32;
+            (m.messages, m.users, m.chats, Some(n))
+        }
+        R::Slice(m) => (m.messages, m.users, m.chats, Some(m.count)),
+        R::ChannelMessages(m) => (m.messages, m.users, m.chats, Some(m.count)),
+        R::NotModified(_) => (vec![], vec![], vec![], None),
+    };
+    let mut names: HashMap<i64, String> = HashMap::new();
+    for u in &users {
+        if let tl::enums::User::User(user) = u {
+            names.insert(user.id, user_name(u));
+        }
+    }
+    names.extend(chats.iter().filter_map(chat_title));
+    let next_offset = messages.iter().map(|m| m.id()).min();
+    let messages = messages
+        .iter()
+        .filter_map(|m| match m {
+            tl::enums::Message::Message(m) => Some(saved_message(m, &names)),
+            _ => None,
+        })
+        .collect();
+    Ok(SavedPage { messages, next_offset, total })
+}
+
+/// A photo size to download: a custom location so we can ask for the ~800px version
+/// instead of grammers' default (the largest).
+struct PhotoFile {
+    location: tl::enums::InputFileLocation,
+    dc_id: i32,
+}
+
+impl Downloadable for PhotoFile {
+    fn to_raw_input_location(&self) -> Option<tl::enums::InputFileLocation> {
+        Some(self.location.clone())
+    }
+
+    fn dc_id(&self) -> Option<i32> {
+        Some(self.dc_id)
+    }
+}
+
+/// The size to keep: "x" (800px on the long side) when Telegram has it, else the largest
+/// one that's no bigger than 1280px, else whatever is largest.
+fn pick_photo_size(sizes: &[tl::enums::PhotoSize]) -> Option<String> {
+    let all: Vec<(String, i32, i32)> = sizes
+        .iter()
+        .filter_map(|s| match s {
+            tl::enums::PhotoSize::Size(s) => Some((s.r#type.clone(), s.w, s.h)),
+            tl::enums::PhotoSize::Progressive(s) => Some((s.r#type.clone(), s.w, s.h)),
+            _ => None,
+        })
+        .collect();
+    if let Some((t, _, _)) = all.iter().find(|(t, _, _)| t == "x") {
+        return Some(t.clone());
+    }
+    all.iter()
+        .filter(|(_, w, h)| (*w).max(*h) <= 1280)
+        .max_by_key(|(_, w, h)| w * h)
+        .or_else(|| all.iter().max_by_key(|(_, w, h)| w * h))
+        .map(|(t, _, _)| t.clone())
+}
+
+fn media_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    use tauri::Manager;
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?.join("telegram-media");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedPhoto {
+    id: i32,
+    /// Absolute path of the downloaded JPEG.
+    path: String,
+}
+
+/// Downloads the photos of these Saved Messages into the app's folder (telegram-media/<id>.jpg)
+/// and returns where each one went. Photos already on disk are not downloaded again, so an
+/// interrupted run picks up where it stopped. Messages without a photo, or that no longer
+/// exist, are left out of the result.
+#[tauri::command]
+pub async fn tg_saved_photos(app: tauri::AppHandle, state: tauri::State<'_, TgState>, ids: Vec<i32>) -> Result<Vec<SavedPhoto>, String> {
+    let dir = media_dir(&app)?;
+    let mut out = Vec::new();
+    let mut todo = Vec::new();
+    for id in ids {
+        let path = dir.join(format!("{id}.jpg"));
+        if path.metadata().map(|m| m.len() > 0).unwrap_or(false) {
+            out.push(SavedPhoto { id, path: path.to_string_lossy().into_owned() });
+        } else {
+            todo.push(id);
+        }
+    }
+    if todo.is_empty() {
+        return Ok(out);
+    }
+    let c = conn(&state).await?;
+    // Fresh copies of the messages: a photo's file_reference expires, so the one from the
+    // history page may be stale by now.
+    let req = tl::functions::messages::GetMessages { id: todo.iter().map(|&id| tl::types::InputMessageId { id }.into()).collect() };
+    use tl::enums::messages::Messages as R;
+    let messages = match c.client.invoke(&req).await.map_err(err)? {
+        R::Messages(m) => m.messages,
+        R::Slice(m) => m.messages,
+        R::ChannelMessages(m) => m.messages,
+        R::NotModified(_) => vec![],
+    };
+    for m in messages {
+        let tl::enums::Message::Message(m) = m else { continue };
+        let Some(tl::enums::MessageMedia::Photo(media)) = &m.media else { continue };
+        let Some(tl::enums::Photo::Photo(photo)) = &media.photo else { continue };
+        let Some(thumb_size) = pick_photo_size(&photo.sizes) else { continue };
+        let file = PhotoFile {
+            location: tl::types::InputPhotoFileLocation {
+                id: photo.id,
+                access_hash: photo.access_hash,
+                file_reference: photo.file_reference.clone(),
+                thumb_size,
+            }
+            .into(),
+            dc_id: photo.dc_id,
+        };
+        let mut bytes = Vec::new();
+        let mut download = c.client.iter_download(&file);
+        while let Some(chunk) = download.next().await.map_err(err)? {
+            bytes.extend(chunk);
+        }
+        if bytes.is_empty() {
+            continue;
+        }
+        let path = dir.join(format!("{}.jpg", m.id));
+        let tmp = dir.join(format!("{}.jpg.part", m.id));
+        std::fs::write(&tmp, &bytes).map_err(|e| e.to_string())?;
+        std::fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
+        out.push(SavedPhoto { id: m.id, path: path.to_string_lossy().into_owned() });
+    }
+    Ok(out)
+}
+
+/// Deletes the downloaded photos (Settings → «Удалить все данные»).
+#[tauri::command]
+pub async fn tg_forget_media(app: tauri::AppHandle) -> Result<(), String> {
+    let dir = media_dir(&app)?;
+    std::fs::remove_dir_all(&dir).map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -755,5 +1131,20 @@ mod tests {
         // Bytes that hit the URL-safe characters (+ and / in plain base64).
         assert_eq!(base64url(&[0xfb, 0xff, 0xbf]), "-_-_");
         assert_eq!(qr_url(&[0xfb, 0xff]), "tg://login?token=-_8");
+    }
+
+    fn size(t: &str, w: i32, h: i32) -> tl::enums::PhotoSize {
+        tl::types::PhotoSize { r#type: t.into(), w, h, size: 0 }.into()
+    }
+
+    #[test]
+    fn picks_the_800px_photo_size() {
+        let sizes = vec![size("s", 90, 60), size("m", 320, 213), size("x", 800, 533), size("y", 1280, 853), size("w", 2560, 1706)];
+        assert_eq!(pick_photo_size(&sizes).as_deref(), Some("x"));
+        let no_x = vec![size("m", 320, 213), size("y", 1280, 853), size("w", 2560, 1706)];
+        assert_eq!(pick_photo_size(&no_x).as_deref(), Some("y"));
+        let only_big = vec![size("w", 2560, 1706)];
+        assert_eq!(pick_photo_size(&only_big).as_deref(), Some("w"));
+        assert_eq!(pick_photo_size(&[]), None);
     }
 }
