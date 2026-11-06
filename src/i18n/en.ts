@@ -292,6 +292,15 @@ export const en: Dict = {
     toJunk: "Move to junk",
     sort: "Sort",
     view: "View",
+    show: "Show on cards",
+    fieldCover: "Cover",
+    fieldTitle: "Title",
+    fieldExcerpt: "Description",
+    fieldTags: "Tags and labels",
+    fieldInfo: "Site and date",
+    coverSide: "Cover in list",
+    coverLeft: "Left",
+    coverRight: "Right",
   },
 
   grid: {

@@ -299,6 +299,15 @@ export const ru = {
     toJunk: "В мусор",
     sort: "Сортировка",
     view: "Вид",
+    show: "Показывать на карточках",
+    fieldCover: "Обложку",
+    fieldTitle: "Заголовок",
+    fieldExcerpt: "Описание",
+    fieldTags: "Теги и метки",
+    fieldInfo: "Сайт и дату",
+    coverSide: "Обложка в списке",
+    coverLeft: "Слева",
+    coverRight: "Справа",
   },
 
   grid: {

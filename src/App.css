@@ -604,6 +604,47 @@ code {
   border-color: var(--accent);
   background: radial-gradient(circle, var(--accent) 0 3.5px, transparent 4px);
 }
+/* View menu: the sort dropdown plus checkboxes for card fields and the list cover side */
+.view-menu {
+  min-width: 240px;
+}
+.view-menu hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 6px 4px;
+}
+.view-menu small:not(:first-child) {
+  padding-top: 2px;
+}
+.view-menu button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.view-menu button:disabled:hover {
+  background: transparent;
+}
+.view-menu .checkbox {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  border: 1.5px solid var(--line);
+  box-sizing: border-box;
+  color: var(--bg);
+}
+.view-menu button:hover .checkbox {
+  border-color: var(--muted);
+}
+.view-menu button.on .checkbox {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.view-menu button .checkbox .icon {
+  color: inherit;
+  stroke-width: 3;
+}
 .segmented {
   display: inline-flex;
   background: var(--hover);
@@ -906,6 +947,16 @@ code {
 .card.view-list .hover-actions {
   top: 50%;
   transform: translateY(-50%);
+}
+
+.card.view-list.cover-right {
+  flex-direction: row-reverse;
+}
+.card.view-list.cover-right .card-body {
+  padding: 10px 14px;
+}
+.card.view-list.cover-right .hover-actions {
+  right: 128px;
 }
 
 /* Headlines: dense rows */
