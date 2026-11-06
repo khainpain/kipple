@@ -1109,6 +1109,49 @@ code {
   background: var(--panel);
   border-left: 1px solid var(--line);
   min-height: 0;
+  position: relative;
+}
+/* Left edge of the side panel: drag to resize, double-click to reset. A thin line
+   shows on hover and while dragging; no focus ring, just the same quiet line. */
+.panel-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+  z-index: 2;
+  cursor: col-resize;
+  touch-action: none;
+}
+.panel-resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: transparent;
+  transition: background-color 0.12s ease;
+}
+.panel-resizer:hover::after,
+.detail-panel.resizing .panel-resizer::after {
+  background: var(--accent);
+  transition-delay: 0.1s;
+}
+.detail-panel.resizing .panel-resizer::after {
+  transition-delay: 0s;
+}
+.panel-resizer:focus-visible {
+  outline: none;
+}
+.panel-resizer:focus-visible::after {
+  background: var(--muted);
+}
+/* While dragging: the col-resize cursor everywhere and no accidental text selection. */
+:root.col-resizing,
+:root.col-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 /* Centered and full-window modes: the same panel over the board */
 .peek-backdrop {
