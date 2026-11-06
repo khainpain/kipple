@@ -485,17 +485,67 @@ code {
 .pill.warn {
   color: var(--warn);
 }
-.sort {
-  width: auto;
+/* Sort: quiet toolbar button + dropdown with an icon and a radio mark per option */
+.sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 5px 8px;
   font-size: 13px;
   background: transparent;
-  border-color: transparent;
+  border: 1px solid transparent;
   color: var(--muted);
+  border-radius: 8px;
   cursor: pointer;
+  white-space: nowrap;
 }
-.sort:hover {
+.sort-btn:hover,
+.sort-btn.open {
   background: var(--hover);
+  color: var(--ink);
+}
+.sort-btn .chev {
+  opacity: 0.7;
+  transition: transform 0.15s;
+}
+.sort-btn.open .chev {
+  transform: rotate(180deg);
+}
+.sort-menu {
+  min-width: 230px;
+}
+.sort-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 7px;
+}
+.sort-menu button .icon {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.sort-menu button.on .icon {
+  color: var(--accent);
+}
+.sort-menu button:focus-visible {
+  outline: none;
+  background: var(--hover);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+.sort-menu .radio {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  box-sizing: border-box;
+}
+.sort-menu button:hover .radio {
+  border-color: var(--muted);
+}
+.sort-menu button.on .radio {
+  border-color: var(--accent);
+  background: radial-gradient(circle, var(--accent) 0 3.5px, transparent 4px);
 }
 .segmented {
   display: inline-flex;

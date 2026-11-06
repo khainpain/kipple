@@ -8,7 +8,7 @@ export type Scope =
   | { kind: "notopic" };
 
 export type TypeKey = "links" | "photos" | "videos" | "docs" | "notes";
-export type SortKey = "new" | "old" | "title";
+export type SortKey = "new" | "old" | "title" | "title_desc" | "priority";
 export type ViewKey = "masonry" | "grid" | "list" | "headlines";
 export type OpenMode = "center" | "side" | "full";
 
@@ -35,16 +35,19 @@ export const TYPES: Array<{ key: TypeKey; label: string; icon: string }> = [
 ];
 
 export const VIEWS: Array<{ key: ViewKey; label: string; icon: string }> = [
-  { key: "masonry", label: "Плитка", icon: "masonry" },
   { key: "grid", label: "Сетка", icon: "grid" },
+  { key: "masonry", label: "Плитка", icon: "masonry" },
   { key: "list", label: "Список", icon: "list" },
   { key: "headlines", label: "Заголовки", icon: "rows" },
 ];
 
-export const SORTS: Array<{ key: SortKey; label: string }> = [
-  { key: "new", label: "Сначала новые" },
-  { key: "old", label: "Сначала старые" },
-  { key: "title", label: "По названию" },
+/** Sort options for the sort menu; `short` is what the toolbar button shows. */
+export const SORTS: Array<{ key: SortKey; label: string; short: string; icon: string }> = [
+  { key: "new", label: "Сначала новые", short: "Новые", icon: "sortNew" },
+  { key: "old", label: "Сначала старые", short: "Старые", icon: "sortOld" },
+  { key: "title", label: "По названию (А–Я)", short: "А–Я", icon: "sortAz" },
+  { key: "title_desc", label: "По названию (Я–А)", short: "Я–А", icon: "sortZa" },
+  { key: "priority", label: "Сначала важные", short: "Важные", icon: "flag" },
 ];
 
 export function matchesScope(c: Card, s: Scope): boolean {
@@ -81,12 +84,18 @@ export function scopeTitle(s: Scope): string {
 export function sortCards(cards: Card[], sort: SortKey): Card[] {
   if (sort === "new") return cards; // the library is stored newest first
   if (sort === "old") return [...cards].reverse();
+  if (sort === "priority") {
+    // AI priority 1 (important) first; cards without AI markup go last; newest first inside a group.
+    const p = (c: Card) => c.ai?.priority ?? 4;
+    return cards.map((c, i) => [c, i] as const).sort((a, b) => p(a[0]) - p(b[0]) || a[1] - b[1]).map(([c]) => c);
+  }
+  const dir = sort === "title_desc" ? -1 : 1;
   const key = (c: Card) => (effectiveTitle(c) || c.text || c.link?.siteName || "").trim().toLocaleLowerCase("ru");
   return [...cards].sort((a, b) => {
     const ka = key(a);
     const kb = key(b);
-    if (!ka !== !kb) return ka ? -1 : 1;
-    return ka.localeCompare(kb, "ru");
+    if (!ka !== !kb) return ka ? -1 : 1; // untitled cards stay at the end either way
+    return dir * ka.localeCompare(kb, "ru");
   });
 }
 
