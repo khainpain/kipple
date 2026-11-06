@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { platform } from "@platform";
 import type { Settings } from "../lib/store";
-import { AI_MODELS, aiModelOf } from "../lib/ai";
+import { AI_MODELS, aiModelOf, costEstimate } from "../lib/ai";
 import { setThemePref, THEME_ICONS, THEME_LABELS, THEME_PREFS, useThemePref } from "../lib/theme";
 import { Icon } from "./Icon";
 import { LANGS, T, systemLang, type LangPref } from "../i18n";
@@ -11,6 +11,9 @@ export function SettingsDialog(props: {
   hasKey: boolean;
   version: string;
   onSave: (s: Settings, apiKey: string | null) => void;
+  /** Number of already tagged cards a re-tag would send again. */
+  retagCount: number;
+  onRetag: (s: Settings, apiKey: string | null) => void;
   onWipe: () => void;
   onClose: () => void;
 }) {
@@ -90,6 +93,20 @@ export function SettingsDialog(props: {
             </label>
           ))}
           {aiModelOf(s.aiModel) !== aiModelOf(props.settings.aiModel) && <p className="hint">{L.aiModelNote}</p>}
+          {props.retagCount > 0 && (
+            <div>
+              <button
+                className="secondary small"
+                disabled={!props.hasKey && !key.trim()}
+                onClick={() => {
+                  const m = aiModelOf(s.aiModel);
+                  if (confirm(L.retagConfirm(props.retagCount, L.aiModels[m].name, costEstimate(props.retagCount, m)))) props.onRetag(s, key.trim() || null);
+                }}
+              >
+                {L.retag}
+              </button>
+            </div>
+          )}
         </fieldset>
         <label className="check">
           <input type="checkbox" checked={s.aiImages} disabled={!s.aiEnabled} onChange={(e) => setS({ ...s, aiImages: e.target.checked })} />

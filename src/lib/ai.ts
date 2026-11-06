@@ -12,6 +12,19 @@ import { T, lang as uiLang, type Lang } from "../i18n";
 export const AI_MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"] as const;
 export type AiModel = (typeof AI_MODELS)[number];
 export const DEFAULT_AI_MODEL: AiModel = "claude-haiku-5-5";
+/** Rough cost of tagging 10,000 messages, in dollars: [low, high]. */
+export const COST_PER_10K: Record<AiModel, [number, number]> = {
+  "claude-haiku-5-5": [1, 2],
+  "claude-sonnet-5-5": [20, 40],
+  "claude-opus-5-5": [40, 80],
+};
+/** A rough "$a–b" for tagging n messages with the model. */
+export function costEstimate(n: number, model: AiModel): string {
+  const fmt = (x: number) => (x < 1 ? x.toFixed(2) : x < 10 ? x.toFixed(1) : String(Math.round(x)));
+  const [lo, hi] = COST_PER_10K[model];
+  return `$${fmt((n * lo) / 10000)}–${fmt((n * hi) / 10000)}`;
+}
+
 /** A model id from settings, or the default if it is unknown (e.g. retired later). */
 export const aiModelOf = (m: string | undefined): AiModel => ((AI_MODELS as readonly string[]).includes(m ?? "") ? (m as AiModel) : DEFAULT_AI_MODEL);
 const BATCH = 40;
@@ -77,6 +90,11 @@ function describeCard(c: Card): Record<string, unknown> {
   if (c.media?.fileName) out.file = c.media.fileName;
   if (c.album) out.albumSize = c.album.length + 1;
   return out;
+}
+
+/** Cards a full re-tag would send again: the ones the AI already tagged. */
+export function retagCount(cards: Card[]): number {
+  return cards.filter((c) => c.ai).length;
 }
 
 /** Cards that still need AI fields. Sensitive ones are never sent. */

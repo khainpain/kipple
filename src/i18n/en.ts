@@ -82,7 +82,10 @@ export const en: Dict = {
       "claude-sonnet-5-5": { name: "Sonnet 5.5", hint: "sharper topics and summaries, ~$20–40 per 10,000 messages" },
       "claude-opus-5-5": { name: "Opus 5.5", hint: "the smartest, ~$40–80 per 10,000 messages" },
     },
-    aiModelNote: "Cards that are already tagged stay as they are; the new model applies to the next tagging run.",
+    aiModelNote: "Cards that are already tagged stay as they are; the new model applies to the next tagging run. To redo them too, press \"Re-tag everything\".",
+    retag: "Re-tag everything",
+    retagConfirm: (n, model, cost) =>
+      `Tag ${n} cards again with ${model}? It costs about ${cost}. AI topics, tags and summaries will be replaced; your own edits stay.`,
     aiImages:
       "Name uncaptioned pictures from what's in them. The pictures themselves then go to Anthropic as copies shrunk to 768 px; originals stay on this computer. Screenshots with personal data go too if they have no caption. With Haiku it costs about $0.15 per 1,000 pictures. Without this, the title comes from a nearby message or is set to \"Photo, date\"; you can still name one picture with the button in its card.",
     fetchLinks: "Load link previews (page title, image, description)",
