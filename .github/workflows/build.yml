@@ -18,6 +18,7 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - run: npm run build:web
 
   windows:
     needs: test
@@ -33,7 +34,18 @@ jobs:
         with:
           workspaces: src-tauri
       - run: npm ci
-      - run: npx tauri build
+      # Signs the update bundle when the signing key secret exists; otherwise builds without update artifacts.
+      - name: Build installer
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            npx tauri build
+          else
+            npx tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}'
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: saved-board-windows

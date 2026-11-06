@@ -1,31 +1,23 @@
-import { open } from "@tauri-apps/plugin-dialog";
-import { readTextFile } from "@tauri-apps/plugin-fs";
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { platform } from "@platform";
+import type { ExportSource } from "../platform/types";
 import { parseExport } from "./parser";
 import { mergeImport } from "./library";
 import type { Library } from "./types";
 
-export function joinPath(dir: string, rel: string): string {
-  const sep = dir.includes("\\") ? "\\" : "/";
-  const trimmed = dir.replace(/[\\/]+$/, "");
-  return `${trimmed}${sep}${rel.replace(/[\\/]+/g, sep)}`;
-}
+export { joinPath } from "../platform/types";
 
 export function mediaUrl(lib: Library, rel: string | undefined): string | undefined {
   if (!rel) return undefined;
-  return convertFileSrc(joinPath(lib.sourceDir, rel));
+  return platform.mediaUrl(lib.sourceDir, rel);
 }
 
 /** Asks for the export folder (the one that contains result.json) and returns null if cancelled. */
-export async function pickExportFolder(): Promise<string | null> {
-  const dir = await open({ directory: true, title: "Папка экспорта Telegram (с файлом result.json)" });
-  return typeof dir === "string" ? dir : null;
-}
+export const pickExportFolder = (): Promise<ExportSource | null> => platform.pickExport();
 
-export async function importFolder(dir: string, prev: Library | null): Promise<{ lib: Library; added: number; warning?: string }> {
+export async function importFolder(src: ExportSource, prev: Library | null): Promise<{ lib: Library; added: number; warning?: string }> {
   let raw: string;
   try {
-    raw = await readTextFile(joinPath(dir, "result.json"));
+    raw = await src.readText("result.json");
   } catch {
     throw new Error("В этой папке нет result.json. Выбери папку, которую создал экспорт Telegram Desktop (формат JSON).");
   }
@@ -34,7 +26,7 @@ export async function importFolder(dir: string, prev: Library | null): Promise<{
   const added = parsed.cards.filter((c) => !known.has(c.id)).length;
   const lib = mergeImport(prev, {
     chatName: parsed.chatName,
-    sourceDir: dir,
+    sourceDir: src.dir,
     importedAt: new Date().toISOString(),
     cards: parsed.cards,
   });

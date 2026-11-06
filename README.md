@@ -31,13 +31,17 @@ Requirements: Node 22, Rust stable, and the [Tauri prerequisites](https://tauri.
 ```sh
 npm install
 npm run tauri dev     # run the app
+npm run dev:web       # browser build at http://localhost:1420
 npm test              # parser, rules and library tests
 npm run tauri build   # installer in src-tauri/target/release/bundle
 ```
 
-`npm run dev` + http://localhost:1420/preview.html renders the card grid with sample data in a normal browser, without Tauri.
+### Checking changes without reinstalling
 
-Windows installers (`.exe`, `.msi`) are built by GitHub Actions on every push; download them from the run's artifacts. They are not code-signed yet, so Windows SmartScreen will warn on first launch («Подробнее» → «Выполнить в любом случае»).
+- **Browser build on Vercel.** The same UI runs in a normal browser (`npm run build:web`, `vercel.json`). Every pull request gets its own preview link from Vercel; `main` is the production link. The desktop parts are swapped for browser ones in `src/platform/web.ts`: data in IndexedDB, the export folder picked with the browser's folder dialog, photos shown until the page reloads, no link previews (browsers block cross-site requests), AI tagging works with your own key. «Открыть демо» loads sample cards.
+- **Auto-update in the desktop app.** Every push to `main` publishes a signed Windows release `v0.1.<n>` (`.github/workflows/release.yml`). An installed app checks `latest.json` from the latest release on start and offers «Обновить и перезапустить». This needs the repository secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`; the matching public key is in `src-tauri/tauri.conf.json`, and the release assets must be publicly downloadable.
+
+Windows installers (`.exe`, `.msi`) are also built by GitHub Actions on every pull request; download them from the run's artifacts. They are not code-signed yet, so Windows SmartScreen will warn on first launch («Подробнее» → «Выполнить в любом случае»).
 
 ## Layout
 
@@ -47,4 +51,5 @@ Windows installers (`.exe`, `.msi`) are built by GitHub Actions on every push; d
 - `src/lib/ai.ts`: batched tagging with Claude Haiku 5.5 (structured output)
 - `src/lib/linkmeta.ts`: link previews (OpenGraph, YouTube oEmbed)
 - `src/components/`: grid, card, detail and settings UI
-- `src-tauri/`: Tauri shell and OS credential store commands
+- `src/platform/`: desktop (Tauri) and browser implementations of files, dialogs, secrets, HTTP and updates
+- `src-tauri/`: Tauri shell, OS credential store commands, updater

@@ -469,3 +469,27 @@ code {
   max-width: 80vw;
   z-index: 20;
 }
+
+/* Banners: web build notice and "update available" */
+.banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 7px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--line);
+}
+.banner.web {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+.banner.update {
+  background: var(--panel);
+  font-weight: 500;
+}
+.welcome .banner {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-bottom: 20px;
+}

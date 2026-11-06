@@ -1,9 +1,8 @@
-import { BaseDirectory, exists, mkdir, readTextFile, writeTextFile, rename } from "@tauri-apps/plugin-fs";
+import { platform } from "@platform";
 import type { EditEvent, Library } from "./types";
 import { applyEdits } from "./library";
 
-// Everything lives in the app's own data folder (on Windows: %APPDATA%\com.khainpain.savedboard).
-const base = { baseDir: BaseDirectory.AppData };
+const { exists, read, write: atomicWrite, append } = platform.data;
 const LIBRARY = "library.json";
 const EDITS = "edits.jsonl";
 const SETTINGS = "settings.json";
@@ -15,21 +14,9 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = { aiEnabled: true, fetchLinks: true };
 
-async function ensureDir() {
-  if (!(await exists("", base))) await mkdir("", { ...base, recursive: true });
-}
-
-/** Write to a temp file and rename, so a crash mid-write never corrupts the library. */
-async function atomicWrite(name: string, data: string) {
-  await ensureDir();
-  const tmp = `${name}.tmp`;
-  await writeTextFile(tmp, data, base);
-  await rename(tmp, name, { oldPathBaseDir: BaseDirectory.AppData, newPathBaseDir: BaseDirectory.AppData });
-}
-
 export async function loadLibrary(): Promise<Library | null> {
-  if (!(await exists(LIBRARY, base))) return null;
-  const lib = JSON.parse(await readTextFile(LIBRARY, base)) as Library | null;
+  if (!(await exists(LIBRARY))) return null;
+  const lib = JSON.parse(await read(LIBRARY)) as Library | null;
   if (!lib?.cards) return null;
   applyEdits(lib.cards, await loadEdits());
   return lib;
@@ -42,8 +29,8 @@ export async function saveLibrary(lib: Library) {
 }
 
 export async function loadEdits(): Promise<EditEvent[]> {
-  if (!(await exists(EDITS, base))) return [];
-  const text = await readTextFile(EDITS, base);
+  if (!(await exists(EDITS))) return [];
+  const text = await read(EDITS);
   const out: EditEvent[] = [];
   for (const line of text.split("\n")) {
     if (!line.trim()) continue;
@@ -57,13 +44,12 @@ export async function loadEdits(): Promise<EditEvent[]> {
 }
 
 export async function appendEdit(ev: EditEvent) {
-  await ensureDir();
-  await writeTextFile(EDITS, JSON.stringify(ev) + "\n", { ...base, append: true });
+  await append(EDITS, JSON.stringify(ev) + "\n");
 }
 
 export async function loadSettings(): Promise<Settings> {
-  if (!(await exists(SETTINGS, base))) return DEFAULT_SETTINGS;
-  return { ...DEFAULT_SETTINGS, ...JSON.parse(await readTextFile(SETTINGS, base)) };
+  if (!(await exists(SETTINGS))) return DEFAULT_SETTINGS;
+  return { ...DEFAULT_SETTINGS, ...JSON.parse(await read(SETTINGS)) };
 }
 
 export async function saveSettings(s: Settings) {

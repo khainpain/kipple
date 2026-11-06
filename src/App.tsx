@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { save } from "@tauri-apps/plugin-dialog";
-import { writeTextFile } from "@tauri-apps/plugin-fs";
+import { platform } from "@platform";
+import type { AvailableUpdate } from "./platform/types";
 import "./App.css";
 import type { Card, Library, UserFields } from "./lib/types";
 import { FILTERS, type FilterKey, effectiveTags, effectiveTopic, makeEdit, matchesFilter } from "./lib/library";
@@ -14,6 +14,9 @@ import { deleteApiKey, getApiKey, setApiKey } from "./lib/secrets";
 import { Grid } from "./components/Grid";
 import { Detail } from "./components/Detail";
 import { SettingsDialog } from "./components/Settings";
+import { demoLibrary } from "./lib/demo";
+
+const isWeb = platform.kind === "web";
 
 type Job = { label: string; done: number; total: number } | null;
 
@@ -32,6 +35,9 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [job, setJob] = useState<Job>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [version, setVersion] = useState("");
+  const [update, setUpdate] = useState<AvailableUpdate | null>(null);
+  const [updating, setUpdating] = useState<number | null | false>(false);
   const abortRef = useRef<AbortController | null>(null);
   const lastClicked = useRef<number | null>(null);
 
@@ -54,6 +60,24 @@ export default function App() {
       }
     })();
   }, [notify]);
+
+  useEffect(() => {
+    platform.appVersion().then(setVersion, () => undefined);
+    // Desktop only: a new release on GitHub shows a banner; installing it restarts the app.
+    platform.checkUpdate().then(setUpdate, (e) => console.warn("update check failed", e));
+  }, []);
+
+  async function installUpdate() {
+    if (!update) return;
+    abortRef.current?.abort();
+    setUpdating(null);
+    try {
+      await update.install((p) => setUpdating(p));
+    } catch (e) {
+      setUpdating(false);
+      notify(`Не удалось обновиться: ${e}`);
+    }
+  }
 
   const persist = useCallback(async (l: Library) => {
     try {
@@ -117,7 +141,7 @@ export default function App() {
     const ctl = new AbortController();
     abortRef.current = ctl;
     try {
-      if (settings.fetchLinks) await enrichLinks(l, ctl.signal);
+      if (settings.fetchLinks && platform.canFetchLinks) await enrichLinks(l, ctl.signal);
       if (settings.aiEnabled && !ctl.signal.aborted) await runAi(l, ctl.signal);
     } finally {
       setJob(null);
@@ -126,10 +150,10 @@ export default function App() {
   }
 
   async function doImport() {
-    const dir = await pickExportFolder();
-    if (!dir) return;
+    const src = await pickExportFolder();
+    if (!src) return;
     try {
-      const { lib: next, added, warning } = await importFolder(dir, lib);
+      const { lib: next, added, warning } = await importFolder(src, lib);
       await saveLibrary(next);
       setLib(next);
       setRev((r) => r + 1);
@@ -138,6 +162,13 @@ export default function App() {
     } catch (e) {
       notify(e instanceof Error ? e.message : String(e));
     }
+  }
+
+  async function openDemo() {
+    const next = demoLibrary();
+    await saveLibrary(next);
+    setLib(next);
+    setRev((r) => r + 1);
   }
 
   const edit = useCallback(
@@ -203,13 +234,12 @@ export default function App() {
 
   async function doExport(kind: "csv" | "md") {
     const cards = selected.size ? visible.filter((c) => selected.has(c.id)) : visible;
-    const path = await save({
-      title: "Экспорт карточек",
-      defaultPath: kind === "csv" ? "saved-board.csv" : "saved-board.md",
-      filters: [kind === "csv" ? { name: "CSV", extensions: ["csv"] } : { name: "Markdown", extensions: ["md"] }],
-    });
+    const path = await platform.saveTextFile(
+      kind === "csv" ? "saved-board.csv" : "saved-board.md",
+      kind === "csv" ? { name: "CSV", ext: "csv" } : { name: "Markdown", ext: "md" },
+      kind === "csv" ? toCsv(cards) : toMarkdown(cards, lib?.chatName),
+    );
     if (!path) return;
-    await writeTextFile(path, kind === "csv" ? toCsv(cards) : toMarkdown(cards, lib?.chatName));
     notify(`Сохранено ${cards.length} карточек в ${path}`);
   }
 
@@ -241,11 +271,39 @@ export default function App() {
 
   const openCard = open && lib ? lib.cards.find((c) => c.id === open.id) ?? null : null;
   const needAi = lib ? pendingForAi(lib.cards).length : 0;
-  const settingsDialog = showSettings && <SettingsDialog settings={settings} hasKey={hasKey} onSave={onSaveSettings} onWipe={onWipe} onClose={() => setShowSettings(false)} />;
+  const settingsDialog = showSettings && <SettingsDialog settings={settings} hasKey={hasKey} version={version} onSave={onSaveSettings} onWipe={onWipe} onClose={() => setShowSettings(false)} />;
+
+  const banners = (
+    <>
+      {isWeb && (
+        <div className="banner web">
+          Веб-версия для проверки интерфейса{version ? ` (${version})` : ""}. Данные хранятся только в этом браузере, превью ссылок не загружаются, фото видны до перезагрузки страницы.
+        </div>
+      )}
+      {update && (
+        <div className="banner update">
+          {updating === false ? (
+            <>
+              Доступна версия {update.version}.
+              <button className="small" onClick={installUpdate}>
+                Обновить и перезапустить
+              </button>
+              <button className="secondary small" onClick={() => setUpdate(null)}>
+                Позже
+              </button>
+            </>
+          ) : (
+            <>Скачиваю обновление{updating !== null ? ` ${updating}%` : ""}…</>
+          )}
+        </div>
+      )}
+    </>
+  );
 
   if (!lib) {
     return (
       <div className="welcome">
+        {banners}
         <h1>Saved Board</h1>
         <p>Превращает «Избранное» Telegram в визуальную библиотеку с темами, тегами и поиском. Всё хранится на этом компьютере.</p>
         <ol>
@@ -255,6 +313,11 @@ export default function App() {
         </ol>
         <div className="welcome-buttons">
           <button onClick={doImport}>Выбрать папку экспорта</button>
+          {isWeb && (
+            <button className="secondary" onClick={openDemo}>
+              Открыть демо
+            </button>
+          )}
           <button className="secondary" onClick={() => setShowSettings(true)}>
             Настройки и ключ AI
           </button>
@@ -268,6 +331,7 @@ export default function App() {
 
   return (
     <div className="app">
+      {banners}
       <header className="toolbar">
         <strong className="brand">Saved Board</strong>
         <input className="search" placeholder="Поиск по тексту, тегам, сайтам…" value={query} onChange={(e) => setQuery(e.target.value)} />

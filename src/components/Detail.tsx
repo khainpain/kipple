@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { openUrl, openPath } from "@tauri-apps/plugin-opener";
+import { platform } from "@platform";
 import type { Action, Card, Library, UserFields } from "../lib/types";
 import { ACTIONS, ACTION_LABELS } from "../lib/types";
-import { joinPath, mediaUrl } from "../lib/importer";
+import { mediaUrl } from "../lib/importer";
 import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic } from "../lib/library";
 
 export function Detail(props: { lib: Library; card: Card; onClose: () => void; onEdit: (patch: UserFields) => void }) {
@@ -36,7 +36,7 @@ export function Detail(props: { lib: Library; card: Card; onClose: () => void; o
           </div>
         )}
         {card.media?.path && card.kind !== "photo" && (
-          <button className="secondary" onClick={() => openPath(joinPath(lib.sourceDir, card.media!.path!))}>
+          <button className="secondary" onClick={() => platform.openFile(lib.sourceDir, card.media!.path!)}>
             Открыть файл {card.media.fileName ?? ""}
           </button>
         )}
@@ -68,7 +68,7 @@ export function Detail(props: { lib: Library; card: Card; onClose: () => void; o
         {card.urls.length > 0 && (
           <div className="links">
             {card.urls.map((u) => (
-              <a key={u} href="#" onClick={(e) => (e.preventDefault(), openUrl(u))}>
+              <a key={u} href="#" onClick={(e) => (e.preventDefault(), platform.openUrl(u))}>
                 {u}
               </a>
             ))}
