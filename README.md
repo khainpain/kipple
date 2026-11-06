@@ -2,13 +2,13 @@
 
 Desktop app that turns Telegram «Избранное» (Saved Messages) into a visual, searchable library: a masonry grid of cards with AI topics, tags, summaries and actions (read later / idea / reference / todo / junk).
 
-Everything stays on your computer. The only things that leave it are message text sent to the Anthropic API for tagging (sensitive-looking messages are never sent) and requests to the websites your saved links point to (for previews).
+Everything stays on your computer. The only things that leave it are message text sent to Anthropic for tagging (sensitive-looking messages are never sent) and requests to the websites your saved links point to (for previews). Without your own key, tagging requests go through our Vercel function, which adds the built-in key and passes them on; it keeps nothing but a per-install usage counter.
 
 ## How to use
 
 1. In Telegram Desktop open «Избранное» → ⋮ → «Экспорт истории чата», format **JSON**, tick «Фотографии» (videos and files are optional).
 2. Start Saved Board and pick the export folder (the one with `result.json`).
-3. Optionally add an Anthropic API key in Settings (stored in Windows Credential Manager / macOS Keychain). Tagging ~10k messages with Claude Haiku 5.5 costs about $1–2.
+3. AI tagging works out of the box with the built-in key, within a daily allowance. Optionally add your own Anthropic API key in Settings → «Свой ключ Anthropic» (stored in Windows Credential Manager / macOS Keychain): requests then go straight to Anthropic, with no allowance. Tagging ~10k messages with Claude Haiku 5.5 costs about $1–2.
 4. Filter, search, mark junk (hover a card → 🗑, or Ctrl/Shift-click to select several), and export to Markdown or CSV.
 
 Re-importing a newer export keeps your edits and AI tags; only new messages are processed.
@@ -28,11 +28,26 @@ The paper-plane button in the toolbar lays the library out inside Telegram: the 
 | --- | --- |
 | Library (imported cards, AI fields, link previews) | `%APPDATA%\com.khainpain.savedboard\library.json` |
 | Your edits (append-only log, replayed on load) | `%APPDATA%\com.khainpain.savedboard\edits.jsonl` |
-| Anthropic API key, Telegram session and api_id/api_hash | OS credential store |
+| Your Anthropic API key (if any), install id for the built-in allowance, Telegram session and api_id/api_hash | OS credential store |
 | What was sent to the Telegram group | `%APPDATA%\com.khainpain.savedboard\telegram.json` |
 | Photos and files | Read in place from the Telegram export folder, never copied |
 
 Settings → «Удалить все данные» removes the library, edits and the key.
+
+## Built-in Anthropic key
+
+`api/claude/v1/messages.ts` is a Vercel function the app calls instead of `api.anthropic.com` when the user has no key of their own. It adds `ANTHROPIC_API_KEY`, accepts only the app's own requests (the models of the Settings picker, the app's system prompts, no tools, `max_tokens` ≤ 16000) and counts usage per install, per IP and in total per UTC day (`api/_lib/quota.ts`). `api/claude/usage.ts` tells Settings how much of today's allowance is used. The desktop app calls the production site, `https://telegram-saved-messages.vercel.app`; the web build calls its own origin.
+
+Vercel project → Settings → Environment Variables:
+
+| Variable | What |
+| --- | --- |
+| `ANTHROPIC_API_KEY` | Required. The key that pays. |
+| `KV_REST_API_URL`, `KV_REST_API_TOKEN` | Set by Vercel → Storage → Upstash Redis. Without them counters live in each function instance's memory. |
+| `KIPPLE_INSTALL_DAILY_UNITS` | Per install per day, default 3000000. 1,000,000 units ≈ $1 at Haiku prices (output ×5, Sonnet ×3, Opus ×5). |
+| `KIPPLE_IP_DAILY_UNITS` | Per IP per day, default 6000000. |
+| `KIPPLE_GLOBAL_DAILY_UNITS` | Everyone together per day, default 20000000: the most the key can cost in a day. |
+| `KIPPLE_IP_REQUESTS_PER_MINUTE` | Default 40. |
 
 ## Development
 

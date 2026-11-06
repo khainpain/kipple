@@ -27,8 +27,6 @@ export const en: Dict = {
     jobAi: "AI tagging",
     jobTelegram: "To Telegram",
     jobTelegramPause: (sec) => `To Telegram, waiting ${sec} s`,
-    needKeyAi: "Add an Anthropic key in Settings to turn on AI tagging.",
-    needKeyImage: "Add an Anthropic key in Settings so the AI can name the picture.",
     imagesFailed: (n) => `Couldn't name ${num(n)} picture${s(n)}: the file is unavailable or the AI didn't answer.`,
     aiFailed: (n) => `The AI couldn't tag ${cards(n)}; you can run it again.`,
     aiError: (e) => `AI error: ${e}`,
@@ -55,14 +53,21 @@ export const en: Dict = {
     step3b: ").",
     pickFolder: "Choose export folder",
     demo: "Open demo",
-    settings: "Settings and AI key",
-    noKeyHint: "Without an Anthropic key you still get the board, type filters and search; topics and summaries appear once you add a key.",
+    settings: "Settings",
   },
 
   settings: {
     title: "Settings",
     language: "Language",
     languageAuto: (name) => `System default (${name})`,
+    aiViaBuiltin:
+      "No key needed: AI tagging goes through the Kipple server with a built-in key. The server passes the text on to Anthropic and keeps nothing. Free within a daily allowance.",
+    aiViaOwnKey: "Your own key is used: requests go from this computer straight to Anthropic, not through the Kipple server, with no daily allowance.",
+    builtinUsed: (pct: number) => `${pct}% of today's allowance used.`,
+    ownKey: "Your own Anthropic key (optional)",
+    ownKeyWhy: "With your own key, message text doesn't pass through the Kipple server and there is no daily allowance; you pay Anthropic yourself.",
+    forgetKey: "Remove my key",
+    forgetKeyConfirm: "Remove your key? AI will go through the built-in Kipple key again.",
     apiKey: "Anthropic API key",
     keySaved: "saved",
     keyKeep: "•••••••• (leave empty to keep it)",
@@ -71,7 +76,7 @@ export const en: Dict = {
     keyGet: "Get a key:",
     keyCost: ".",
     aiEnabled:
-      "AI tagging (only message text and page descriptions go to Anthropic; sensitive messages are never sent, media only if turned on below)",
+      "AI tagging (only message text and page descriptions go to Anthropic, through the Kipple server unless you add your own key; sensitive messages are never sent, media only if turned on below)",
     aiLanguage: "Language of AI topics, tags and summaries",
     aiLanguageUi: "Interface language: one set of topics for the whole library, even if messages are in different languages",
     aiLanguageSource: "Each message's own language: a Russian article gets Russian tags",
@@ -306,6 +311,9 @@ export const en: Dict = {
 
   ai: {
     keyRejected: "The Anthropic key was rejected. Check it in Settings.",
+    quotaUsed: "Today's allowance for the built-in key is used up. Tagging continues tomorrow, or add your own key in Settings.",
+    quotaGlobal: "The built-in key is overloaded today. Try tomorrow or add your own key in Settings.",
+    builtinDown: "The built-in key isn't working right now. Try later or add your own key in Settings.",
     refused: "The model refused to process the batch",
     refusedImages: "The model refused to process the pictures",
     languageName: "English",

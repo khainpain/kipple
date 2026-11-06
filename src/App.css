@@ -1339,3 +1339,8 @@ code {
   margin-bottom: 20px;
 }
 
+
+.own-key summary {
+  cursor: pointer;
+  margin: 4px 0 8px;
+}
