@@ -50,7 +50,7 @@ const SECRET_PREFIX = "secret:";
 
 export const platform: Platform = {
   kind: "web",
-  canFetchLinks: false,
+  canFetchLinks: true,
   data: {
     exists: async (name) => (await getFile(name)) !== undefined,
     read: async (name) => (await getFile(name)) ?? "",
@@ -107,7 +107,9 @@ export const platform: Platform = {
     setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
     return `«Загрузки» (${defaultName})`;
   },
-  httpFetch: (url, init) => fetch(url, init),
+  // Browsers block reading other sites, so pages and pictures for previews go through
+  // api/fetch.ts, a small function deployed next to this build on Vercel. It only gets the link.
+  httpFetch: (url, init) => fetch(`/api/fetch?url=${encodeURIComponent(url)}`, { signal: init?.signal }),
   appVersion: async () => `web ${__BUILD_ID__}`,
   checkUpdate: async () => null,
 };

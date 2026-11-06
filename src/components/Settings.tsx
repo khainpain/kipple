@@ -40,6 +40,7 @@ export function SettingsDialog(props: {
         <label className="check" hidden={!platform.canFetchLinks}>
           <input type="checkbox" checked={s.fetchLinks} onChange={(e) => setS({ ...s, fetchLinks: e.target.checked })} />
           Загружать превью ссылок (заголовок, картинка, описание страницы)
+          {platform.kind === "web" ? ". В веб-версии страницы загружаются через сервер этого сайта, туда уходит только сама ссылка" : ""}
         </label>
 
         {props.version && <p className="hint">Версия {props.version}</p>}

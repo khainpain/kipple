@@ -4,6 +4,7 @@ import { ACTION_LABELS } from "../lib/types";
 import { mediaUrl } from "../lib/importer";
 import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic } from "../lib/library";
 import { domainOf } from "../lib/rules";
+import { instantImage } from "../lib/embeds";
 import { Icon } from "./Icon";
 import { hueOf, type ViewKey } from "./nav";
 
@@ -53,7 +54,10 @@ export function coverOf(lib: Library, card: Card): { src?: string; ratio?: numbe
   const ratio = m?.width && m?.height ? m.width / m.height : undefined;
   if (card.kind === "photo") return m?.missing ? { missing: "Фото не было в экспорте" } : { src: mediaUrl(lib, m?.path), ratio };
   if (card.kind === "video" || card.kind === "animation") return { src: mediaUrl(lib, m?.thumb), ratio, missing: m?.missing ? "Видео не было в экспорте" : undefined };
-  if (card.kind === "link" && card.link?.image) return { src: card.link.image };
+  if (card.kind === "link") {
+    const src = card.link?.image ?? instantImage(card.urls[0]);
+    if (src) return { src };
+  }
   return {};
 }
 

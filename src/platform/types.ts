@@ -20,7 +20,7 @@ export type HttpFetch = (url: string, init?: RequestInit & { connectTimeout?: nu
 
 export interface Platform {
   kind: "desktop" | "web";
-  /** Link previews need cross-origin requests, which browsers block. */
+  /** Whether link previews can be loaded (the browser build goes through its Vercel function). */
   canFetchLinks: boolean;
   /** Small app data files: library.json, edits.jsonl, settings.json. */
   data: {
