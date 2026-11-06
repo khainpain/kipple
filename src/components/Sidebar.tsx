@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { TelegramAccount } from "../platform/types";
+import logoLight from "../../brand/kipple-icon-tiny-light.svg";
+import logoDark from "../../brand/kipple-icon-tiny-dark.svg";
 import { Icon } from "./Icon";
 import { T, formatNumber } from "../i18n";
 import { SMART_LISTS, hueOf, sameScope, type Scope } from "./nav";
@@ -29,8 +32,62 @@ function Section(props: { title: string; children: React.ReactNode; defaultOpen?
   );
 }
 
+/** Object URL for the avatar bytes, revoked when they change. */
+function usePhotoUrl(photo?: number[] | null) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!photo?.length) return setUrl(null);
+    const u = URL.createObjectURL(new Blob([new Uint8Array(photo)], { type: "image/jpeg" }));
+    setUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [photo]);
+  return url;
+}
+
+function initials(name: string) {
+  return (
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => [...w][0])
+      .join("")
+      .toUpperCase() || "?"
+  );
+}
+
+/** The signed-in Telegram account when there is one, otherwise the app name and the library's source. */
+function Brand(props: { chatName: string; account?: TelegramAccount | null }) {
+  const { account } = props;
+  const photo = usePhotoUrl(account?.photo);
+  if (!account) {
+    return (
+      <div className="side-brand">
+        <span className="logo">
+          <img className="only-light" src={logoLight} alt="" />
+          <img className="only-dark" src={logoDark} alt="" />
+        </span>
+        <div>
+          <strong>Kipple</strong>
+          <small>{props.chatName}</small>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="side-brand" title={T.sidebar.signedIn}>
+      <span className="avatar">{photo ? <img src={photo} alt="" /> : initials(account.name)}</span>
+      <div>
+        <strong>{account.name}</strong>
+        <small>{account.username ? `@${account.username}` : props.chatName}</small>
+      </div>
+    </div>
+  );
+}
+
 export function Sidebar(props: {
   chatName: string;
+  account?: TelegramAccount | null;
   scope: Scope;
   tag: string | null;
   listCounts: Record<string, number>;
@@ -46,13 +103,7 @@ export function Sidebar(props: {
 
   return (
     <aside className="sidebar">
-      <div className="side-brand">
-        <span className="logo">SB</span>
-        <div>
-          <strong>Saved Board</strong>
-          <small>{props.chatName}</small>
-        </div>
-      </div>
+      <Brand chatName={props.chatName} account={props.account} />
 
       <nav className="side-group">
         {SMART_LISTS.map((l) => (

@@ -13,10 +13,14 @@ import { joinPath, type HttpFetch, type Platform, type TelegramApi } from "./typ
 // Telegram over MTProto lives in src-tauri/src/telegram.rs; these are thin wrappers around its commands.
 const telegram: TelegramApi = {
   status: () => invoke("tg_status"),
+  account: () => invoke("tg_account"),
   setApi: (apiId, apiHash) => invoke("tg_set_api", { apiId, apiHash }),
+  clearApi: () => invoke("tg_clear_api"),
   requestCode: (phone) => invoke("tg_request_code", { phone }),
   signIn: (code) => invoke("tg_sign_in", { code }),
   checkPassword: (password) => invoke("tg_check_password", { password }),
+  qrPoll: () => invoke("tg_qr_poll"),
+  qrCancel: () => invoke("tg_qr_cancel"),
   logout: () => invoke("tg_logout"),
   ensureBoard: (prev, title, about) => invoke("tg_ensure_board", { channelId: prev?.channelId ?? null, accessHash: prev?.accessHash ?? null, title, about }),
   createTopic: (b, title, iconColor) => invoke("tg_create_topic", { channelId: b.channelId, accessHash: b.accessHash, title, iconColor: iconColor ?? null }),

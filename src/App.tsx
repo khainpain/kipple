@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { platform } from "@platform";
 import { useUpdateCheck } from "./useUpdateCheck";
+import { useTelegramAccount } from "./useTelegramAccount";
 import "./App.css";
 import type { Card, Library, UserFields } from "./lib/types";
 import { makeEdit } from "./lib/library";
@@ -14,6 +15,7 @@ import { toCsv, toMarkdown } from "./lib/exporters";
 import { deleteApiKey, getAiAuth, getApiKey, setApiKey } from "./lib/secrets";
 import { Workspace, type Job } from "./components/Workspace";
 import { SettingsDialog } from "./components/Settings";
+import { Welcome } from "./components/Welcome";
 import { demoLibrary } from "./lib/demo";
 import { T, lang, resolveLang, setLang } from "./i18n";
 import type { AiLang } from "./lib/ai";
@@ -28,6 +30,7 @@ export default function App() {
   const [hasKey, setHasKey] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showTelegram, setShowTelegram] = useState(false);
+  const tgAccount = useTelegramAccount(!showTelegram && lib !== null);
   const [sendingTg, setSendingTg] = useState(false);
   const [job, setJob] = useState<Job>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -37,6 +40,13 @@ export default function App() {
   updatingRef.current = updating;
   const { update, later: updateLater } = useUpdateCheck(() => updatingRef.current !== false);
   const abortRef = useRef<AbortController | null>(null);
+  /**
+   * The demo is a sealed sandbox: only in memory, never saved, no import, AI or Telegram,
+   * so nothing done in it can touch the real library. "Exit demo" goes back to the start.
+   */
+  const [demo, setDemo] = useState(false);
+  const demoRef = useRef(demo);
+  demoRef.current = demo;
   /** Settings as of now, for AI runs that start right after a save (state updates later). */
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
@@ -88,6 +98,7 @@ export default function App() {
   }
 
   const persist = useCallback(async (l: Library) => {
+    if (demoRef.current) return;
     try {
       await saveLibrary(l);
     } catch (e) {
@@ -216,8 +227,10 @@ export default function App() {
     const src = await pickExportFolder();
     if (!src) return;
     try {
-      const { lib: next, added, warning } = await importFolder(src, lib);
+      const { lib: next, added, warning } = await importFolder(src, demoRef.current ? null : lib);
       await saveLibrary(next);
+      demoRef.current = false; // before processAll below, which saves as it goes
+      setDemo(false);
       setLib(next);
       setRev((r) => r + 1);
       notify(warning ?? T.app.imported(next.cards.length, added));
@@ -229,9 +242,17 @@ export default function App() {
 
   async function openDemo() {
     const next = demoLibrary();
-    await saveLibrary(next);
+    demoRef.current = true;
+    setDemo(true);
     setLib(next);
     setRev((r) => r + 1);
+  }
+
+  function exitDemo() {
+    abortRef.current?.abort();
+    demoRef.current = false;
+    setDemo(false);
+    setLib(null);
   }
 
   const edit = useCallback(
@@ -240,6 +261,7 @@ export default function App() {
       const set = new Set(ids);
       for (const c of lib.cards) if (set.has(c.id)) c.user = { ...c.user, ...patch };
       setRev((r) => r + 1);
+      if (demoRef.current) return;
       for (const id of ids) void appendEdit(makeEdit(id, patch)).catch((e) => notify(T.app.editFailed(String(e))));
     },
     [lib, notify],
@@ -301,7 +323,7 @@ export default function App() {
   /** Saves the settings, then tags every already tagged card again with the chosen model. */
   async function onRetag(s: Settings, key: string | null) {
     await onSaveSettings(s, key);
-    if (!lib) return;
+    if (!lib || demoRef.current) return;
     const old = new Map<Card, NonNullable<Card["ai"]>>();
     for (const c of lib.cards) {
       if (!c.ai) continue;
@@ -330,6 +352,7 @@ export default function App() {
     await wipeAll();
     await deleteApiKey().catch(() => undefined);
     await platform.telegram?.logout().catch(() => undefined);
+    setDemo(false);
     setLib(null);
     setHasKey(false);
     setShowSettings(false);
@@ -339,13 +362,21 @@ export default function App() {
   if (loading) return <div className="center">{T.common.loading}</div>;
 
   const needAi = lib ? pendingForAi(lib.cards).length + (settings.aiImages ? pendingImages(lib.cards).length : 0) : 0;
-  const settingsDialog = showSettings && <SettingsDialog settings={settings} hasKey={hasKey} version={version} onSave={onSaveSettings} onRetag={onRetag} retagCount={lib ? retagCount(lib.cards) : 0} onWipe={onWipe} onForgetKey={onForgetKey} onClose={() => setShowSettings(false)} />;
+  const settingsDialog = showSettings && <SettingsDialog settings={settings} hasKey={hasKey} version={version} onSave={onSaveSettings} onRetag={onRetag} retagCount={lib && !demo ? retagCount(lib.cards) : 0} onWipe={onWipe} onForgetKey={onForgetKey} onClose={() => setShowSettings(false)} />;
 
   const banners = (
     <>
       {isWeb && (
         <div className="banner web">
           {T.app.webBanner(version)}
+        </div>
+      )}
+      {demo && (
+        <div className="banner demo">
+          {T.app.demoBanner}
+          <button className="small" onClick={exitDemo}>
+            {T.app.demoExit}
+          </button>
         </div>
       )}
       {update && (
@@ -370,37 +401,19 @@ export default function App() {
 
   if (!lib) {
     return (
-      <div className="welcome">
-        {banners}
-        <h1>Saved Board</h1>
-        <p>{T.welcome.intro}</p>
-        <ol>
-          <li>{T.welcome.step1}</li>
-          <li>
-            {T.welcome.step2a}
-            <b>JSON</b>
-            {T.welcome.step2b}
-          </li>
-          <li>
-            {T.welcome.step3a}
-            <code>result.json</code>
-            {T.welcome.step3b}
-          </li>
-        </ol>
-        <div className="welcome-buttons">
-          <button onClick={doImport}>{T.welcome.pickFolder}</button>
-          {isWeb && (
-            <button className="secondary" onClick={openDemo}>
-              {T.welcome.demo}
-            </button>
-          )}
-          <button className="secondary" onClick={() => setShowSettings(true)}>
-            {T.welcome.settings}
-          </button>
-        </div>
+      <Welcome
+        tg={platform.telegram}
+        showDemo
+        onImport={doImport}
+        onDemo={openDemo}
+        onSettings={() => setShowSettings(true)}
+        onLanguage={(l) => void onSaveSettings({ ...settingsRef.current, language: l }, null)}
+        openUrl={(u) => void platform.openUrl(u)}
+        top={banners}
+      >
         {settingsDialog}
         {toast && <div className="toast">{toast}</div>}
-      </div>
+      </Welcome>
     );
   }
 
@@ -410,21 +423,22 @@ export default function App() {
       <Workspace
         lib={lib}
         rev={rev}
+        tgAccount={tgAccount}
         job={job}
-        needAi={needAi}
+        needAi={demo ? 0 : needAi}
         aiEnabled={settings.aiEnabled}
-        onImport={doImport}
+        onImport={demo ? undefined : doImport}
         onExport={doExport}
         onSettings={() => setShowSettings(true)}
-        onTelegram={platform.telegram ? () => setShowTelegram(true) : undefined}
+        onTelegram={platform.telegram && !demo ? () => setShowTelegram(true) : undefined}
         onRunAi={() => processAll(lib)}
-        onNameImage={settings.aiEnabled ? nameOne : undefined}
+        onNameImage={settings.aiEnabled && !demo ? nameOne : undefined}
         onStop={() => abortRef.current?.abort()}
         onEdit={edit}
       />
       {settingsDialog}
       {showTelegram && platform.telegram && (
-        <TelegramDialog tg={platform.telegram} cards={lib.cards} running={sendingTg} onStart={sendTelegram} onClose={() => setShowTelegram(false)} />
+        <TelegramDialog tg={platform.telegram} cards={lib.cards} running={sendingTg} onStart={sendTelegram} onOpenSettings={() => (setShowTelegram(false), setShowSettings(true))} onClose={() => setShowTelegram(false)} />
       )}
       {toast && <div className="toast">{toast}</div>}
     </div>

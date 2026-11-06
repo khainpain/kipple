@@ -12,7 +12,7 @@ import { T, compareText } from "../i18n";
 import { en } from "../i18n/en";
 import { ru } from "../i18n/ru";
 
-export const BOARD_TITLE = "Saved Board";
+export const BOARD_TITLE = "Kipple";
 export const boardAbout = () => T.telegram.boardAbout(BOARD_TITLE);
 /**
  * The catch-all topic. Once a group has one, it is reused whatever the interface language
@@ -286,6 +286,7 @@ export function telegramErrorText(e: unknown): string {
     [/PHONE_CODE_EMPTY|NO_CODE_REQUESTED/, L.errNoCode],
     [/PASSWORD_HASH_INVALID/, L.errPassword],
     [/SIGN_UP_REQUIRED/, L.errSignUp],
+    [/AUTH_TOKEN_(EXPIRED|INVALID|ALREADY_ACCEPTED)|QR_MIGRATE_LOOP/, L.errQrExpired],
     [/AUTH_KEY|SESSION_REVOKED/, L.errSession],
     [/CHANNELS_TOO_MUCH/, L.errTooMany],
   ];

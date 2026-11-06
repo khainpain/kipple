@@ -144,23 +144,6 @@ code {
   flex: 1;
 }
 
-/* Welcome */
-.welcome {
-  max-width: 640px;
-  margin: 10vh auto;
-  padding: 0 24px;
-  line-height: 1.55;
-}
-.welcome h1 {
-  font-size: 30px;
-  margin-bottom: 4px;
-}
-.welcome-buttons {
-  display: flex;
-  gap: 10px;
-  margin: 20px 0 8px;
-}
-
 /* Layout */
 .app {
   display: flex;
@@ -223,17 +206,37 @@ code {
   gap: 10px;
   padding: 4px 8px 12px;
 }
-.side-brand .logo {
+.side-brand .logo,
+.side-brand .avatar {
+  flex: none;
   display: grid;
   place-items: center;
   width: 30px;
   height: 30px;
-  border-radius: 9px;
+}
+.side-brand .logo img {
+  width: 30px;
+  height: 30px;
+}
+.side-brand .avatar {
+  border-radius: 50%;
+  overflow: hidden;
   background: var(--accent);
   color: #fff;
   font-weight: 700;
   font-size: 12px;
-  letter-spacing: 0.02em;
+}
+.side-brand .avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+:root[data-theme="dark"] .only-light,
+:root:not([data-theme="dark"]) .only-dark {
+  display: none;
+}
+.side-brand > div {
+  min-width: 0;
 }
 .side-brand strong {
   display: block;
@@ -1327,19 +1330,35 @@ code {
   background: var(--accent-soft);
   color: var(--ink);
 }
-.banner.update {
+.banner.update,
+.banner.demo {
   background: var(--accent-soft);
   border-bottom-color: var(--accent);
   color: var(--ink);
   font-weight: 500;
 }
-.welcome .banner {
+
+
+/* Collapsible sections in Settings */
+.modal details.advanced {
   border: 1px solid var(--line);
-  border-radius: 10px;
-  margin-bottom: 20px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 10px 14px;
+  margin: 16px 0 0;
 }
-
-
+.modal details.advanced summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.modal details.advanced[open] summary {
+  margin-bottom: 10px;
+}
+.modal details.advanced .tg-api {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 .own-key summary {
   cursor: pointer;
   margin: 4px 0 8px;
