@@ -11,6 +11,8 @@ export const en = {
   ogDescription: "Links, photos, videos and notes from Saved Messages as a board you can search. Free Windows app, fully local.",
   ogAlt: "Kipple showing Telegram Saved Messages as a grid of cards with topics and tags",
   skip: "Skip to content",
+  alpha: "Alpha: early version, things may change",
+  news: { title: "What's new", next: "Coming next", close: "Close", all: "All releases" },
   other: "Русский",
   hero: {
     title: "Tame your Saved Messages",
@@ -69,6 +71,8 @@ export const ru = {
   ogDescription: "Ссылки, фото, видео и заметки из «Избранного» в виде доски с поиском. Бесплатно для Windows, работает локально.",
   ogAlt: "Kipple: «Избранное» Telegram в виде сетки карточек с темами и тегами",
   skip: "К содержанию",
+  alpha: "Альфа-версия: всё ещё может поменяться",
+  news: { title: "Что нового", next: "Скоро", close: "Закрыть", all: "Все версии" },
   other: "English",
   hero: {
     title: "Приручи своё «Избранное»",

@@ -10,6 +10,47 @@
     });
   });
 
+  // The language menu closes on a click outside it or on Escape.
+  var langs = document.querySelector(".langs");
+  if (langs) {
+    document.addEventListener("click", function (e) {
+      if (langs.open && !langs.contains(e.target)) langs.open = false;
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && langs.open) {
+        langs.open = false;
+        langs.querySelector("summary").focus();
+      }
+    });
+  }
+
+  // "What's new": the dot goes away once this version's notes were opened.
+  var news = document.querySelector(".news");
+  if (news) {
+    var KEY = "kipple.news.seen";
+    var ver = news.getAttribute("data-ver");
+    try {
+      if (localStorage.getItem(KEY) === ver) news.classList.add("seen");
+    } catch (e) {}
+    news.addEventListener("toggle", function () {
+      if (!news.open) return;
+      news.classList.add("seen");
+      try {
+        localStorage.setItem(KEY, ver);
+      } catch (e) {}
+    });
+    news.querySelector(".news-x").addEventListener("click", function () {
+      news.open = false;
+      news.querySelector("summary").focus();
+    });
+    document.addEventListener("click", function (e) {
+      if (news.open && !news.contains(e.target)) news.open = false;
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && news.open) news.open = false;
+    });
+  }
+
   var root = document.documentElement;
   if (!root.classList.contains("motion") || !Element.prototype.animate) return;
 
