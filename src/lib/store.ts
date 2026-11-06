@@ -1,11 +1,13 @@
 import { platform } from "@platform";
 import type { EditEvent, Library } from "./types";
 import { applyEdits } from "./library";
+import { emptyBoardState, type BoardState } from "./telegram";
 
 const { exists, read, write: atomicWrite, append } = platform.data;
 const LIBRARY = "library.json";
 const EDITS = "edits.jsonl";
 const SETTINGS = "settings.json";
+const TELEGRAM = "telegram.json";
 
 export interface Settings {
   aiEnabled: boolean;
@@ -56,7 +58,19 @@ export async function saveSettings(s: Settings) {
   await atomicWrite(SETTINGS, JSON.stringify(s));
 }
 
+/** What was already sent to the Telegram group, so later runs only send new cards. */
+export async function loadBoardState(): Promise<BoardState> {
+  if (!(await exists(TELEGRAM))) return emptyBoardState();
+  const s = JSON.parse(await read(TELEGRAM)) as Partial<BoardState> | null;
+  return { ...emptyBoardState(), ...s };
+}
+
+export async function saveBoardState(s: BoardState) {
+  await atomicWrite(TELEGRAM, JSON.stringify(s));
+}
+
 export async function wipeAll() {
   await atomicWrite(LIBRARY, "null");
   await atomicWrite(EDITS, "");
+  await atomicWrite(TELEGRAM, "null");
 }

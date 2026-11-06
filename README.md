@@ -13,13 +13,23 @@ Everything stays on your computer. The only things that leave it are message tex
 
 Re-importing a newer export keeps your edits and AI tags; only new messages are processed.
 
+### Send back to Telegram (desktop only)
+
+The paper-plane button in the toolbar lays the library out inside Telegram: the app creates a private group «Saved Board» with one topic per theme, forwards each original message from «Избранное» into its topic, and replies under it with the title, summary and hashtags (`#прочитать_позже`, `#идея`, the card's tags), so tapping a hashtag in Telegram shows everything with it.
+
+- It logs in to **your own account** over MTProto (the protocol Telegram's apps use, via [grammers](https://github.com/Lonami/grammers)): phone number, code, and the cloud password if you have one. There is no server in between; the session key is kept in the OS credential store and «Выйти» ends the session.
+- Telegram needs an app key: open [my.telegram.org](https://my.telegram.org/apps) → «API development tools», create an app (any name, platform Desktop) and paste `api_id` and `api_hash` into the dialog once. If the repository secrets `TG_API_ID` and `TG_API_HASH` are set, builds carry them and nobody has to do this.
+- By default junk, sensitive and hidden cards are not sent. Telegram limits sending speed, so the app goes card by card (about 2–3 seconds each) and waits out rate limits; «Стоп» or closing the app is safe, the next run continues where it stopped.
+- What was sent is remembered in `telegram.json`, so later runs only send new saves. Delete the group in Telegram and the next run starts a fresh one. Changing a card's theme after sending doesn't move it.
+
 ## Where data lives
 
 | What | Where |
 | --- | --- |
 | Library (imported cards, AI fields, link previews) | `%APPDATA%\com.khainpain.savedboard\library.json` |
 | Your edits (append-only log, replayed on load) | `%APPDATA%\com.khainpain.savedboard\edits.jsonl` |
-| Anthropic API key | OS credential store |
+| Anthropic API key, Telegram session and api_id/api_hash | OS credential store |
+| What was sent to the Telegram group | `%APPDATA%\com.khainpain.savedboard\telegram.json` |
 | Photos and files | Read in place from the Telegram export folder, never copied |
 
 Settings → «Удалить все данные» removes the library, edits and the key.
@@ -49,7 +59,8 @@ Windows installers (`.exe`, `.msi`) are also built by GitHub Actions on every pu
 - `src/lib/rules.ts`: junk heuristics and sensitive-content detection
 - `src/lib/library.ts`: re-import merge, edit log, filters
 - `src/lib/ai.ts`: batched tagging with Claude Haiku 5.5 (structured output)
+- `src/lib/telegram.ts`: what goes to which topic, notes and hashtags, paced and resumable sending
 - `src/lib/linkmeta.ts`: link previews (OpenGraph, YouTube oEmbed)
 - `src/components/`: grid, card, detail and settings UI
 - `src/platform/`: desktop (Tauri) and browser implementations of files, dialogs, secrets, HTTP and updates
-- `src-tauri/`: Tauri shell, OS credential store commands, updater
+- `src-tauri/`: Tauri shell, OS credential store commands, updater; `src/telegram.rs` is the Telegram login and send commands

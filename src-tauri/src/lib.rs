@@ -1,3 +1,5 @@
+mod telegram;
+
 const SERVICE: &str = "com.khainpain.savedboard";
 
 fn entry(name: &str) -> Result<keyring::Entry, String> {
@@ -35,6 +37,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_process::init())
+        .manage(telegram::TgState::default())
         .setup(|app| {
             // Checks GitHub Releases for a newer signed build; the UI asks before installing.
             #[cfg(desktop)]
@@ -42,7 +45,21 @@ pub fn run() {
             let _ = app;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_secret, set_secret, delete_secret])
+        .invoke_handler(tauri::generate_handler![
+            get_secret,
+            set_secret,
+            delete_secret,
+            telegram::tg_status,
+            telegram::tg_set_api,
+            telegram::tg_request_code,
+            telegram::tg_sign_in,
+            telegram::tg_check_password,
+            telegram::tg_logout,
+            telegram::tg_ensure_board,
+            telegram::tg_create_topic,
+            telegram::tg_forward,
+            telegram::tg_send_note
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
