@@ -109,6 +109,8 @@ export interface Library {
   sourceDir: string;
   importedAt: string;
   cards: Card[];
+  /** AI subgroups inside topics, by topic name (as shown, after merges). */
+  subgroups?: Record<string, TopicGroups>;
   /** Where loading straight from Telegram got to (src/lib/tgImport.ts). */
   telegram?: TelegramSync;
 }
@@ -126,6 +128,12 @@ export interface TelegramSync {
   passTop?: number;
   /** Photos Telegram no longer has (the message was deleted), so they aren't asked for again. */
   noPhoto?: number[];
+}
+
+/** A topic split into subgroups by the AI; cards added later aren't in any group until it's redone. */
+export interface TopicGroups {
+  at: string;
+  groups: Array<{ name: string; ids: number[] }>;
 }
 
 /** One user edit; the edit log is replayed on load and is what a future sync would carry. */

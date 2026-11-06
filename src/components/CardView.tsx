@@ -7,6 +7,7 @@ import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic } from "
 import { domainOf } from "../lib/rules";
 import { instantImage } from "../lib/embeds";
 import { isImportant } from "../lib/smart";
+import { TopicMenu } from "./TopicMenu";
 import { Icon } from "./Icon";
 import { hueOf, type ViewKey } from "./nav";
 
@@ -147,9 +148,13 @@ export function CardView(props: {
   onToggleSelect: (range: boolean) => void;
   onJunk: () => void;
   onPin: () => void;
+  /** Topics to offer in "Move to topic", and moving there ("" = no topic). */
+  topics: string[];
+  onMove: (topic: string) => void;
   onOpenLink: (url: string) => void;
 }) {
   const { card, lib, view } = props;
+  const [moveAt, setMoveAt] = useState<HTMLElement | null>(null);
   const action = effectiveAction(card);
   const important = isImportant(card);
   const tags = effectiveTags(card).slice(0, view === "headlines" ? 3 : 4);
@@ -158,7 +163,7 @@ export function CardView(props: {
   const site = siteOf(card);
   const fileMeta = [formatSize(card.media?.size), card.kind === "video" ? "" : formatDuration(card.media?.duration)].filter(Boolean).join(" · ");
 
-  const cls = ["card", `view-${view}`, `kind-${card.kind}`, props.selected && "selected", props.active && "active", action === "junk" && "junk", props.selecting && "selecting"]
+  const cls = ["card", `view-${view}`, `kind-${card.kind}`, props.selected && "selected", props.active && "active", action === "junk" && "junk", props.selecting && "selecting", moveAt && "menu-open"]
     .filter(Boolean)
     .join(" ");
 
@@ -220,6 +225,10 @@ export function CardView(props: {
         <button className={`ha${important ? " on" : ""}`} title={important ? T.card.unpin : T.card.pin} onClick={props.onPin}>
           <Icon name="star" size={15} />
         </button>
+        <button className={`ha${moveAt ? " on" : ""}`} title={T.move.button} onClick={(e) => setMoveAt(moveAt ? null : e.currentTarget)}>
+          <Icon name="folder" size={15} />
+        </button>
+        {moveAt && <TopicMenu anchor={moveAt} topics={props.topics} current={effectiveTopic(card)} onPick={props.onMove} onClose={() => setMoveAt(null)} />}
         {card.urls[0] && (
           <button className="ha" title={T.card.openLink} onClick={() => props.onOpenLink(card.urls[0])}>
             <Icon name="external" size={15} />

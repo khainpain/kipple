@@ -249,6 +249,21 @@ export const en: Dict = {
     noticeAction: "Tidy up",
   },
 
+  move: {
+    button: "Move to topic",
+    bulk: "To topic",
+    filter: "Find or create a topic",
+    create: (name) => `Create topic "${name}"`,
+    clear: "Remove from topic",
+  },
+
+  groups: {
+    make: "Split into groups",
+    redo: "Regroup",
+    working: "Grouping…",
+    hint: "The AI splits the topic into a few subgroups by subject. Only card titles, summaries and tags are sent.",
+  },
+
   sidebar: {
     signedIn: "Signed in to Telegram",
     topics: "Topics",
@@ -434,6 +449,7 @@ export const en: Dict = {
     article: (i) => `Article number ${i}`,
     card: (i, kind) => `Card ${i}: ${kind}`,
     summary: "A short note on what's saved here and why you'd come back to it.",
+    groups: ["Color and type", "Grids and layout"],
     tags: ["css", "ideas", "references"],
     textFile: "shopping.txt",
     textBody: "Shopping list\n\n- coffee\n- bread\n- E27 light bulb\n\nText files show right inside the card.",

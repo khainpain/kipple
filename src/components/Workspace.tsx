@@ -5,6 +5,7 @@ import { effectiveAction, effectiveTags, effectiveTopic, matchesFilter } from ".
 import { countDuplicateGroups, findDuplicates, groupDuplicates, isImportant } from "../lib/smart";
 import { Overview, type OverviewSection } from "./Overview";
 import { TidyDialog, type TidyKind } from "./TidyDialog";
+import { TopicMenu } from "./TopicMenu";
 import { suggestMerges } from "../lib/tidy";
 import type { Aliases } from "../lib/library";
 import { buildIndex } from "../lib/search";
@@ -38,6 +39,9 @@ import {
   type ViewKey,
 } from "./nav";
 
+/** Topics smaller than this aren't worth splitting into subgroups. */
+const GROUP_MIN = 12;
+
 export type Job = { label: string; done: number; total: number } | null;
 
 /** The library screen: sidebar, toolbar, board in one of four views, and the card panel. */
@@ -65,6 +69,8 @@ export function Workspace(props: {
   onAliases: (a: Aliases) => void;
   /** Ask the AI for synonyms among topic or tag names; undefined when AI can't be used. */
   askSynonyms?: (kind: TidyKind, counts: Map<string, number>) => Promise<Array<{ into: string; from: string[] }>>;
+  /** Split a topic into AI subgroups; undefined when AI can't be used. */
+  onGroupTopic?: (topic: string) => Promise<void>;
 }) {
   const { lib, rev, onEdit } = props;
   const [scope, setScope] = useState<Scope>({ kind: "home" });
@@ -81,6 +87,11 @@ export function Workspace(props: {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [exportOpen, setExportOpen] = useState(false);
   const [tidy, setTidy] = useState<TidyKind | null>(null);
+  const [bulkMoveAt, setBulkMoveAt] = useState<HTMLElement | null>(null);
+  /** The open subgroup of the topic, by name, and whether the AI is grouping right now. */
+  const [sub, setSub] = useState<string | null>(null);
+  const [grouping, setGrouping] = useState(false);
+  const [groupError, setGroupError] = useState<string | null>(null);
   const lastClicked = useRef<number | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -138,6 +149,7 @@ export function Workspace(props: {
     }
     return { topics, tags };
   }, [lib, rev]); // eslint-disable-line react-hooks/exhaustive-deps
+  const topicNames = useMemo(() => [...names.topics.keys()], [names]);
   const tidyCount = useMemo(() => suggestMerges(names.topics).length + suggestMerges(names.tags).length, [names]);
 
   const inScope = useMemo(() => base.filter((c) => matchesScope(c, shown, dupes)), [base, JSON.stringify(shown), dupes]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -152,11 +164,34 @@ export function Workspace(props: {
     return [...m.entries()].sort((a, b) => b[1] - a[1] || compareText(a[0], b[0]));
   }, [inType]);
 
+  // AI subgroups of the open topic, counted among the cards shown now; a group whose cards all left disappears.
+  const groups = useMemo(() => {
+    if (scope.kind !== "topic") return [];
+    const here = new Set(inType.map((c) => c.id));
+    return (lib.subgroups?.[scope.name]?.groups ?? []).map((g) => ({ name: g.name, ids: new Set(g.ids.filter((id) => here.has(id))) })).filter((g) => g.ids.size > 0);
+  }, [lib, rev, scope, inType]); // eslint-disable-line react-hooks/exhaustive-deps
+  const subIds = sub ? groups.find((g) => g.name === sub)?.ids : undefined;
+
+  async function groupTopic() {
+    if (scope.kind !== "topic" || !props.onGroupTopic) return;
+    setGrouping(true);
+    setGroupError(null);
+    try {
+      await props.onGroupTopic(scope.name);
+      setSub(null);
+    } catch (e) {
+      setGroupError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setGrouping(false);
+    }
+  }
+
   const visible = useMemo(() => {
-    const list = tag ? inType.filter((c) => effectiveTags(c).includes(tag)) : inType;
+    let list = tag ? inType.filter((c) => effectiveTags(c).includes(tag)) : inType;
+    if (subIds) list = list.filter((c) => subIds.has(c.id));
     // Duplicates stay next to each other so the extras are easy to spot.
     return isDupes ? groupDuplicates(list, dupes) : sortCards(list, sort);
-  }, [inType, tag, sort, isDupes, dupes]);
+  }, [inType, tag, sort, isDupes, dupes, subIds]);
 
   const sections = useMemo((): OverviewSection[] => {
     if (!home) return [];
@@ -195,6 +230,8 @@ export function Workspace(props: {
   function pickScope(s: Scope) {
     setScope(s);
     setTag(null);
+    setSub(null);
+    setGroupError(null);
     setSelected(new Set());
   }
 
@@ -210,6 +247,10 @@ export function Workspace(props: {
       lastClicked.current = c.id;
       return next;
     });
+  }
+
+  function moveTo(c: Card, topic: string) {
+    onEdit([c.id], { topic });
   }
 
   function togglePin(c: Card) {
@@ -251,7 +292,7 @@ export function Workspace(props: {
 
   const exportCards = selected.size ? visible.filter((c) => selected.has(c.id)) : visible;
   const heading = scopeTitle(home ? scope : shown);
-  const subtitle = [type && TYPES.find((t) => t.key === type)?.label, tag && `#${tag}`].filter(Boolean).join(" · ");
+  const subtitle = [sub, type && TYPES.find((t) => t.key === type)?.label, tag && `#${tag}`].filter(Boolean).join(" · ");
 
   return (
     <div className={`workspace${sideOpen ? "" : " side-closed"}${openCard && openMode === "side" ? " with-detail" : ""}`}>
@@ -354,6 +395,7 @@ export function Workspace(props: {
             onOpen={(c) => setOpenId(c.id)}
             onJunk={toggleJunk}
             onPin={togglePin}
+            onMove={moveTo}
             onOpenLink={(u) => void platform.openUrl(u)}
           />
         ) : (
@@ -368,6 +410,10 @@ export function Workspace(props: {
               <button className="pill" onClick={() => onEdit([...selected], { pinned: true })}>
                 <Icon name="star" size={13} /> {T.nav.important}
               </button>
+              <button className={`pill${bulkMoveAt ? " active" : ""}`} onClick={(e) => setBulkMoveAt(bulkMoveAt ? null : e.currentTarget)}>
+                <Icon name="folder" size={13} /> {T.move.bulk}
+              </button>
+              {bulkMoveAt && <TopicMenu anchor={bulkMoveAt} topics={topicNames} onPick={(t) => onEdit([...selected], { topic: t })} onClose={() => setBulkMoveAt(null)} />}
               <button className="pill" onClick={() => onEdit([...selected], { action: "read_later" })}>
                 {actionLabel("read_later")}
               </button>
@@ -390,6 +436,18 @@ export function Workspace(props: {
                   </button>
                 ) : null,
               )}
+              {scope.kind === "topic" && (groups.length > 0 || props.onGroupTopic) && <span className="quick-sep" />}
+              {groups.map((g) => (
+                <button key={g.name} className={`pill${sub === g.name ? " active" : ""}`} onClick={() => setSub(sub === g.name ? null : g.name)}>
+                  {g.name} <small>{formatNumber(g.ids.size)}</small>
+                </button>
+              ))}
+              {scope.kind === "topic" && props.onGroupTopic && inScope.length >= GROUP_MIN && (
+                <button className="pill ghost" onClick={() => void groupTopic()} disabled={grouping} title={groupError ?? T.groups.hint}>
+                  <Icon name="sparkle" size={13} /> {grouping ? T.groups.working : groups.length ? T.groups.redo : T.groups.make}
+                </button>
+              )}
+              {groupError && <span className="quick-error">{groupError}</span>}
               {tag && (
                 <button className="pill active" onClick={() => setTag(null)}>
                   #{tag} <Icon name="close" size={12} />
@@ -409,7 +467,7 @@ export function Workspace(props: {
         </div>
 
         <Grid
-          key={`${JSON.stringify(shown)}|${type}|${tag}|${query}|${sort}|${view}`}
+          key={`${JSON.stringify(shown)}|${sub}|${type}|${tag}|${query}|${sort}|${view}`}
           lib={lib}
           cards={visible}
           view={view}
@@ -419,6 +477,8 @@ export function Workspace(props: {
           onToggleSelect={toggleSelect}
           onJunk={toggleJunk}
           onPin={togglePin}
+          topics={topicNames}
+          onMove={moveTo}
           onOpenLink={(u) => void platform.openUrl(u)}
         />
         </>

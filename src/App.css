@@ -1571,3 +1571,75 @@ button.ov-title:hover {
   font-size: 13px;
   padding: 6px 0;
 }
+
+/* Move to topic */
+.popover-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+}
+.topic-menu {
+  position: fixed;
+  right: auto;
+  gap: 2px;
+}
+.topic-menu.up {
+  transform: translateY(-100%);
+}
+.topic-menu input {
+  margin-bottom: 4px;
+}
+.topic-menu-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.topic-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.topic-menu button .label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.topic-menu button.on {
+  font-weight: 600;
+}
+.topic-menu button .icon {
+  color: var(--muted);
+}
+.topic-menu-clear {
+  border-top: 1px solid var(--line) !important;
+  border-radius: 0 !important;
+  margin-top: 4px;
+  color: var(--muted) !important;
+}
+.card.menu-open .hover-actions {
+  opacity: 1;
+}
+
+.quick-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--line);
+  flex-shrink: 0;
+  margin: 0 2px;
+}
+.quick .pill small {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.quick .pill.active small {
+  color: inherit;
+  opacity: 0.7;
+}
+.quick-error {
+  color: var(--danger);
+  font-size: 12.5px;
+  white-space: nowrap;
+}

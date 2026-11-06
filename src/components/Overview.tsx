@@ -36,6 +36,7 @@ export function Overview(props: {
   onOpen: (c: Card) => void;
   onJunk: (c: Card) => void;
   onPin: (c: Card) => void;
+  onMove: (c: Card, topic: string) => void;
   onOpenLink: (url: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -99,6 +100,8 @@ export function Overview(props: {
                 onToggleSelect={() => props.onOpen(c)}
                 onJunk={() => props.onJunk(c)}
                 onPin={() => props.onPin(c)}
+                topics={props.topics.map(([t]) => t)}
+                onMove={(t) => props.onMove(c, t)}
                 onOpenLink={props.onOpenLink}
               />
             ))}

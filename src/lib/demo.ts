@@ -57,5 +57,9 @@ export function demoLibrary(): Library {
   });
   cards.reverse(); // the library is kept newest first
   annotateContext(cards);
-  return { version: 1, chatName: D.chatName, sourceDir: "demo", importedAt: new Date().toISOString(), cards };
+  // The first topic comes already split into AI subgroups, to show how that looks.
+  const first = cards.filter((c) => c.ai?.topic === topics[0]).map((c) => c.id);
+  const half = Math.ceil(first.length / 2);
+  const subgroups = { [topics[0]]: { at: "", groups: D.groups.map((name, i) => ({ name, ids: first.slice(i * half, (i + 1) * half) })) } };
+  return { version: 1, chatName: D.chatName, sourceDir: "demo", importedAt: new Date().toISOString(), cards, subgroups };
 }
