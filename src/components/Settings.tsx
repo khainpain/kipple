@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { platform } from "@platform";
 import type { Settings } from "../lib/store";
 import { AI_MODELS, aiModelOf, costEstimate } from "../lib/ai";
 import { setThemePref, THEME_ICONS, THEME_LABELS, THEME_PREFS, useThemePref } from "../lib/theme";
 import { Icon } from "./Icon";
 import { LANGS, T, systemLang, type LangPref } from "../i18n";
+import { telegramErrorText } from "../lib/telegram";
+import type { TelegramApi, TelegramStatus } from "../platform/types";
 
 export function SettingsDialog(props: {
   settings: Settings;
@@ -118,6 +120,13 @@ export function SettingsDialog(props: {
           {platform.kind === "web" ? L.fetchLinksWeb : ""}
         </label>
 
+        {platform.telegram && (
+          <details className="advanced">
+            <summary>{L.advanced}</summary>
+            <TelegramKey tg={platform.telegram} />
+          </details>
+        )}
+
         {props.version && <p className="hint">{L.version(props.version)}</p>}
 
         <div className="dialog-buttons">
@@ -132,5 +141,87 @@ export function SettingsDialog(props: {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * The user's own api_id / api_hash from my.telegram.org. The app normally ships with its own key,
+ * so this is only for when that one stops working (or for builds without it). Saved on its own,
+ * straight into the OS credential store, separately from the dialog's Save button.
+ */
+function TelegramKey(props: { tg: TelegramApi }) {
+  const { tg } = props;
+  const L = T.settings;
+  const [status, setStatus] = useState<TelegramStatus | null>(null);
+  const [apiId, setApiId] = useState("");
+  const [apiHash, setApiHash] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = () => tg.status().then(setStatus, () => undefined);
+  useEffect(() => {
+    void refresh();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function run(fn: () => Promise<void>, done: string | null) {
+    setBusy(true);
+    setError(null);
+    setNote(null);
+    try {
+      await fn();
+      setNote(done);
+      await refresh();
+    } catch (e) {
+      setError(telegramErrorText(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const noBuiltIn = status !== null && !status.builtInApi;
+
+  return (
+    <form
+      className="tg-api"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void run(async () => (await tg.setApi(apiId, apiHash), setApiId(""), setApiHash("")), L.tgApiSaved);
+      }}
+    >
+      <span>
+        <b>{L.tgApi}</b> {status?.customApi && <span className="ok">{L.tgApiCustom}</span>}
+      </span>
+      <p className="hint">
+        {noBuiltIn ? L.tgApiWhyNoBuiltIn : L.tgApiWhy} {L.tgApiHow1}
+        <a href="#" onClick={(e) => (e.preventDefault(), platform.openUrl("https://my.telegram.org/apps"))}>
+          my.telegram.org
+        </a>
+        {L.tgApiHow2}
+      </p>
+      <div className="row">
+        <label>
+          api_id
+          <input inputMode="numeric" value={apiId} onChange={(e) => setApiId(e.target.value)} placeholder="1234567" />
+        </label>
+        <label>
+          api_hash
+          <input value={apiHash} onChange={(e) => setApiHash(e.target.value)} placeholder={L.tgApiHashPlaceholder} />
+        </label>
+      </div>
+      <div className="dialog-buttons">
+        {status?.customApi && status.builtInApi && (
+          <button type="button" className="secondary small" disabled={busy} onClick={() => void run(() => tg.clearApi(), null)}>
+            {L.tgApiReset}
+          </button>
+        )}
+        <span className="spacer" />
+        <button className="secondary small" disabled={busy || !apiId.trim() || !apiHash.trim()}>
+          {L.tgApiSave}
+        </button>
+      </div>
+      {note && <p className="hint">{note}</p>}
+      {error && <p className="error">{error}</p>}
+    </form>
   );
 }

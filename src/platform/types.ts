@@ -21,6 +21,8 @@ export type HttpFetch = (url: string, init?: RequestInit & { connectTimeout?: nu
 export interface TelegramStatus {
   hasApi: boolean;
   builtInApi: boolean;
+  /** The user saved their own api_id / api_hash in Settings → Advanced. */
+  customApi: boolean;
   authorized: boolean;
   name?: string | null;
 }
@@ -35,6 +37,9 @@ export interface TelegramAccount {
 
 export type SignInResult = { status: "ok"; name: string } | { status: "password"; hint?: string | null };
 
+/** QR sign-in: a `tg://login?token=…` link to show until `expires` (unix seconds), or the outcome. */
+export type QrResult = { status: "qr"; url: string; expires: number } | SignInResult;
+
 /**
  * The user's own Telegram account over MTProto (desktop only). Errors are strings:
  * `FLOOD_WAIT:<seconds>` for rate limits, otherwise Telegram's error name.
@@ -43,10 +48,21 @@ export interface TelegramApi {
   status(): Promise<TelegramStatus>;
   /** Who is signed in (name, @username, avatar), or null. */
   account(): Promise<TelegramAccount | null>;
+  /** The user's own api_id / api_hash from my.telegram.org (Settings → Advanced); wins over the built-in key. */
   setApi(apiId: string, apiHash: string): Promise<void>;
+  /** Forgets the user's own key and goes back to the one built into the app. */
+  clearApi(): Promise<void>;
   requestCode(phone: string): Promise<void>;
   signIn(code: string): Promise<SignInResult>;
   checkPassword(password: string): Promise<SignInResult>;
+  /**
+   * QR sign-in. Call about every 1.5 s while the code is on screen: returns the current code
+   * (a new one once it expires) or, after the phone confirmed it, the sign-in result.
+   * A "password" result continues with checkPassword().
+   */
+  qrPoll(): Promise<QrResult>;
+  /** Stops QR sign-in (switched to the phone number or left the screen). */
+  qrCancel(): Promise<void>;
   logout(): Promise<void>;
   ensureBoard(prev: { channelId: number; accessHash: string } | null, title: string, about: string): Promise<{ channelId: number; accessHash: string; created: boolean }>;
   createTopic(board: { channelId: number; accessHash: string }, title: string, iconColor?: number): Promise<number>;

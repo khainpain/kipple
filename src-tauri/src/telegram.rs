@@ -11,13 +11,14 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use grammers_client::client::{LoginToken, PasswordToken};
 use grammers_client::media::Downloadable;
 use grammers_client::sender::{AutoSleep, ConnectionParams, SenderPool};
 use grammers_client::session::storages::MemorySession;
+use grammers_client::session::updates::UpdatesLike;
 use grammers_client::session::{Session, SessionData};
 use grammers_client::tl;
 use grammers_client::{Client, InvocationError, SignInError};
@@ -37,9 +38,14 @@ const BUILT_IN_API_HASH: Option<&str> = option_env!("TG_API_HASH");
 struct Conn {
     client: Client,
     session: Arc<MemorySession>,
+    api_id: i32,
     api_hash: String,
     login: Option<LoginToken>,
     password: Option<PasswordToken>,
+    /// The QR login token being shown and when it expires (unix seconds).
+    qr: Option<(Vec<u8>, i64)>,
+    /// Set when Telegram sends updateLoginToken: the QR was scanned and accepted on the phone.
+    qr_scanned: Arc<AtomicBool>,
 }
 
 #[derive(Default)]
@@ -52,6 +58,8 @@ pub struct TgStatus {
     has_api: bool,
     /// This build has api_id / api_hash baked in, so the user never has to enter them.
     built_in_api: bool,
+    /// The user saved their own api_id / api_hash (Settings → Advanced); they win over the built-in ones.
+    custom_api: bool,
     authorized: bool,
     name: Option<String>,
 }
@@ -96,6 +104,10 @@ fn built_in_api() -> Option<(&'static str, &'static str)> {
         (Some(id), Some(hash)) if !id.trim().is_empty() && !hash.trim().is_empty() => Some((id, hash)),
         _ => None,
     }
+}
+
+fn custom_api() -> bool {
+    read_secret(API_ID_KEY).is_some() && read_secret(API_HASH_KEY).is_some()
 }
 
 fn api_credentials() -> Option<(i32, String)> {
@@ -188,9 +200,22 @@ fn connect() -> Result<Conn, String> {
     };
     let pool = SenderPool::with_configuration(Arc::clone(&session), api_id, params);
     let client = Client::new(pool.handle);
-    drop(pool.updates); // we never read incoming updates
     tauri::async_runtime::spawn(pool.runner.run());
-    Ok(Conn { client, session, api_hash, login: None, password: None })
+    // The only update we care about is updateLoginToken (QR sign-in confirmed on the phone);
+    // everything else is drained and dropped.
+    let qr_scanned = Arc::new(AtomicBool::new(false));
+    let flag = Arc::clone(&qr_scanned);
+    let mut updates = pool.updates;
+    tauri::async_runtime::spawn(async move {
+        while let Some(u) = updates.recv().await {
+            if let UpdatesLike::Updates(u) = u
+                && updates_parts(u).0.iter().any(|u| matches!(u, tl::enums::Update::LoginToken))
+            {
+                flag.store(true, Ordering::Relaxed);
+            }
+        }
+    });
+    Ok(Conn { client, session, api_id, api_hash, login: None, password: None, qr: None, qr_scanned })
 }
 
 /// Locks the connection, opening it on first use.
@@ -239,17 +264,18 @@ async fn me(client: &Client) -> Result<Option<String>, InvocationError> {
 #[tauri::command]
 pub async fn tg_status(state: tauri::State<'_, TgState>) -> Result<TgStatus, String> {
     let built_in_api = built_in_api().is_some();
+    let custom_api = custom_api();
     if api_credentials().is_none() {
-        return Ok(TgStatus { has_api: false, built_in_api, authorized: false, name: None });
+        return Ok(TgStatus { has_api: false, built_in_api, custom_api, authorized: false, name: None });
     }
     // Without a saved session there's nothing to check, and no reason to connect yet.
     let connected = state.0.lock().await.is_some();
     if read_secret(SESSION_KEY).is_none() && !connected {
-        return Ok(TgStatus { has_api: true, built_in_api, authorized: false, name: None });
+        return Ok(TgStatus { has_api: true, built_in_api, custom_api, authorized: false, name: None });
     }
     let c = conn(&state).await?;
     let name = me(&c.client).await.map_err(err)?;
-    Ok(TgStatus { has_api: true, built_in_api, authorized: name.is_some(), name })
+    Ok(TgStatus { has_api: true, built_in_api, custom_api, authorized: name.is_some(), name })
 }
 
 /// The small profile photo of the signed-in user.
@@ -324,6 +350,20 @@ pub async fn tg_set_api(state: tauri::State<'_, TgState>, api_id: String, api_ha
     Ok(())
 }
 
+/// Forgets the user's own api_id / api_hash, so the built-in ones are used again.
+#[tauri::command]
+pub async fn tg_clear_api(state: tauri::State<'_, TgState>) -> Result<(), String> {
+    for name in [API_ID_KEY, API_HASH_KEY] {
+        if let Ok(e) = keyring(name) {
+            let _ = e.delete_credential();
+        }
+    }
+    if let Some(old) = state.0.lock().await.take() {
+        old.client.disconnect();
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn tg_request_code(state: tauri::State<'_, TgState>, phone: String) -> Result<(), String> {
     let mut c = conn(&state).await?;
@@ -373,6 +413,107 @@ pub async fn tg_check_password(state: tauri::State<'_, TgState>, password: Strin
         Err(SignInError::Other(e)) => Err(err(e)),
         Err(_) => Err("SIGN_IN_FAILED".into()),
     }
+}
+
+/// What the QR tile should show next.
+#[derive(Serialize)]
+#[serde(tag = "status", rename_all = "camelCase")]
+pub enum QrResult {
+    /// Show this `tg://login?token=…` link as a QR code until `expires` (unix seconds).
+    Qr { url: String, expires: i64 },
+    Ok { name: String },
+    Password { hint: Option<String> },
+}
+
+const B64URL: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+/// base64url without padding, as Telegram expects in `tg://login?token=`.
+fn base64url(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let n = (u32::from(chunk[0]) << 16) | (u32::from(*chunk.get(1).unwrap_or(&0)) << 8) | u32::from(*chunk.get(2).unwrap_or(&0));
+        for i in 0..=chunk.len() {
+            out.push(B64URL[(n >> (18 - 6 * i) & 63) as usize] as char);
+        }
+    }
+    out
+}
+
+fn qr_url(token: &[u8]) -> String {
+    format!("tg://login?token={}", base64url(token))
+}
+
+fn now_secs() -> i64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0)
+}
+
+/// Asks the phone's account for the cloud password, keeping the token for `tg_check_password`.
+async fn password_step(c: &mut Conn) -> Result<QrResult, String> {
+    let p: tl::types::account::Password = c.client.invoke(&tl::functions::account::GetPassword {}).await.map_err(err)?.into();
+    let token = PasswordToken::new(p);
+    let hint = token.hint().map(str::to_string);
+    c.password = Some(token);
+    c.qr = None;
+    Ok(QrResult::Password { hint })
+}
+
+/// The QR was confirmed on the phone: keep the session and report who signed in.
+fn qr_authorized(c: &mut Conn, auth: tl::enums::auth::Authorization) -> Result<QrResult, String> {
+    c.qr = None;
+    match auth {
+        tl::enums::auth::Authorization::Authorization(a) => {
+            let name = user_name(&a.user);
+            save_session(&c.session)?;
+            Ok(QrResult::Ok { name })
+        }
+        tl::enums::auth::Authorization::SignUpRequired(_) => Err("SIGN_UP_REQUIRED".into()),
+    }
+}
+
+/// QR sign-in (auth.exportLoginToken). The UI calls this about every 1.5 seconds while the QR
+/// tile is visible: it returns the current code while it is still valid, a fresh one when it
+/// has expired, and the result once the code was scanned and confirmed on the phone.
+/// Telegram announces the scan with updateLoginToken; the token is re-exported then, and also
+/// whenever it expires, so a missed update only delays sign-in to the next refresh (~30 s).
+#[tauri::command]
+pub async fn tg_qr_poll(state: tauri::State<'_, TgState>) -> Result<QrResult, String> {
+    let mut c = conn(&state).await?;
+    let scanned = c.qr_scanned.swap(false, Ordering::Relaxed);
+    if !scanned
+        && let Some((token, expires)) = &c.qr
+        && *expires > now_secs() + 2
+    {
+        return Ok(QrResult::Qr { url: qr_url(token), expires: *expires });
+    }
+    let req = tl::functions::auth::ExportLoginToken { api_id: c.api_id, api_hash: c.api_hash.clone(), except_ids: vec![] };
+    let mut answer = c.client.invoke(&req).await;
+    // The account lives on another data centre: switch there and import the token.
+    if let Ok(tl::enums::auth::LoginToken::MigrateTo(m)) = &answer {
+        let dc = m.dc_id;
+        c.session.set_home_dc_id(dc).await.map_err(|e| e.to_string())?;
+        answer = c.client.invoke_in_dc(dc, &tl::functions::auth::ImportLoginToken { token: m.token.clone() }).await;
+    }
+    match answer {
+        Ok(tl::enums::auth::LoginToken::Token(t)) => {
+            let url = qr_url(&t.token);
+            c.qr = Some((t.token, i64::from(t.expires)));
+            Ok(QrResult::Qr { url, expires: i64::from(t.expires) })
+        }
+        Ok(tl::enums::auth::LoginToken::Success(s)) => qr_authorized(&mut c, s.authorization),
+        Ok(tl::enums::auth::LoginToken::MigrateTo(_)) => Err("QR_MIGRATE_LOOP".into()),
+        Err(e) if e.is("SESSION_PASSWORD_NEEDED") => password_step(&mut c).await,
+        Err(e) => Err(err(e)),
+    }
+}
+
+/// Stops showing the QR (switched to phone sign-in or left the screen).
+#[tauri::command]
+pub async fn tg_qr_cancel(state: tauri::State<'_, TgState>) -> Result<(), String> {
+    if let Some(c) = state.0.lock().await.as_mut() {
+        c.qr = None;
+        c.qr_scanned.store(false, Ordering::Relaxed);
+    }
+    Ok(())
 }
 
 /// Ends the session on Telegram's side (it disappears from «Активные сеансы») and forgets it here.
@@ -597,5 +738,22 @@ pub async fn tg_send_note(
     match u {
         U::UpdateShortSentMessage(m) => Ok(m.id),
         other => sent_ids(&updates_parts(other).0, &[rid]).first().copied().ok_or_else(|| "SEND_NO_RESULT".into()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn qr_url_is_base64url_without_padding() {
+        assert_eq!(base64url(b""), "");
+        assert_eq!(base64url(b"f"), "Zg");
+        assert_eq!(base64url(b"fo"), "Zm8");
+        assert_eq!(base64url(b"foo"), "Zm9v");
+        assert_eq!(base64url(b"foob"), "Zm9vYg");
+        // Bytes that hit the URL-safe characters (+ and / in plain base64).
+        assert_eq!(base64url(&[0xfb, 0xff, 0xbf]), "-_-_");
+        assert_eq!(qr_url(&[0xfb, 0xff]), "tg://login?token=-_8");
     }
 }
