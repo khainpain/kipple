@@ -7,6 +7,7 @@ import { mediaUrl } from "../lib/importer";
 import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic } from "../lib/library";
 import { Icon } from "./Icon";
 import { coverOf, displayTitle, siteOf } from "./CardView";
+import { SiteIcon } from "./SiteIcon";
 import { Preview } from "./Preview";
 import { isImportant } from "../lib/smart";
 import { OPEN_MODES, PANEL_WIDTH, clampPanelWidth, hueOf, loadPanelWidth, savePref, type OpenMode } from "./nav";
@@ -195,7 +196,12 @@ export function Detail(props: {
           </div>
         )}
         {cover && <img className="detail-cover" src={cover} alt="" onError={(e) => (e.currentTarget.style.display = "none")} />}
-        {site && <div className="detail-site">{site}</div>}
+        {site && (
+          <div className="detail-site">
+            <SiteIcon url={card.urls[0]} favicon={card.link?.favicon} />
+            {site}
+          </div>
+        )}
 
         <Preview lib={lib} card={card} />
 

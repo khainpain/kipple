@@ -1020,6 +1020,13 @@ code {
   height: 14px;
   border-radius: 3px;
 }
+.favicon,
+.site-icon {
+  flex: none;
+}
+.site-icon.generic {
+  opacity: 0.75;
+}
 .date {
   margin-left: auto;
   white-space: nowrap;
@@ -1418,6 +1425,9 @@ code {
   border-radius: 10px;
 }
 .detail-site {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   color: var(--muted);
   font-size: 12.5px;
   margin-bottom: -10px;
