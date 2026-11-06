@@ -40,7 +40,7 @@ export const en: Dict = {
     wiped: "All data has been deleted from this computer.",
     webBanner: (version) =>
       `Web build for trying out the interface${version ? ` (${version})` : ""}. Data stays in this browser only, link previews aren't loaded, and photos show until the page is reloaded.`,
-    updateAvailable: (v) => `Version ${v} is available.`,
+    updateAvailable: (v) => `Version ${v} is out. Update now?`,
     updateInstall: "Update and restart",
     updateLater: "Later",
     updateDownloading: (p) => `Downloading the update${p !== null ? ` ${p}%` : ""}…`,

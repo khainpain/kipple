@@ -44,7 +44,7 @@ export const ru = {
     wiped: "Все данные удалены с этого компьютера.",
     webBanner: (version: string) =>
       `Веб-версия для проверки интерфейса${version ? ` (${version})` : ""}. Данные хранятся только в этом браузере, превью ссылок не загружаются, фото видны до перезагрузки страницы.`,
-    updateAvailable: (v: string) => `Доступна версия ${v}.`,
+    updateAvailable: (v: string) => `Вышла новая версия ${v}. Обновиться сейчас?`,
     updateInstall: "Обновить и перезапустить",
     updateLater: "Позже",
     updateDownloading: (p: number | null) => `Скачиваю обновление${p !== null ? ` ${p}%` : ""}…`,
