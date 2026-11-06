@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { platform } from "@platform";
 import type { Card, Library, UserFields } from "../lib/types";
-import { effectiveAction, effectiveTags, effectiveTopic, matchesFilter } from "../lib/library";
+import { effectiveAction, effectiveTags, effectiveTopic, getOwnTopics, matchesFilter } from "../lib/library";
 import { countDuplicateGroups, findDuplicates, groupDuplicates, isImportant } from "../lib/smart";
 import { Overview, type OverviewSection } from "./Overview";
 import { TidyDialog, type TidyKind } from "./TidyDialog";
@@ -71,6 +71,10 @@ export function Workspace(props: {
   askSynonyms?: (kind: TidyKind, counts: Map<string, number>) => Promise<Array<{ into: string; from: string[] }>>;
   /** Split a topic into AI subgroups; undefined when AI can't be used. */
   onGroupTopic?: (topic: string) => Promise<void>;
+  /** Topics made by hand: each returns the name the topic ends up under. */
+  onCreateTopic: (name: string) => Promise<string>;
+  onRenameTopic: (from: string, to: string) => Promise<string>;
+  onDeleteTopic: (name: string) => Promise<void>;
 }) {
   const { lib, rev, onEdit } = props;
   const [scope, setScope] = useState<Scope>({ kind: "home" });
@@ -129,8 +133,10 @@ export function Workspace(props: {
       if (t) m.set(t, (m.get(t) ?? 0) + 1);
       else none++;
     }
+    // The user's own topics show even before anything is in them.
+    for (const t of getOwnTopics()) if (!m.has(t)) m.set(t, 0);
     return { topics: [...m.entries()].sort((a, b) => b[1] - a[1] || compareText(a[0], b[0])), noTopic: none };
-  }, [base]);
+  }, [base, rev]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Searching from the overview searches everything, shown as a board.
   const home = scope.kind === "home" && !query.trim();
@@ -149,7 +155,7 @@ export function Workspace(props: {
     }
     return { topics, tags };
   }, [lib, rev]); // eslint-disable-line react-hooks/exhaustive-deps
-  const topicNames = useMemo(() => [...names.topics.keys()], [names]);
+  const topicNames = useMemo(() => [...new Set([...names.topics.keys(), ...getOwnTopics()])], [names]);
   const tidyCount = useMemo(() => suggestMerges(names.topics).length + suggestMerges(names.tags).length, [names]);
 
   const inScope = useMemo(() => base.filter((c) => matchesScope(c, shown, dupes)), [base, JSON.stringify(shown), dupes]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -310,6 +316,15 @@ export function Workspace(props: {
           onTag={setTag}
           tidyCount={tidyCount}
           onTidy={() => setTidy("tags")}
+          onCreateTopic={async (name) => pickScope({ kind: "topic", name: await props.onCreateTopic(name) })}
+          onRenameTopic={async (from, to) => {
+            const name = await props.onRenameTopic(from, to);
+            if (scope.kind === "topic" && scope.name === from) pickScope({ kind: "topic", name });
+          }}
+          onDeleteTopic={async (name) => {
+            await props.onDeleteTopic(name);
+            if (scope.kind === "topic" && scope.name === name) pickScope({ kind: "home" });
+          }}
         />
       )}
 
@@ -483,6 +498,7 @@ export function Workspace(props: {
           topics={topicNames}
           onMove={moveTo}
           onOpenLink={(u) => void platform.openUrl(u)}
+          empty={shown.kind === "topic" && !inScope.length && !query.trim() ? { title: T.topics.emptyTitle, hint: T.topics.emptyHint } : undefined}
         />
         </>
         )}

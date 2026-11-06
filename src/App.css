@@ -7,6 +7,8 @@
   --muted: #77726a;
   --line: #e3dfd7;
   --hover: rgba(35, 33, 30, 0.06);
+  --scroll-thumb: rgba(35, 33, 30, 0.18);
+  --scroll-thumb-hover: rgba(35, 33, 30, 0.34);
   --accent: #d9573b;
   --accent-ink: #b8432a;
   --accent-soft: #fbe7e0;
@@ -16,17 +18,45 @@
   --shadow: 0 1px 2px rgba(40, 30, 20, 0.06), 0 2px 10px rgba(40, 30, 20, 0.04);
   --shadow-hover: 0 2px 4px rgba(40, 30, 20, 0.08), 0 10px 24px rgba(40, 30, 20, 0.08);
   --tile-l: 90%;
+  --tile-s: 45%;
+  --tile-ink-s: 35%;
   --tile-ink-l: 38%;
   --ok: #1b7a43;
   --act-read: #1b7a43;
   --act-idea: #8a4fd8;
   --act-todo: #c25e00;
   --act-ref: #2f6fae;
+  /* Text/icons on a filled accent or ok surface (buttons, active chips, badges). */
+  --on-accent: #ffffff;
+  --on-ok: #ffffff;
+  --ok-soft: rgba(27, 122, 67, 0.1);
+  /* Dimmed layer behind modals and the centred peek panel. */
+  --scrim: rgba(20, 16, 12, 0.4);
+  /* Dark chip laid over media (video duration etc.); same in both themes. */
+  --overlay: rgba(0, 0, 0, 0.6);
+  --on-overlay: #ffffff;
+  --shadow-float: 0 1px 4px rgba(0, 0, 0, 0.18);
+  --shadow-pop: 0 24px 64px rgba(0, 0, 0, 0.28);
+  /* Per-topic colour dot: hue comes from the topic (--h), saturation/lightness from here. */
+  --topic-s: 55%;
+  --topic-l: 58%;
+  /* Theme-independent surfaces: the QR code must stay black on white, and the welcome
+     collage mocks a Telegram video card, which is always dark. */
+  --fixed-paper: #ffffff;
+  --fixed-qr: #000000;
+  --fixed-ink: #23211e;
+  --fixed-muted: #77726a;
+  --fixed-line: #e3dfd7;
+  --fixed-cream: #fbf3e6;
+  --fixed-accent: #d9573b;
+  --fixed-on-dark-track: rgba(255, 255, 255, 0.2);
   font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Inter, Roboto, sans-serif;
   font-size: 14px;
   color: var(--ink);
   background: var(--bg);
   color-scheme: light;
+  /* Native checkboxes and radios take the accent instead of the system blue. */
+  accent-color: var(--accent);
 }
 /* public/theme-init.js and src/lib/theme.ts set data-theme from the user's choice (or the OS). */
 :root[data-theme="dark"] {
@@ -38,6 +68,8 @@
   --muted: #9d978e;
   --line: #36332f;
   --hover: rgba(255, 250, 240, 0.06);
+  --scroll-thumb: rgba(255, 250, 240, 0.16);
+  --scroll-thumb-hover: rgba(255, 250, 240, 0.32);
   --accent: #f07a5f;
   --accent-ink: #f59a84;
   --accent-soft: #3a2621;
@@ -52,9 +84,45 @@
   --act-ref: #7fb2f0;
   --warn: #f0a052;
   --danger: #ef6b5b;
+  --on-ok: var(--bg);
+  --ok-soft: rgba(95, 207, 143, 0.12);
+  --scrim: rgba(0, 0, 0, 0.55);
+  --shadow-float: 0 1px 4px rgba(0, 0, 0, 0.45);
+  --shadow-pop: 0 24px 64px rgba(0, 0, 0, 0.55);
 }
 * {
   box-sizing: border-box;
+}
+/* Scrollbars: thin, no arrows, a soft rounded thumb that darkens on hover, same in every
+   scrolling area. WebView2/Chromium uses the ::-webkit-scrollbar rules (they give a padded,
+   rounded thumb); other engines fall back to the standard properties. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  min-height: 32px;
+}
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--scroll-thumb-hover);
+}
+::-webkit-scrollbar-button {
+  display: none;
+}
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scroll-thumb) transparent;
+  }
 }
 html,
 body,
@@ -72,7 +140,7 @@ button {
   border-radius: 8px;
   padding: 8px 14px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 button:disabled {
   opacity: 0.35;
@@ -222,7 +290,7 @@ code {
   border-radius: 50%;
   overflow: hidden;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 700;
   font-size: 12px;
 }
@@ -338,7 +406,7 @@ code {
   margin: 0 3px;
   border-radius: 3px;
   flex-shrink: 0;
-  background: hsl(var(--h) 55% 58%);
+  background: hsl(var(--h) var(--topic-s) var(--topic-l));
 }
 .side-hint {
   padding: 0 10px;
@@ -366,10 +434,10 @@ code {
 .side-tag.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 .side-tag.active small {
-  color: #fff;
+  color: var(--on-accent);
 }
 
 /* Toolbar */
@@ -491,6 +559,84 @@ code {
   padding: 7px 8px;
 }
 .menu button:hover {
+  background: var(--hover);
+}
+
+/* App-styled select (replaces native <select>): looks like an input, opens a .menu list */
+.select {
+  width: 100%;
+}
+.select-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 10px;
+}
+.select-btn:hover {
+  border-color: var(--muted);
+}
+.select-btn.open {
+  border-color: var(--muted);
+}
+.select-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.select-btn .label,
+.select-menu .label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.select-btn .chev {
+  color: var(--muted);
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+.select-btn.open .chev {
+  transform: rotate(180deg);
+}
+.select-btn .topic-dot {
+  margin: 0;
+}
+.select-btn .placeholder {
+  color: var(--muted);
+}
+.select-menu {
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 40;
+  max-height: 260px;
+  overflow-y: auto;
+  gap: 1px;
+}
+.select-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 7px;
+  font-size: 13.5px;
+}
+.select-menu button.on {
+  font-weight: 600;
+}
+.select-menu button .icon {
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.select-menu button:focus-visible,
+.topic-menu button:focus-visible {
+  outline: none;
   background: var(--hover);
 }
 
@@ -750,8 +896,8 @@ code {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: hsl(var(--h) 45% var(--tile-l));
-  color: hsl(var(--h) 35% var(--tile-ink-l));
+  background: hsl(var(--h) var(--tile-s) var(--tile-l));
+  color: hsl(var(--h) var(--tile-ink-s) var(--tile-ink-l));
   font-size: 12.5px;
   font-weight: 600;
   padding: 10px;
@@ -762,8 +908,8 @@ code {
   position: absolute;
   right: 8px;
   bottom: 8px;
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
+  background: var(--overlay);
+  color: var(--on-overlay);
   font-size: 12px;
   border-radius: 6px;
   padding: 2px 6px;
@@ -859,12 +1005,12 @@ code {
   border-radius: 7px;
   background: var(--panel);
   color: var(--ink);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--shadow-float);
 }
 .ha:hover,
 .ha.on {
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 .card.selected .ha:not(.sel) {
   display: none;
@@ -981,6 +1127,49 @@ code {
   background: var(--panel);
   border-left: 1px solid var(--line);
   min-height: 0;
+  position: relative;
+}
+/* Left edge of the side panel: drag to resize, double-click to reset. A thin line
+   shows on hover and while dragging; no focus ring, just the same quiet line. */
+.panel-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+  z-index: 2;
+  cursor: col-resize;
+  touch-action: none;
+}
+.panel-resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: transparent;
+  transition: background-color 0.12s ease;
+}
+.panel-resizer:hover::after,
+.detail-panel.resizing .panel-resizer::after {
+  background: var(--accent);
+  transition-delay: 0.1s;
+}
+.detail-panel.resizing .panel-resizer::after {
+  transition-delay: 0s;
+}
+.panel-resizer:focus-visible {
+  outline: none;
+}
+.panel-resizer:focus-visible::after {
+  background: var(--muted);
+}
+/* While dragging: the col-resize cursor everywhere and no accidental text selection. */
+:root.col-resizing,
+:root.col-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 /* Centered and full-window modes: the same panel over the board */
 .peek-backdrop {
@@ -993,7 +1182,7 @@ code {
   animation: peek-fade 0.12s ease-out;
 }
 .peek-backdrop.mode-center {
-  background: rgba(20, 16, 12, 0.38);
+  background: var(--scrim);
   padding: 5vh 24px;
 }
 .detail-panel.mode-center {
@@ -1001,7 +1190,7 @@ code {
   max-height: 90vh;
   border: 1px solid var(--line);
   border-radius: 14px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--shadow-pop);
   overflow: hidden;
   animation: peek-rise 0.16s ease-out;
 }
@@ -1267,7 +1456,7 @@ code {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.45);
+  background: var(--scrim);
   display: grid;
   place-items: center;
   z-index: 10;
@@ -1675,4 +1864,60 @@ button.ov-title:hover {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+/* Topics made by hand: "+" in the sidebar, rename/delete from a row's menu */
+.side-row {
+  position: relative;
+}
+.side-row-more {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  transform: translateY(-50%);
+  opacity: 0;
+}
+.side-row:hover .side-row-more,
+.side-row.menu-open .side-row-more,
+.side-row-more:focus-visible {
+  opacity: 1;
+}
+.side-row:hover .side-item small,
+.side-row.menu-open .side-item small {
+  visibility: hidden;
+}
+.side-edit {
+  padding: 2px 6px 2px 10px;
+}
+.side-edit input {
+  padding: 3px 6px;
+  border-radius: 6px;
+}
+.topic-actions button.topic-actions-delete {
+  color: var(--danger);
+}
+.topic-actions button.topic-actions-delete .icon {
+  color: var(--danger);
+}
+.topic-actions-text {
+  margin: 4px 6px 10px;
+  line-height: 1.4;
+}
+.topic-actions-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.topic-actions .topic-actions-row button {
+  padding: 5px 10px;
+}
+.topic-actions .topic-actions-row button.danger {
+  border: 1px solid var(--danger);
+  color: var(--danger);
+}
+.topic-actions .topic-actions-row button.secondary {
+  border: 1px solid var(--line);
 }

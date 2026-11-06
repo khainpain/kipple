@@ -5,6 +5,7 @@ import { AI_MODELS, aiModelOf, builtinUsage, costEstimate } from "../lib/ai";
 import { getInstallId } from "../lib/secrets";
 import { setThemePref, THEME_ICONS, THEME_LABELS, THEME_PREFS, useThemePref } from "../lib/theme";
 import { Icon } from "./Icon";
+import { Select } from "./Select";
 import { AiConsentDialog } from "./AiConsent";
 import { LANGS, T, systemLang, type LangPref } from "../i18n";
 import { telegramErrorText } from "../lib/telegram";
@@ -65,17 +66,15 @@ export function SettingsDialog(props: {
           </div>
         </div>
 
-        <label>
-          {L.language}
-          <select value={s.language} onChange={(e) => setS({ ...s, language: e.target.value as LangPref })}>
-            <option value="auto">{L.languageAuto(systemName)}</option>
-            {LANGS.map((l) => (
-              <option key={l.key} value={l.key}>
-                {l.name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="field">
+          <span id="language-label">{L.language}</span>
+          <Select<LangPref>
+            labelledBy="language-label"
+            value={s.language}
+            options={[{ value: "auto", label: L.languageAuto(systemName) }, ...LANGS.map((l) => ({ value: l.key as LangPref, label: l.name }))]}
+            onChange={(v) => setS({ ...s, language: v })}
+          />
+        </div>
 
         <label className="check">
           <input
