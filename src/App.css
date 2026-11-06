@@ -903,10 +903,6 @@ code {
 .card.view-list .excerpt {
   -webkit-line-clamp: 1;
 }
-.card.view-list .hover-actions {
-  top: 50%;
-  transform: translateY(-50%);
-}
 
 /* Headlines: dense rows */
 .board-headlines {
