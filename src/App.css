@@ -441,37 +441,53 @@ code {
 }
 
 /* Toolbar */
+/* Three columns: the heading on the left, search in the middle, actions on the right.
+   The side columns share the free space equally, so the search stays centred and
+   doesn't move when the heading gets longer; the heading is cut with an ellipsis.
+   The search takes at most 38% of the width, so on a narrow board (wide card panel)
+   it shrinks before the heading disappears. The actions never shrink. */
 .toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, min(360px, 38%)) minmax(max-content, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px 6px 10px;
+}
+.toolbar-start,
+.toolbar-end {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 16px 6px 10px;
+  min-width: 0;
+}
+.toolbar-end {
+  justify-content: flex-end;
 }
 .heading {
   display: flex;
   align-items: baseline;
   gap: 10px;
   min-width: 0;
-  margin: 0 12px 0 4px;
+  margin-left: 4px;
 }
 .heading h1 {
   font-size: 20px;
   margin: 0;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 34vw;
 }
 .heading .count {
   color: var(--muted);
   white-space: nowrap;
+  flex-shrink: 0;
 }
 .search {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 0 1 360px;
-  min-width: 140px;
+  min-width: 0;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 9px;
@@ -482,6 +498,8 @@ code {
   border-color: var(--muted);
 }
 .search input {
+  flex: 1;
+  min-width: 0;
   border: 0;
   padding: 7px 0;
   background: transparent;
