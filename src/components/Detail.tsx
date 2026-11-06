@@ -5,13 +5,22 @@ import { ACTIONS, ACTION_LABELS } from "../lib/types";
 import { mediaUrl } from "../lib/importer";
 import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic } from "../lib/library";
 import { Icon } from "./Icon";
-import { coverOf, siteOf } from "./CardView";
+import { coverOf, displayTitle, siteOf } from "./CardView";
+import { Preview } from "./Preview";
+import { OPEN_MODES, type OpenMode } from "./nav";
 
-/** Right-hand panel with the full card: stays next to the board, arrow keys step through cards. */
+/**
+ * The full card. Opens the way the user picked: centered over the board (default),
+ * as a panel on the right next to the board, or over the whole window.
+ * Arrow keys step through cards in every mode.
+ */
 export function Detail(props: {
   lib: Library;
   card: Card;
   topics: string[];
+  mode: OpenMode;
+  onMode: (m: OpenMode) => void;
+  onNameImage?: () => void;
   onClose: () => void;
   onEdit: (patch: UserFields) => void;
   onPrev?: () => void;
@@ -40,8 +49,8 @@ export function Detail(props: {
     if (Object.keys(patch).length) props.onEdit(patch);
   }
 
-  return (
-    <aside className="detail-panel" aria-label="Карточка">
+  const panel = (
+    <aside className={`detail-panel mode-${props.mode}`} aria-label="Карточка" onClick={(e) => e.stopPropagation()}>
       <header className="detail-head">
         <button className="icon-btn" onClick={props.onPrev} disabled={!props.onPrev} title="Предыдущая (↑)">
           <Icon name="up" />
@@ -50,6 +59,18 @@ export function Detail(props: {
           <Icon name="down" />
         </button>
         <span className="spacer" />
+        <div className="segmented small" role="radiogroup" aria-label="Как открывать карточки">
+          {OPEN_MODES.map((m) => (
+            <button key={m.key} role="radio" aria-checked={props.mode === m.key} className={props.mode === m.key ? "on" : ""} onClick={() => props.onMode(m.key)} title={m.label}>
+              <Icon name={m.icon} size={15} />
+            </button>
+          ))}
+        </div>
+        {card.media?.path && card.kind !== "photo" && (
+          <button className="icon-btn" onClick={() => platform.openFile(lib.sourceDir, card.media!.path!)} title="Открыть файл в его приложении">
+            <Icon name="file" />
+          </button>
+        )}
         {card.urls[0] && (
           <button className="secondary small-btn" onClick={() => platform.openUrl(card.urls[0])}>
             <Icon name="external" size={14} /> Открыть
@@ -61,6 +82,7 @@ export function Detail(props: {
       </header>
 
       <div className="detail-scroll">
+        <div className="detail-body">
         {photos.length > 0 && (
           <div className="detail-photos">
             {photos.map((m) => (
@@ -71,14 +93,29 @@ export function Detail(props: {
         {cover && <img className="detail-cover" src={cover} alt="" onError={(e) => (e.currentTarget.style.display = "none")} />}
         {site && <div className="detail-site">{site}</div>}
 
-        <textarea className="detail-title" rows={1} value={title} placeholder="Заголовок" onChange={(e) => setTitle(e.target.value)} onBlur={saveText} />
-        {card.ai?.summary && <p className="detail-summary">{card.ai.summary}</p>}
+        <Preview lib={lib} card={card} />
 
-        {card.media?.path && card.kind !== "photo" && (
-          <button className="secondary" onClick={() => platform.openFile(lib.sourceDir, card.media!.path!)}>
-            <Icon name="file" size={14} /> Открыть файл {card.media.fileName ?? ""}
-          </button>
+        <textarea
+          className="detail-title"
+          rows={1}
+          value={title}
+          placeholder={displayTitle({ ...card, user: { ...card.user, title: undefined } }) || "Заголовок"}
+          title="Название можно поправить"
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={saveText}
+          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), e.currentTarget.blur())}
+        />
+        {(!title || props.onNameImage) && card.kind === "photo" && (
+          <div className="title-help">
+            {!title && <span>{card.context ? "Название из соседнего сообщения." : "У картинки нет подписи."} Можно вписать своё.</span>}
+            {props.onNameImage && !card.user?.title && (
+              <button className="link-btn" onClick={props.onNameImage} title="Уменьшенная копия этой картинки уйдёт в Anthropic">
+                <Icon name="sparkle" size={13} /> {card.ai ? "Переназвать по картинке" : "Назвать по картинке (AI)"}
+              </button>
+            )}
+          </div>
         )}
+        {card.ai?.summary && <p className="detail-summary">{card.ai.summary}</p>}
 
         <div className="field">
           <span>Статус</span>
@@ -134,7 +171,15 @@ export function Detail(props: {
         <button className="link-btn" onClick={() => props.onEdit({ hidden: !card.user?.hidden })}>
           {card.user?.hidden ? "Показать в ленте" : "Скрыть из ленты"}
         </button>
+        </div>
       </div>
     </aside>
+  );
+
+  if (props.mode === "side") return panel;
+  return (
+    <div className={`peek-backdrop mode-${props.mode}`} onClick={props.onClose}>
+      {panel}
+    </div>
   );
 }

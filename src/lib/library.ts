@@ -22,6 +22,7 @@ export function mergeImport(prev: Library | null, next: Omit<Library, "version">
   });
   for (const o of prev?.cards ?? []) if (!seen.has(o.id)) cards.push({ ...o, removed: true });
   cards.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.id - a.id));
+  annotateContext(cards);
   return { version: 1, ...next, cards };
 }
 
@@ -91,4 +92,47 @@ export function matchesFilter(c: Card, f: FilterKey): boolean {
 
 export function makeEdit(id: number, patch: UserFields): EditEvent {
   return { t: new Date().toISOString(), id, patch };
+}
+
+const CONTEXT_WINDOW_MS = 3 * 60 * 1000;
+const BATCH_MS = 10 * 1000;
+const MEDIA_KINDS = new Set(["photo", "video", "animation", "document", "audio", "video_note"]);
+
+function firstLine(c: Card): string | undefined {
+  const t = c.user?.title || c.ai?.title || c.link?.title || c.text.split("\n").find((l) => l.trim());
+  return t?.trim().slice(0, 100) || undefined;
+}
+
+/**
+ * A caption often arrives as a separate message right before or after the photo.
+ * For media without text, remember the text of the nearest such message (within a
+ * few minutes) so the card has a name before, or instead of, any AI.
+ */
+export function annotateContext(cards: Card[]) {
+  const sorted = [...cards].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id - b.id));
+  const time = sorted.map((c) => Date.parse(c.date));
+  const hasText = (c: Card) => !c.sensitive && !c.removed && !MEDIA_KINDS.has(c.kind) && !!firstLine(c);
+  sorted.forEach((c, i) => {
+    c.context = undefined;
+    if (!MEDIA_KINDS.has(c.kind) || c.text.trim()) return;
+    let best: { d: number; t: string } | undefined;
+    for (const dir of [1, -1]) {
+      for (let j = i + dir; j >= 0 && j < sorted.length; j += dir) {
+        const d = Math.abs(time[j] - time[i]);
+        if (d > CONTEXT_WINDOW_MS) break;
+        const n = sorted[j];
+        if (n.text.trim() && MEDIA_KINDS.has(n.kind)) {
+          // Another captioned photo sent in the same batch: its caption fits this one too.
+          if (n.kind === c.kind && d <= BATCH_MS && !n.sensitive && (!best || d < best.d)) best = { d, t: n.text.split("\n").find((l) => l.trim())!.trim().slice(0, 100) };
+          break;
+        }
+        if (hasText(n)) {
+          // Prefer the message after the photo on a tie: people usually send the picture first.
+          if (!best || d < best.d || (d === best.d && dir === 1)) best = { d, t: firstLine(n)! };
+          break;
+        }
+      }
+    }
+    c.context = best?.t;
+  });
 }
