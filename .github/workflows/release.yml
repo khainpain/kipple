@@ -30,7 +30,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
+          workspaces: |
+            src-tauri
+            setup-app/src-tauri
       - run: npm ci
       - run: npm test
       - name: Set version
@@ -58,10 +60,18 @@ jobs:
           releaseName: Kipple v__VERSION__
           releaseBody: |
             Сборка из ${{ github.ref_name }} @ ${{ github.sha }}.
-            Уже установленное приложение предложит обновиться само. Для первой установки скачай `Kipple_${{ env.VERSION }}_x64-setup.exe` ниже.
+            Уже установленное приложение предложит обновиться само. Для первой установки скачай `Install-Kipple-${{ env.VERSION }}.exe` ниже (если он не запускается, есть классический `Kipple_${{ env.VERSION }}_x64-setup.exe`).
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
           # The generic "windows-x86_64" entry in latest.json points to the NSIS setup.exe,
           # not the MSI: a per-user NSIS install updates silently without admin rights.
           updaterJsonPreferNsis: true
+      # The branded installer for first installs. Updates keep using the NSIS setup.exe above (latest.json).
+      - name: Build and attach Kipple Setup
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          setup-app/build.sh
+          gh release upload "v$VERSION" "Install-Kipple-$VERSION.exe" --clobber
