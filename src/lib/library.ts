@@ -51,7 +51,7 @@ export function effectiveTitle(c: Card): string {
   return c.user?.title ?? c.ai?.title ?? c.link?.title ?? "";
 }
 
-export type FilterKey = "all" | "links" | "photos" | "videos" | "docs" | "ideas" | "read_later" | "junk" | "sensitive";
+export type FilterKey = "all" | "links" | "photos" | "videos" | "docs" | "ideas" | "reference" | "read_later" | "junk" | "sensitive";
 
 export function matchesFilter(c: Card, f: FilterKey): boolean {
   const action = effectiveAction(c);
@@ -71,6 +71,8 @@ export function matchesFilter(c: Card, f: FilterKey): boolean {
       return c.kind === "document" || c.kind === "audio" || c.kind === "voice";
     case "ideas":
       return action === "idea";
+    case "reference":
+      return action === "reference";
     case "read_later":
       return action === "read_later";
     case "sensitive":

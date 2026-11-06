@@ -169,6 +169,7 @@ export const en: Dict = {
     all: "All cards",
     readLater: "Read later",
     ideas: "Ideas",
+    reference: "Reference",
     todo: "To do",
     junk: "Junk",
     sensitive: "Sensitive",
