@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { platform } from "@platform";
-import type { Action, Card, Library, UserFields } from "../lib/types";
-import { ACTIONS, actionLabel } from "../lib/types";
+import type { Card, Library, UserFields } from "../lib/types";
 import { T, locale } from "../i18n";
 import { mediaUrl } from "../lib/importer";
 import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic } from "../lib/library";
@@ -11,6 +10,10 @@ import { Preview } from "./Preview";
 import { isImportant } from "../lib/smart";
 import { OPEN_MODES, PANEL_WIDTH, clampPanelWidth, hueOf, loadPanelWidth, savePref, type OpenMode } from "./nav";
 import { TopicMenu } from "./TopicMenu";
+import { NoteField, PropRow, StatusChip, TagsEditor } from "./CardProps";
+
+/** Messages up to this long (and without media or links) are shown as the card's heading. */
+const SHORT_TEXT = 140;
 
 /**
  * The full card. Opens the way the user picked: centered over the board (default),
@@ -37,22 +40,21 @@ export function Detail(props: {
   const [title, setTitle] = useState(effectiveTitle(card));
   const [topic, setTopic] = useState(effectiveTopic(card) ?? "");
   const [topicAt, setTopicAt] = useState<HTMLElement | null>(null);
-  const [tags, setTags] = useState(effectiveTags(card).join(", "));
+  const [tags, setTags] = useState(effectiveTags(card));
   const [note, setNote] = useState(card.user?.note ?? "");
   const action = effectiveAction(card);
   const photos = card.kind === "photo" ? [card.media, ...(card.album ?? [])].filter((m) => m?.path) : [];
   const cover = card.kind !== "photo" ? coverOf(lib, card).src : undefined;
   const site = siteOf(card);
+  // A one-liner like "Important, safety": the message itself is the heading, and the AI
+  // title and summary (often longer than the message) step back.
+  const text = card.text?.trim() ?? "";
+  const short = !!text && text.length <= SHORT_TEXT && !text.includes("\n\n") && !photos.length && !cover && !card.media?.path && !card.urls.length;
 
   function saveText() {
     const patch: UserFields = {};
     if (title !== effectiveTitle(card)) patch.title = title.trim();
     if (topic !== (effectiveTopic(card) ?? "")) patch.topic = topic.trim();
-    const t = tags
-      .split(",")
-      .map((x) => x.trim().replace(/^#/, "").toLowerCase())
-      .filter(Boolean);
-    if (t.join(",") !== effectiveTags(card).join(",")) patch.tags = t;
     if (note !== (card.user?.note ?? "")) patch.note = note;
     if (Object.keys(patch).length) props.onEdit(patch);
   }
@@ -199,77 +201,94 @@ export function Detail(props: {
 
         <Preview lib={lib} card={card} />
 
-        <textarea
-          className="detail-title"
-          rows={1}
-          value={title}
-          placeholder={displayTitle({ ...card, user: { ...card.user, title: undefined } }) || T.detail.titlePlaceholder}
-          title={T.detail.titleEditable}
-          onChange={(e) => setTitle(e.target.value)}
-          onBlur={saveText}
-          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), e.currentTarget.blur())}
-        />
-        {(!title || props.onNameImage) && card.kind === "photo" && (
-          <div className="title-help">
-            {!title && <span>{card.context ? T.detail.titleFromContext : T.detail.noCaption} {T.detail.writeOwn}</span>}
-            {props.onNameImage && !card.user?.title && (
-              <button className="link-btn" onClick={props.onNameImage} title={T.detail.nameImageHint}>
-                <Icon name="sparkle" size={13} /> {card.ai ? T.detail.renameImage : T.detail.nameImage}
-              </button>
+        {short ? (
+          <>
+            <p className="detail-lead">{text}</p>
+            <label className="detail-cardname">
+              <span>{T.detail.cardName}</span>
+              <input
+                value={title}
+                placeholder={displayTitle({ ...card, user: { ...card.user, title: undefined } }) || T.detail.titlePlaceholder}
+                title={T.detail.titleEditable}
+                onChange={(e) => setTitle(e.target.value)}
+                onBlur={saveText}
+                onKeyDown={(e) => (e.stopPropagation(), e.key === "Enter" && (e.preventDefault(), e.currentTarget.blur()))}
+              />
+            </label>
+          </>
+        ) : (
+          <>
+            <textarea
+              className="detail-title"
+              rows={1}
+              value={title}
+              placeholder={displayTitle({ ...card, user: { ...card.user, title: undefined } }) || T.detail.titlePlaceholder}
+              title={T.detail.titleEditable}
+              onChange={(e) => setTitle(e.target.value)}
+              onBlur={saveText}
+              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), e.currentTarget.blur())}
+            />
+            {(!title || props.onNameImage) && card.kind === "photo" && (
+              <div className="title-help">
+                {!title && <span>{card.context ? T.detail.titleFromContext : T.detail.noCaption} {T.detail.writeOwn}</span>}
+                {props.onNameImage && !card.user?.title && (
+                  <button className="link-btn" onClick={props.onNameImage} title={T.detail.nameImageHint}>
+                    <Icon name="sparkle" size={13} /> {card.ai ? T.detail.renameImage : T.detail.nameImage}
+                  </button>
+                )}
+              </div>
             )}
-          </div>
+            {card.ai?.summary && <p className="detail-summary">{card.ai.summary}</p>}
+          </>
         )}
-        {card.ai?.summary && <p className="detail-summary">{card.ai.summary}</p>}
 
-        <div className="field">
-          <span>{T.detail.status}</span>
-          <div className="actions">
-            {ACTIONS.map((a: Action) => (
-              <button key={a} className={`pill action-${a}${action === a ? " on" : ""}`} onClick={() => props.onEdit({ action: a })}>
-                {actionLabel(a)}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="field">
-          <span id="detail-topic-label">{T.detail.topic}</span>
-          <button
-            type="button"
-            className={`select-btn${topicAt ? " open" : ""}`}
-            aria-haspopup="listbox"
-            aria-expanded={!!topicAt}
-            aria-labelledby="detail-topic-label"
-            onClick={(e) => setTopicAt(topicAt ? null : e.currentTarget)}
-          >
-            {topic ? <span className="topic-dot" style={{ "--h": hueOf(topic) } as React.CSSProperties} /> : null}
-            <span className={`label${topic ? "" : " placeholder"}`}>{topic || T.nav.noTopic}</span>
-            <Icon name="down" size={12} className="chev" />
-          </button>
-          {topicAt && (
-            <TopicMenu
-              anchor={topicAt}
-              matchAnchor
-              topics={props.topics}
-              current={topic || undefined}
-              onPick={(t) => {
-                setTopic(t);
-                if (t !== (effectiveTopic(card) ?? "")) props.onEdit({ topic: t });
-              }}
-              onClose={() => {
-                setTopicAt(null);
-                topicAt.focus();
+        <div className="props">
+          <PropRow icon="flag" label={T.detail.status} id="detail-status-label">
+            <StatusChip value={action} labelledBy="detail-status-label" onChange={(a) => props.onEdit({ action: a })} />
+          </PropRow>
+          <PropRow icon="folder" label={T.detail.topic} id="detail-topic-label">
+            <button
+              type="button"
+              className={`prop-btn${topicAt ? " open" : ""}`}
+              aria-haspopup="listbox"
+              aria-expanded={!!topicAt}
+              aria-labelledby="detail-topic-label"
+              onClick={(e) => setTopicAt(topicAt ? null : e.currentTarget)}
+            >
+              {topic ? <span className="topic-dot" style={{ "--h": hueOf(topic) } as React.CSSProperties} /> : null}
+              <span className={topic ? "" : "placeholder"}>{topic || T.nav.noTopic}</span>
+              <Icon name="down" size={11} className="chev" />
+            </button>
+            {topicAt && (
+              <TopicMenu
+                anchor={topicAt}
+                matchAnchor
+                topics={props.topics}
+                current={topic || undefined}
+                onPick={(t) => {
+                  setTopic(t);
+                  if (t !== (effectiveTopic(card) ?? "")) props.onEdit({ topic: t });
+                }}
+                onClose={() => {
+                  setTopicAt(null);
+                  topicAt.focus();
+                }}
+              />
+            )}
+          </PropRow>
+          <PropRow icon="hash" label={T.detail.tagsShort}>
+            <TagsEditor
+              tags={tags}
+              onChange={(t) => {
+                setTags(t);
+                props.onEdit({ tags: t });
               }}
             />
-          )}
+          </PropRow>
+          <PropRow icon="text" label={T.detail.note} id="detail-note-label">
+            <NoteField value={note} labelledBy="detail-note-label" onChange={setNote} onSave={saveText} />
+          </PropRow>
         </div>
-        <label className="field">
-          <span>{T.detail.tags}</span>
-          <input value={tags} onChange={(e) => setTags(e.target.value)} onBlur={saveText} />
-        </label>
-        <label className="field">
-          <span>{T.detail.note}</span>
-          <textarea rows={2} value={note} placeholder={T.detail.notePlaceholder} onChange={(e) => setNote(e.target.value)} onBlur={saveText} />
-        </label>
 
         {card.urls.length > 0 && (
           <div className="field">
@@ -283,25 +302,24 @@ export function Detail(props: {
             </div>
           </div>
         )}
-        <div className="field">
-          <span>{T.detail.message}</span>
-          <pre className="orig-full">{card.text || T.detail.noText}</pre>
+        {!short && text && <pre className="orig-full" aria-label={T.detail.message}>{card.text}</pre>}
+        <div className="detail-foot">
+          <span className="meta">
+            {[
+              new Date(card.date).toLocaleString(locale(), { dateStyle: "medium", timeStyle: "short" }),
+              T.detail.messageId(card.id),
+              card.forwardedFrom && T.detail.from(card.forwardedFrom),
+              card.ai && T.detail.taggedBy(card.ai.model),
+              card.sensitive && T.detail.notSentToAi,
+              card.removed && T.detail.removed,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </span>
+          <button className="link-btn" onClick={() => props.onEdit({ hidden: !card.user?.hidden })}>
+            {card.user?.hidden ? T.detail.show : T.detail.hide}
+          </button>
         </div>
-        <div className="meta">
-          {[
-            new Date(card.date).toLocaleString(locale()),
-            T.detail.messageId(card.id),
-            card.forwardedFrom && T.detail.from(card.forwardedFrom),
-            card.ai && T.detail.taggedBy(card.ai.model),
-            card.sensitive && T.detail.notSentToAi,
-            card.removed && T.detail.removed,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        </div>
-        <button className="link-btn" onClick={() => props.onEdit({ hidden: !card.user?.hidden })}>
-          {card.user?.hidden ? T.detail.show : T.detail.hide}
-        </button>
         </div>
       </div>
     </aside>
