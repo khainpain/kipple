@@ -1321,7 +1321,9 @@ code {
   color: var(--ink);
 }
 .banner.update {
-  background: var(--panel);
+  background: var(--accent-soft);
+  border-bottom-color: var(--accent);
+  color: var(--ink);
   font-weight: 500;
 }
 .welcome .banner {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { platform } from "@platform";
-import type { AvailableUpdate } from "./platform/types";
+import { useUpdateCheck } from "./useUpdateCheck";
 import "./App.css";
 import type { Card, Library, UserFields } from "./lib/types";
 import { makeEdit } from "./lib/library";
@@ -32,8 +32,10 @@ export default function App() {
   const [job, setJob] = useState<Job>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [version, setVersion] = useState("");
-  const [update, setUpdate] = useState<AvailableUpdate | null>(null);
   const [updating, setUpdating] = useState<number | null | false>(false);
+  const updatingRef = useRef(updating);
+  updatingRef.current = updating;
+  const { update, later: updateLater } = useUpdateCheck(() => updatingRef.current !== false);
   const abortRef = useRef<AbortController | null>(null);
 
   const notify = useCallback((msg: string) => {
@@ -68,8 +70,6 @@ export default function App() {
 
   useEffect(() => {
     platform.appVersion().then(setVersion, () => undefined);
-    // Desktop only: a new release on GitHub shows a banner; installing it restarts the app.
-    platform.checkUpdate().then(setUpdate, (e) => console.warn("update check failed", e));
   }, []);
 
   async function installUpdate() {
@@ -325,7 +325,7 @@ export default function App() {
               <button className="small" onClick={installUpdate}>
                 {T.app.updateInstall}
               </button>
-              <button className="secondary small" onClick={() => setUpdate(null)}>
+              <button className="secondary small" onClick={updateLater}>
                 {T.app.updateLater}
               </button>
             </>
