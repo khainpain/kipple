@@ -27,8 +27,8 @@ export const TYPES: Array<{ key: TypeKey; label: string; icon: string }> = [
 ];
 
 export const VIEWS: Array<{ key: ViewKey; label: string; icon: string }> = [
-  { key: "masonry", label: "Плитка", icon: "masonry" },
   { key: "grid", label: "Сетка", icon: "grid" },
+  { key: "masonry", label: "Плитка", icon: "masonry" },
   { key: "list", label: "Список", icon: "list" },
   { key: "headlines", label: "Заголовки", icon: "rows" },
 ];

@@ -49,7 +49,8 @@ export function Workspace(props: {
   const [tag, setTag] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>(() => loadPref("sort", SORTS.map((s) => s.key), "new"));
-  const [view, setView] = useState<ViewKey>(() => loadPref("view", ["masonry", "grid", "list", "headlines"] as const, "masonry"));
+  // Default is the even grid (all cards the same size); a new pref key so earlier saved "masonry" doesn't stick.
+  const [view, setView] = useState<ViewKey>(() => loadPref("layout", ["masonry", "grid", "list", "headlines"] as const, "grid"));
   const [sideOpen, setSideOpen] = useState(() => loadPref("sidebar", ["open", "closed"] as const, "open") === "open");
   const [openId, setOpenId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -58,7 +59,7 @@ export function Workspace(props: {
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => savePref("sort", sort), [sort]);
-  useEffect(() => savePref("view", view), [view]);
+  useEffect(() => savePref("layout", view), [view]);
   useEffect(() => savePref("sidebar", sideOpen ? "open" : "closed"), [sideOpen]);
 
   const index = useMemo(() => buildIndex(lib.cards), [lib, rev]); // eslint-disable-line react-hooks/exhaustive-deps
