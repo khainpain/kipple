@@ -8,6 +8,7 @@
 import { readFile, writeFile, mkdir, cp } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { en, ru } from "./copy.mjs";
+import { changelog } from "./changelog.mjs";
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const OUT = here("../dist/");
@@ -48,6 +49,7 @@ const ICON = {
   doc: '<svg viewBox="0 0 24 24" aria-hidden="true" class="line"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>',
   link: '<svg viewBox="0 0 24 24" aria-hidden="true" class="line"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>',
   globe: '<svg viewBox="0 0 24 24" aria-hidden="true" class="line"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>',
+  x: '<svg viewBox="0 0 24 24" aria-hidden="true" class="line"><path d="M6 6l12 12M18 6 6 18"/></svg>',
   dl: '<svg viewBox="0 0 24 24" aria-hidden="true" class="line"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14"/></svg>',
 };
 
@@ -84,6 +86,25 @@ function stage(c) {
       <div class="junk note" data-pile="52 76 -8">asdf</div>
       ${mascot("kip", 160, true)}
     </div>`;
+}
+
+/** "What's new": a pill in the corner that opens into a small card. A <details>, so it works without script. */
+function news(c, rel) {
+  const date = (d) => new Date(d + "T12:00:00Z").toLocaleDateString(c.lang === "ru" ? "ru-RU" : "en-GB", { day: "numeric", month: "long" });
+  const entries = changelog
+    .map((e, n) => {
+      const head = e.ver === "next" ? `<b>${esc(c.news.next)}</b>` : `<b>v${esc(e.ver)}</b><time datetime="${e.date}">${esc(date(e.date))}</time>`;
+      return `<li class="rel${e.ver === "next" ? " soon" : ""}" style="--n:${n}"><div class="rel-head">${head}</div><ul>${e[c.lang].map((x) => `<li>${esc(x)}</li>`).join("")}</ul></li>`;
+    })
+    .join("");
+  return `<details class="news" data-ver="${esc(rel.ver)}">
+  <summary><span class="dot" aria-hidden="true"></span>${esc(c.news.title)}<span class="ver">v${esc(rel.ver)}</span></summary>
+  <div class="news-card" role="region" aria-label="${esc(c.news.title)}">
+    <div class="news-top"><h2>${esc(c.news.title)}</h2><button type="button" class="news-x" aria-label="${esc(c.news.close)}">${ICON.x}</button></div>
+    <ol class="rels">${entries}</ol>
+    <a class="news-all" href="${LINKS.releases}">${esc(c.news.all)}</a>
+  </div>
+</details>`;
 }
 
 function page(c, other, rel, css, js) {
@@ -223,6 +244,7 @@ ${c.footer.links.map(([n, l]) => `    <a href="${LINKS[l]}">${t(n)}</a>`).join("
   </nav>
   <p>${t(c.footer.note)}</p>
 </footer>
+${news(c, rel)}
 <script>${js}</script>
 </body>
 </html>
