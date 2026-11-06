@@ -167,7 +167,7 @@ h1 { font-size: clamp(40px, 7vw, 76px); letter-spacing: -0.035em; font-weight: 7
 .shot { position: relative; display: block; border-radius: 18px; }
 .shot img { width: 100%; border-radius: 18px; border: 1px solid var(--line); box-shadow: var(--shadow-pop); background: var(--panel); transition: transform 300ms var(--ease); }
 .shot:hover img { transform: translateY(-4px); }
-.shot .over { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.35); }
+.shot .over { position: absolute; inset: 0; width: fit-content; height: fit-content; margin: auto; box-shadow: 0 12px 30px -8px rgba(0, 0, 0, 0.35); }
 .shot:hover .over { background: var(--accent-ink); }
 .badges { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 28px; }
 .badges li { padding: 8px 14px; border-radius: 999px; background: var(--side); font-size: 15px; }
