@@ -1,4 +1,4 @@
-// «Отправить в Telegram»: lays the sorted library out in a private group with topics.
+// "Send to Telegram": lays the sorted library out in a private group with topics.
 // Each card's original message is forwarded from Saved Messages into the topic of its
 // theme, followed by a short reply with the title, summary and hashtags.
 //
@@ -7,12 +7,22 @@
 // continues where it left off and later runs only send new saves.
 import type { TelegramApi } from "../platform/types";
 import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic } from "./library";
-import { ACTION_LABELS, type Card } from "./types";
+import { actionLabel, type Card } from "./types";
+import { T, compareText } from "../i18n";
+import { en } from "../i18n/en";
+import { ru } from "../i18n/ru";
 
 export const BOARD_TITLE = "Saved Board";
-export const BOARD_ABOUT = "Разобранное «Избранное»: темы, описания и теги из Saved Board.";
-export const OTHER_TOPIC = "Разное";
-/** More themes than this and the smallest ones go to «Разное», so the topic list stays usable. */
+export const boardAbout = () => T.telegram.boardAbout(BOARD_TITLE);
+/**
+ * The catch-all topic. Once a group has one, it is reused whatever the interface language
+ * is now, so switching languages doesn't split it in two.
+ */
+export function otherTopic(state?: BoardState): string {
+  for (const t of [ru.telegram.otherTopic, en.telegram.otherTopic]) if (state && t in state.topics) return t;
+  return T.telegram.otherTopic;
+}
+/** More themes than this and the smallest ones go to the catch-all topic, so the topic list stays usable. */
 export const MAX_TOPICS = 40;
 // Telegram only accepts these topic icon colours.
 const TOPIC_COLORS = [0x6fb9f0, 0xffd67e, 0xcb86db, 0x8eee98, 0xff93b2, 0xfb6f5f];
@@ -58,7 +68,7 @@ export function eligible(c: Card, opts: SendOptions): boolean {
   return true;
 }
 
-/** "Прочитать позже" → "#прочитать_позже"; null when nothing usable is left. */
+/** "Read later" → "#read_later"; null when nothing usable is left. */
 export function hashtag(s: string): string | null {
   const t = s
     .toLowerCase()
@@ -83,12 +93,12 @@ export function noteFor(c: Card): { note: string; boldLen: number } {
   }
   const action = effectiveAction(c);
   if (action) {
-    const h = hashtag(ACTION_LABELS[action]);
+    const h = hashtag(actionLabel(action));
     if (h) tags.add(h);
   }
   const parts: string[] = [];
   if (summary && summary !== title) parts.push(summary);
-  if (c.user?.note?.trim()) parts.push(`Заметка: ${c.user.note.trim()}`);
+  if (c.user?.note?.trim()) parts.push(`${T.telegram.noteLabel}: ${c.user.note.trim()}`);
   if (tags.size) parts.push([...tags].join(" "));
   if (!title && !parts.length) return { note: "", boldLen: 0 };
   const note = (title ? [title, ...parts] : parts).join("\n");
@@ -103,7 +113,7 @@ export function chooseTopics(cards: Card[], state: BoardState, max = MAX_TOPICS)
     if (t) counts.set(t, (counts.get(t) ?? 0) + 1);
   }
   const keep = new Set(Object.keys(state.topics));
-  for (const [t] of [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ru"))) {
+  for (const [t] of [...counts.entries()].sort((a, b) => b[1] - a[1] || compareText(a[0], b[0]))) {
     if (keep.size >= max) break;
     keep.add(t);
   }
@@ -120,6 +130,7 @@ export function buildPlan(cards: Card[], state: BoardState, opts: SendOptions): 
   const pool = cards.filter((c) => eligible(c, opts));
   const topics = chooseTopics(pool, state);
   const missing = new Set(state.missing);
+  const other = otherTopic(state);
   return pool
     .filter((c) => !(String(c.id) in state.sent) && !missing.has(c.id))
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id - b.id))
@@ -128,7 +139,7 @@ export function buildPlan(cards: Card[], state: BoardState, opts: SendOptions): 
       return {
         cardId: c.id,
         msgIds: [c.id, ...(c.albumIds ?? [])],
-        topic: t && topics.has(t) ? t : OTHER_TOPIC,
+        topic: t && topics.has(t) ? t : other,
         ...noteFor(c),
       };
     });
@@ -200,7 +211,7 @@ export async function sendToTelegram(cards: Card[], state: BoardState, opts: Sen
     }
   }
 
-  const board = await call(() => tg.ensureBoard(state.board ?? null, BOARD_TITLE, BOARD_ABOUT));
+  const board = await call(() => tg.ensureBoard(state.board ?? null, BOARD_TITLE, boardAbout()));
   if (board.created || !state.board) {
     // A new group (first run, or the old one was deleted): everything goes again.
     Object.assign(state, emptyBoardState(), { board: { channelId: board.channelId, accessHash: board.accessHash, createdAt: new Date().toISOString() } });
@@ -262,24 +273,22 @@ export async function sendToTelegram(cards: Card[], state: BoardState, opts: Sen
 /** Human text for errors from the Telegram commands. */
 export function telegramErrorText(e: unknown): string {
   const msg = String(e instanceof Error ? e.message : e);
+  const L = T.telegram;
   const flood = /^FLOOD_WAIT:(\d+)/.exec(msg);
-  if (flood) {
-    const s = Number(flood[1]);
-    return `Telegram просит подождать ${s >= 120 ? `${Math.ceil(s / 60)} мин` : `${s} с`} и попробовать снова.`;
-  }
+  if (flood) return L.errFlood(Number(flood[1]));
   const known: Array<[RegExp, string]> = [
-    [/^NO_API$/, "Сначала введи api_id и api_hash."],
-    [/^API_INVALID$|API_ID_INVALID|API_ID_PUBLISHED_FLOOD/, "api_id или api_hash не подходят. Проверь их на my.telegram.org."],
-    [/PHONE_NUMBER_INVALID/, "Telegram не узнал номер. Введи его в международном формате, например +7 999 123-45-67."],
-    [/PHONE_NUMBER_BANNED/, "Этот номер заблокирован в Telegram."],
-    [/PHONE_CODE_INVALID/, "Код не подошёл, проверь и введи ещё раз."],
-    [/PHONE_CODE_EXPIRED/, "Код устарел. Запроси новый."],
-    [/PHONE_CODE_EMPTY|NO_CODE_REQUESTED/, "Сначала запроси код."],
-    [/PASSWORD_HASH_INVALID/, "Пароль не подошёл."],
-    [/SIGN_UP_REQUIRED/, "На этот номер нет аккаунта Telegram."],
-    [/AUTH_KEY|SESSION_REVOKED/, "Сеанс Telegram закончился. Войди ещё раз."],
-    [/CHANNELS_TOO_MUCH/, "В аккаунте слишком много групп и каналов, Telegram не даёт создать ещё одну."],
+    [/^NO_API$/, L.errNoApi],
+    [/^API_INVALID$|API_ID_INVALID|API_ID_PUBLISHED_FLOOD/, L.errApiInvalid],
+    [/PHONE_NUMBER_INVALID/, L.errPhoneInvalid],
+    [/PHONE_NUMBER_BANNED/, L.errPhoneBanned],
+    [/PHONE_CODE_INVALID/, L.errCodeInvalid],
+    [/PHONE_CODE_EXPIRED/, L.errCodeExpired],
+    [/PHONE_CODE_EMPTY|NO_CODE_REQUESTED/, L.errNoCode],
+    [/PASSWORD_HASH_INVALID/, L.errPassword],
+    [/SIGN_UP_REQUIRED/, L.errSignUp],
+    [/AUTH_KEY|SESSION_REVOKED/, L.errSession],
+    [/CHANNELS_TOO_MUCH/, L.errTooMany],
   ];
   for (const [re, text] of known) if (re.test(msg)) return text;
-  return `Ошибка Telegram: ${msg}`;
+  return L.errOther(msg);
 }

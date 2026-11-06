@@ -3,15 +3,16 @@
 // mirrored to the desktop window's title bar.
 import { useSyncExternalStore } from "react";
 import { platform } from "@platform";
+import { T } from "../i18n";
 
 export type ThemePref = "system" | "light" | "dark";
 export const THEME_PREFS: ThemePref[] = ["system", "light", "dark"];
 
-// UI strings in one place so the localization work can pick them up.
+// Getters so a language switch shows up on the next render.
 export const THEME_LABELS: Record<ThemePref, string> = {
-  system: "Как в системе",
-  light: "Светлая",
-  dark: "Тёмная",
+  get system() { return T.theme.system; },
+  get light() { return T.theme.light; },
+  get dark() { return T.theme.dark; },
 };
 export const THEME_ICONS: Record<ThemePref, string> = { system: "monitor", light: "sun", dark: "moon" };
 

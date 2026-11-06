@@ -1,3 +1,5 @@
+import { T } from "../i18n";
+
 export type CardKind =
   | "link"
   | "photo"
@@ -16,13 +18,10 @@ export type CardKind =
 export const ACTIONS = ["read_later", "idea", "reference", "todo", "junk"] as const;
 export type Action = (typeof ACTIONS)[number];
 
-export const ACTION_LABELS: Record<Action, string> = {
-  read_later: "Прочитать позже",
-  idea: "Идея",
-  reference: "Справка",
-  todo: "Сделать",
-  junk: "Мусор",
-};
+/** Status name in the interface language. */
+export function actionLabel(a: Action): string {
+  return T.actions[a];
+}
 
 export interface MediaRef {
   /** Path relative to the export folder; undefined when the file was not exported. */
@@ -59,6 +58,8 @@ export interface AiFields {
   priority: 1 | 2 | 3;
   model: string;
   at: string;
+  /** Language the AI wrote in ("ru", "en", or "source" for each message's own); missing on cards tagged before this was recorded. */
+  lang?: string;
 }
 
 export interface UserFields {

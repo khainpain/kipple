@@ -4,6 +4,7 @@ import type { Card, Library, MediaRef } from "../lib/types";
 import { mediaUrl } from "../lib/importer";
 import { Icon } from "./Icon";
 import { formatDuration, formatSize } from "./CardView";
+import { T } from "../i18n";
 
 const IMAGE = ["jpg", "jpeg", "png", "gif", "webp", "avif", "bmp", "svg"];
 const VIDEO = ["mp4", "webm", "mov", "m4v"];
@@ -70,11 +71,11 @@ function TextView({ blob }: { blob: Blob }) {
       alive = false;
     };
   }, [blob]);
-  if (text === null) return <div className="preview-note">Читаю файл…</div>;
+  if (text === null) return <div className="preview-note">{T.preview.reading}</div>;
   return (
     <pre className="preview-text">
       {text}
-      {blob.size > TEXT_LIMIT && <span className="preview-cut">{"\n"}… показано начало файла</span>}
+      {blob.size > TEXT_LIMIT && <span className="preview-cut">{"\n"}{T.preview.cut}</span>}
     </pre>
   );
 }
@@ -95,21 +96,21 @@ export function Preview({ lib, card }: { lib: Library; card: Card }) {
     <div className="preview-file">
       <Icon name={kind === "audio" ? "music" : kind === "video" ? "video" : "file"} size={22} />
       <div className="preview-file-text">
-        <b>{m.fileName ?? (kind === "audio" ? "Аудио" : kind === "video" ? "Видео" : "Файл")}</b>
+        <b>{m.fileName ?? (kind === "audio" ? T.card.kindAudio : kind === "video" ? T.card.kindVideo : T.card.kindFile)}</b>
         <small>{[formatSize(m.size), hint].filter(Boolean).join(" · ")}</small>
       </div>
       {m.path && (
         <button className="secondary small-btn" onClick={open}>
-          <Icon name="external" size={14} /> Открыть
+          <Icon name="external" size={14} /> {T.common.open}
         </button>
       )}
     </div>
   );
 
   if (m.missing || !m.path) {
-    return fileRow("файла нет в экспорте: в Telegram Desktop отметь при экспорте нужные типы файлов и подними лимит размера");
+    return fileRow(T.preview.notExported);
   }
-  if (failed || error) return fileRow("не получилось показать здесь, открой в своём приложении");
+  if (failed || error) return fileRow(T.preview.cannotShow);
 
   switch (kind) {
     case "image":
@@ -141,7 +142,7 @@ export function Preview({ lib, card }: { lib: Library; card: Card }) {
       return (
         <figure className="preview">
           <audio className="preview-audio" src={src} controls preload="metadata" onError={() => setFailed(true)} />
-          <figcaption>{meta || (card.kind === "voice" ? "Голосовое сообщение" : "")}</figcaption>
+          <figcaption>{meta || (card.kind === "voice" ? T.card.voice : "")}</figcaption>
         </figure>
       );
     case "pdf":
@@ -151,12 +152,12 @@ export function Preview({ lib, card }: { lib: Library; card: Card }) {
           <figcaption>
             {meta}
             <button className="link-btn" onClick={open}>
-              Открыть отдельно
+              {T.preview.openSeparately}
             </button>
           </figcaption>
         </figure>
       ) : (
-        <div className="preview-note">Открываю PDF…</div>
+        <div className="preview-note">{T.preview.openingPdf}</div>
       );
     case "text":
       return blob ? (
@@ -165,10 +166,10 @@ export function Preview({ lib, card }: { lib: Library; card: Card }) {
           <figcaption>{meta}</figcaption>
         </figure>
       ) : (
-        <div className="preview-note">Читаю файл…</div>
+        <div className="preview-note">{T.preview.reading}</div>
       );
     case "office":
-      return fileRow("документы Office открываются в своём приложении");
+      return fileRow(T.preview.office);
     default:
       return fileRow();
   }

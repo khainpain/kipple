@@ -53,18 +53,6 @@ export function effectiveTitle(c: Card): string {
 
 export type FilterKey = "all" | "links" | "photos" | "videos" | "docs" | "ideas" | "read_later" | "junk" | "sensitive";
 
-export const FILTERS: Array<{ key: FilterKey; label: string }> = [
-  { key: "all", label: "Все" },
-  { key: "links", label: "Ссылки" },
-  { key: "photos", label: "Фото" },
-  { key: "videos", label: "Видео" },
-  { key: "docs", label: "Файлы" },
-  { key: "ideas", label: "Идеи" },
-  { key: "read_later", label: "Прочитать позже" },
-  { key: "junk", label: "Мусор" },
-  { key: "sensitive", label: "Чувствительное" },
-];
-
 export function matchesFilter(c: Card, f: FilterKey): boolean {
   const action = effectiveAction(c);
   if (f === "junk") return action === "junk";

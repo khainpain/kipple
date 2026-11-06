@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { setLang } from "../i18n";
 import type { TelegramApi } from "../platform/types";
 import type { Card } from "./types";
-import { buildPlan, emptyBoardState, hashtag, noteFor, OTHER_TOPIC, sendToTelegram, type BoardState } from "./telegram";
+import { buildPlan, emptyBoardState, hashtag, noteFor, otherTopic, sendToTelegram, type BoardState } from "./telegram";
 
 const ai = (topic: string, extra: Partial<NonNullable<Card["ai"]>> = {}): Card["ai"] => ({
   title: "Заголовок",
@@ -14,6 +15,9 @@ const ai = (topic: string, extra: Partial<NonNullable<Card["ai"]>> = {}): Card["
   at: "2026-01-01",
   ...extra,
 });
+
+// Expectations below are written for the Russian interface.
+beforeEach(() => setLang("ru"));
 
 const card = (id: number, date: string, extra: Partial<Card> = {}): Card => ({ id, date, kind: "text", text: `msg ${id}`, urls: [], hashtags: [], ...extra });
 
@@ -62,7 +66,7 @@ describe("buildPlan", () => {
     expect(plan[0].msgIds).toEqual([1, 2]);
     expect(plan[0].topic).toBe("Дизайн");
     expect(plan[1].topic).toBe("Дизайн");
-    expect(plan[2].topic).toBe(OTHER_TOPIC);
+    expect(plan[2].topic).toBe(otherTopic());
   });
 
   it("includes junk and sensitive when asked", () => {
@@ -152,5 +156,21 @@ describe("sendToTelegram", () => {
     expect(Object.keys(state.sent)).toEqual(["1"]);
     const rest = buildPlan(cards, state, opts);
     expect(rest.map((p) => p.cardId)).toEqual([2, 3]);
+  });
+});
+
+describe("language", () => {
+  it("writes notes and status hashtags in the interface language", () => {
+    setLang("en");
+    const n = noteFor(card(1, "2026-01-01", { ai: ai("Design"), user: { note: "important", action: "idea" } }));
+    expect(n.note).toContain("Note: important");
+    expect(n.note).toContain("#idea");
+  });
+
+  it("keeps using the catch-all topic the group already has", () => {
+    setLang("en");
+    const state: BoardState = { ...emptyBoardState(), topics: { Разное: 7 } };
+    expect(otherTopic(state)).toBe("Разное");
+    expect(otherTopic(emptyBoardState())).toBe("Other");
   });
 });

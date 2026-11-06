@@ -1,6 +1,7 @@
 // Browser build: the same UI with the desktop pieces swapped out, so a change can be
 // checked by opening a link instead of installing the app. Data stays in this browser
 // (IndexedDB); photos are read from the folder the user picks and live only until reload.
+import { T } from "../i18n";
 import { joinPath, type Platform } from "./types";
 
 const DB = "saved-board";
@@ -75,7 +76,7 @@ export const platform: Platform = {
       dir,
       async readText(rel) {
         const f = media.get(key(rel));
-        if (!f) throw new Error(`Нет файла ${rel}`);
+        if (!f) throw new Error(T.importer.noFile(rel));
         return f.text();
       },
     };
@@ -94,7 +95,7 @@ export const platform: Platform = {
   async readMedia(_sourceDir, rel) {
     if (rel.startsWith("data:")) return (await fetch(rel)).blob();
     const f = media.get(key(rel));
-    if (!f) throw new Error(`Файл ${rel} недоступен: выбери папку экспорта ещё раз.`);
+    if (!f) throw new Error(T.importer.fileGone(rel));
     return f;
   },
   async openUrl(url) {
@@ -103,7 +104,7 @@ export const platform: Platform = {
   async openFile(sourceDir, rel) {
     const url = platform.mediaUrl(sourceDir, rel);
     if (url) window.open(url, "_blank", "noopener");
-    else alert(`Файл ${joinPath(sourceDir, rel)} недоступен: выбери папку экспорта ещё раз.`);
+    else alert(T.importer.fileGone(joinPath(sourceDir, rel)));
   },
   async saveTextFile(defaultName, _filter, content) {
     const a = document.createElement("a");
@@ -111,7 +112,7 @@ export const platform: Platform = {
     a.download = defaultName;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
-    return `«Загрузки» (${defaultName})`;
+    return T.importer.downloads(defaultName);
   },
   // Browsers block reading other sites, so pages and pictures for previews go through
   // api/fetch.ts, a small function deployed next to this build on Vercel. It only gets the link.

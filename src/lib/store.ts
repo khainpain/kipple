@@ -2,6 +2,7 @@ import { platform } from "@platform";
 import type { EditEvent, Library } from "./types";
 import { annotateContext, applyEdits } from "./library";
 import { emptyBoardState, type BoardState } from "./telegram";
+import type { LangPref } from "../i18n";
 
 const { exists, read, write: atomicWrite, append } = platform.data;
 const LIBRARY = "library.json";
@@ -14,9 +15,13 @@ export interface Settings {
   fetchLinks: boolean;
   /** Send downscaled copies of uncaptioned photos to the AI to name them. Off unless the user turns it on. */
   aiImages: boolean;
+  /** Interface language; "auto" follows the system. */
+  language: LangPref;
+  /** AI titles, summaries, topics and tags: in the interface language, or in each message's own. */
+  aiLanguage: "ui" | "source";
 }
 
-export const DEFAULT_SETTINGS: Settings = { aiEnabled: true, fetchLinks: true, aiImages: false };
+export const DEFAULT_SETTINGS: Settings = { aiEnabled: true, fetchLinks: true, aiImages: false, language: "auto", aiLanguage: "ui" };
 
 export async function loadLibrary(): Promise<Library | null> {
   if (!(await exists(LIBRARY))) return null;

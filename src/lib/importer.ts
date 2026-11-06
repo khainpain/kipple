@@ -1,3 +1,4 @@
+import { T } from "../i18n";
 import { platform } from "@platform";
 import type { ExportSource } from "../platform/types";
 import { parseExport } from "./parser";
@@ -19,7 +20,7 @@ export async function importFolder(src: ExportSource, prev: Library | null): Pro
   try {
     raw = await src.readText("result.json");
   } catch {
-    throw new Error("В этой папке нет result.json. Выбери папку, которую создал экспорт Telegram Desktop (формат JSON).");
+    throw new Error(T.importer.noResultJson);
   }
   const parsed = parseExport(JSON.parse(raw));
   const known = new Set(prev?.cards.map((c) => c.id));
@@ -32,7 +33,7 @@ export async function importFolder(src: ExportSource, prev: Library | null): Pro
   });
   const warning =
     parsed.chatType !== "saved_messages"
-      ? `Это экспорт чата «${parsed.chatName}», а не «Избранного». Импортировал как есть.`
+      ? T.importer.notSaved(parsed.chatName)
       : undefined;
   return { lib, added, warning };
 }

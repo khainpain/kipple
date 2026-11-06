@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { platform } from "@platform";
 import type { Action, Card, Library, UserFields } from "../lib/types";
-import { ACTIONS, ACTION_LABELS } from "../lib/types";
+import { ACTIONS, actionLabel } from "../lib/types";
+import { T, locale } from "../i18n";
 import { mediaUrl } from "../lib/importer";
 import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic } from "../lib/library";
 import { Icon } from "./Icon";
@@ -50,16 +51,16 @@ export function Detail(props: {
   }
 
   const panel = (
-    <aside className={`detail-panel mode-${props.mode}`} aria-label="Карточка" onClick={(e) => e.stopPropagation()}>
+    <aside className={`detail-panel mode-${props.mode}`} aria-label={T.detail.label} onClick={(e) => e.stopPropagation()}>
       <header className="detail-head">
-        <button className="icon-btn" onClick={props.onPrev} disabled={!props.onPrev} title="Предыдущая (↑)">
+        <button className="icon-btn" onClick={props.onPrev} disabled={!props.onPrev} title={T.detail.prev}>
           <Icon name="up" />
         </button>
-        <button className="icon-btn" onClick={props.onNext} disabled={!props.onNext} title="Следующая (↓)">
+        <button className="icon-btn" onClick={props.onNext} disabled={!props.onNext} title={T.detail.next}>
           <Icon name="down" />
         </button>
         <span className="spacer" />
-        <div className="segmented small" role="radiogroup" aria-label="Как открывать карточки">
+        <div className="segmented small" role="radiogroup" aria-label={T.detail.openModes}>
           {OPEN_MODES.map((m) => (
             <button key={m.key} role="radio" aria-checked={props.mode === m.key} className={props.mode === m.key ? "on" : ""} onClick={() => props.onMode(m.key)} title={m.label}>
               <Icon name={m.icon} size={15} />
@@ -67,16 +68,16 @@ export function Detail(props: {
           ))}
         </div>
         {card.media?.path && card.kind !== "photo" && (
-          <button className="icon-btn" onClick={() => platform.openFile(lib.sourceDir, card.media!.path!)} title="Открыть файл в его приложении">
+          <button className="icon-btn" onClick={() => platform.openFile(lib.sourceDir, card.media!.path!)} title={T.detail.openFile}>
             <Icon name="file" />
           </button>
         )}
         {card.urls[0] && (
           <button className="secondary small-btn" onClick={() => platform.openUrl(card.urls[0])}>
-            <Icon name="external" size={14} /> Открыть
+            <Icon name="external" size={14} /> {T.common.open}
           </button>
         )}
-        <button className="icon-btn" onClick={props.onClose} title="Закрыть (Esc)" aria-label="Закрыть">
+        <button className="icon-btn" onClick={props.onClose} title={T.detail.closeEsc} aria-label={T.common.close}>
           <Icon name="close" />
         </button>
       </header>
@@ -99,18 +100,18 @@ export function Detail(props: {
           className="detail-title"
           rows={1}
           value={title}
-          placeholder={displayTitle({ ...card, user: { ...card.user, title: undefined } }) || "Заголовок"}
-          title="Название можно поправить"
+          placeholder={displayTitle({ ...card, user: { ...card.user, title: undefined } }) || T.detail.titlePlaceholder}
+          title={T.detail.titleEditable}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={saveText}
           onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), e.currentTarget.blur())}
         />
         {(!title || props.onNameImage) && card.kind === "photo" && (
           <div className="title-help">
-            {!title && <span>{card.context ? "Название из соседнего сообщения." : "У картинки нет подписи."} Можно вписать своё.</span>}
+            {!title && <span>{card.context ? T.detail.titleFromContext : T.detail.noCaption} {T.detail.writeOwn}</span>}
             {props.onNameImage && !card.user?.title && (
-              <button className="link-btn" onClick={props.onNameImage} title="Уменьшенная копия этой картинки уйдёт в Anthropic">
-                <Icon name="sparkle" size={13} /> {card.ai ? "Переназвать по картинке" : "Назвать по картинке (AI)"}
+              <button className="link-btn" onClick={props.onNameImage} title={T.detail.nameImageHint}>
+                <Icon name="sparkle" size={13} /> {card.ai ? T.detail.renameImage : T.detail.nameImage}
               </button>
             )}
           </div>
@@ -118,17 +119,17 @@ export function Detail(props: {
         {card.ai?.summary && <p className="detail-summary">{card.ai.summary}</p>}
 
         <div className="field">
-          <span>Статус</span>
+          <span>{T.detail.status}</span>
           <div className="actions">
             {ACTIONS.map((a: Action) => (
               <button key={a} className={`pill action-${a}${action === a ? " on" : ""}`} onClick={() => props.onEdit({ action: a })}>
-                {ACTION_LABELS[a]}
+                {actionLabel(a)}
               </button>
             ))}
           </div>
         </div>
         <label className="field">
-          <span>Тема</span>
+          <span>{T.detail.topic}</span>
           <input value={topic} list="topic-options" onChange={(e) => setTopic(e.target.value)} onBlur={saveText} />
           <datalist id="topic-options">
             {props.topics.map((t) => (
@@ -137,17 +138,17 @@ export function Detail(props: {
           </datalist>
         </label>
         <label className="field">
-          <span>Теги через запятую</span>
+          <span>{T.detail.tags}</span>
           <input value={tags} onChange={(e) => setTags(e.target.value)} onBlur={saveText} />
         </label>
         <label className="field">
-          <span>Заметка</span>
-          <textarea rows={2} value={note} placeholder="Зачем сохранил, что сделать…" onChange={(e) => setNote(e.target.value)} onBlur={saveText} />
+          <span>{T.detail.note}</span>
+          <textarea rows={2} value={note} placeholder={T.detail.notePlaceholder} onChange={(e) => setNote(e.target.value)} onBlur={saveText} />
         </label>
 
         {card.urls.length > 0 && (
           <div className="field">
-            <span>Ссылки</span>
+            <span>{T.detail.links}</span>
             <div className="links">
               {card.urls.map((u) => (
                 <a key={u} href="#" onClick={(e) => (e.preventDefault(), platform.openUrl(u))}>
@@ -158,18 +159,23 @@ export function Detail(props: {
           </div>
         )}
         <div className="field">
-          <span>Сообщение</span>
-          <pre className="orig-full">{card.text || "(без текста)"}</pre>
+          <span>{T.detail.message}</span>
+          <pre className="orig-full">{card.text || T.detail.noText}</pre>
         </div>
         <div className="meta">
-          {new Date(card.date).toLocaleString("ru-RU")} · сообщение #{card.id}
-          {card.forwardedFrom ? ` · из «${card.forwardedFrom}»` : ""}
-          {card.ai ? ` · разметка ${card.ai.model}` : ""}
-          {card.sensitive ? " · не отправлялось в AI" : ""}
-          {card.removed ? " · нет в последнем экспорте" : ""}
+          {[
+            new Date(card.date).toLocaleString(locale()),
+            T.detail.messageId(card.id),
+            card.forwardedFrom && T.detail.from(card.forwardedFrom),
+            card.ai && T.detail.taggedBy(card.ai.model),
+            card.sensitive && T.detail.notSentToAi,
+            card.removed && T.detail.removed,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         </div>
         <button className="link-btn" onClick={() => props.onEdit({ hidden: !card.user?.hidden })}>
-          {card.user?.hidden ? "Показать в ленте" : "Скрыть из ленты"}
+          {card.user?.hidden ? T.detail.show : T.detail.hide}
         </button>
         </div>
       </div>

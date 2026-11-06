@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "./Icon";
 import { SORTS, type SortKey } from "./nav";
+import { T } from "../i18n";
 
 /** Sort dropdown: a quiet toolbar button that opens a list of options, each with its own icon and a radio mark. */
 export function SortMenu({ value, onChange }: { value: SortKey; onChange: (s: SortKey) => void }) {
@@ -62,15 +63,15 @@ export function SortMenu({ value, onChange }: { value: SortKey; onChange: (s: So
         }}
         aria-haspopup="menu"
         aria-expanded={open}
-        title={`Сортировка: ${current.label}`}
+        title={`${T.toolbar.sort}: ${current.label}`}
       >
         <Icon name={current.icon} size={15} />
         <span>{current.short}</span>
         <Icon name="down" size={12} className="chev" />
       </button>
       {open && (
-        <div className="menu sort-menu" role="menu" aria-label="Сортировка">
-          <small>Сортировка</small>
+        <div className="menu sort-menu" role="menu" aria-label={T.toolbar.sort}>
+          <small>{T.toolbar.sort}</small>
           {SORTS.map((s, i) => (
             <button
               key={s.key}

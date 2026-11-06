@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { platform } from "@platform";
 import type { TelegramApi, TelegramStatus } from "../platform/types";
 import type { Card } from "../lib/types";
-import { BOARD_TITLE, buildPlan, telegramErrorText, type BoardState, type SendOptions } from "../lib/telegram";
+import { BOARD_TITLE, buildPlan, otherTopic, telegramErrorText, type BoardState, type SendOptions } from "../lib/telegram";
 import { loadBoardState } from "../lib/store";
+import { T } from "../i18n";
 
 type Step = "loading" | "api" | "phone" | "code" | "password" | "ready";
 
-/** Logs in to the user's Telegram account and starts sending the library to the «Saved Board» group. */
+/** Logs in to the user's Telegram account and starts sending the library to the "Saved Board" group. */
 export function TelegramDialog(props: { tg: TelegramApi; cards: Card[]; running: boolean; onStart: (opts: SendOptions) => void; onClose: () => void }) {
   const { tg } = props;
   const [step, setStep] = useState<Step>("loading");
@@ -70,19 +71,20 @@ export function TelegramDialog(props: { tg: TelegramApi; cards: Card[]; running:
     </a>
   );
 
+  const L = T.telegram;
+
   return (
     <div className="modal-backdrop" onClick={props.onClose}>
       <div className="modal settings telegram" onClick={(e) => e.stopPropagation()}>
-        <button className="close" onClick={props.onClose} aria-label="Закрыть">
+        <button className="close" onClick={props.onClose} aria-label={T.common.close}>
           ×
         </button>
-        <h2>Отправить в Telegram</h2>
+        <h2>{L.title}</h2>
         <p className="hint">
-          Приложение создаст у тебя закрытую группу «{BOARD_TITLE}» с темами по разделам библиотеки и перешлёт туда оригиналы сообщений из «Избранного». Под каждым будет короткое описание и
-          хештеги. Вход идёт напрямую в Telegram, ключ сеанса хранится только на этом компьютере, в диспетчере учётных данных Windows.
+          {L.intro(BOARD_TITLE)}
         </p>
 
-        {step === "loading" && <p className="hint">Проверяю вход…</p>}
+        {step === "loading" && <p className="hint">{L.checking}</p>}
 
         {(step === "api" || showApi) && (
           <form
@@ -97,8 +99,12 @@ export function TelegramDialog(props: { tg: TelegramApi; cards: Card[]; running:
             }}
           >
             <p>
-              Нужен один раз: ключ приложения Telegram. Открой {link("https://my.telegram.org/apps", "my.telegram.org")}, войди по номеру, в «API development tools» создай приложение (название любое,
-              платформа Desktop) и скопируй сюда <b>api_id</b> и <b>api_hash</b>.
+              {L.apiIntro1}
+              {link("https://my.telegram.org/apps", "my.telegram.org")}
+              {L.apiIntro2}
+              <b>api_id</b>
+              {L.apiIntro3}
+              <b>api_hash</b>.
             </p>
             <div className="row">
               <label>
@@ -107,17 +113,17 @@ export function TelegramDialog(props: { tg: TelegramApi; cards: Card[]; running:
               </label>
               <label>
                 api_hash
-                <input value={apiHash} onChange={(e) => setApiHash(e.target.value)} placeholder="32 символа" />
+                <input value={apiHash} onChange={(e) => setApiHash(e.target.value)} placeholder={L.apiHashPlaceholder} />
               </label>
             </div>
             <div className="dialog-buttons">
               <span className="spacer" />
               {showApi && (
                 <button type="button" className="secondary" onClick={() => setShowApi(false)}>
-                  Отмена
+                  {T.common.cancel}
                 </button>
               )}
-              <button disabled={busy || !apiId.trim() || !apiHash.trim()}>Сохранить</button>
+              <button disabled={busy || !apiId.trim() || !apiHash.trim()}>{T.common.save}</button>
             </div>
           </form>
         )}
@@ -125,17 +131,17 @@ export function TelegramDialog(props: { tg: TelegramApi; cards: Card[]; running:
         {step === "phone" && !showApi && (
           <form className="tg-form" onSubmit={(e) => (e.preventDefault(), void run(async () => (await tg.requestCode(phone), setStep("code"))))}>
             <label>
-              Номер телефона аккаунта Telegram
-              <input type="tel" autoFocus value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7 999 123-45-67" />
+              {L.phone}
+              <input type="tel" autoFocus value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={L.phonePlaceholder} />
             </label>
             <div className="dialog-buttons">
               {!status?.builtInApi && (
                 <button type="button" className="secondary" onClick={() => setShowApi(true)}>
-                  Сменить api_id
+                  {L.changeApi}
                 </button>
               )}
               <span className="spacer" />
-              <button disabled={busy || !phone.trim()}>Получить код</button>
+              <button disabled={busy || !phone.trim()}>{L.getCode}</button>
             </div>
           </form>
         )}
@@ -158,15 +164,15 @@ export function TelegramDialog(props: { tg: TelegramApi; cards: Card[]; running:
             }}
           >
             <label>
-              Код из Telegram (придёт в чат «Telegram» на телефоне или в Telegram Desktop)
+              {L.code}
               <input inputMode="numeric" autoFocus value={code} onChange={(e) => setCode(e.target.value)} placeholder="12345" />
             </label>
             <div className="dialog-buttons">
               <button type="button" className="secondary" onClick={() => (setCode(""), setStep("phone"))}>
-                Другой номер
+                {L.otherPhone}
               </button>
               <span className="spacer" />
-              <button disabled={busy || !code.trim()}>Войти</button>
+              <button disabled={busy || !code.trim()}>{L.signIn}</button>
             </div>
           </form>
         )}
@@ -184,12 +190,12 @@ export function TelegramDialog(props: { tg: TelegramApi; cards: Card[]; running:
             }}
           >
             <label>
-              Облачный пароль (двухэтапная проверка){hint ? `, подсказка: ${hint}` : ""}
+              {L.password}{hint ? L.passwordHint(hint) : ""}
               <input type="password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
             </label>
             <div className="dialog-buttons">
               <span className="spacer" />
-              <button disabled={busy || !password}>Войти</button>
+              <button disabled={busy || !password}>{L.signIn}</button>
             </div>
           </form>
         )}
@@ -197,33 +203,33 @@ export function TelegramDialog(props: { tg: TelegramApi; cards: Card[]; running:
         {step === "ready" && !showApi && (
           <>
             <p>
-              Вход выполнен{name ? <>: <b>{name}</b></> : ""}.{" "}
+              {L.signedIn}{name ? <>: <b>{name}</b></> : ""}.{" "}
               <a href="#" onClick={(e) => (e.preventDefault(), void run(async () => (await tg.logout(), await refresh())))}>
-                Выйти
+                {L.signOut}
               </a>
             </p>
             <label className="check">
               <input type="checkbox" checked={opts.includeJunk} onChange={(e) => setOpts({ ...opts, includeJunk: e.target.checked })} />
-              Отправлять и «Мусор»
+              {L.includeJunk}
             </label>
             <label className="check">
               <input type="checkbox" checked={opts.includeSensitive} onChange={(e) => setOpts({ ...opts, includeSensitive: e.target.checked })} />
-              Отправлять «Чувствительное» (пароли, номера карт). Группа закрытая, но лучше держать их отдельно
+              {L.includeSensitive}
             </label>
             <p className="hint">
               {plan.length
-                ? `К отправке: ${plan.length} карточек в ${topicCount} ${topicCount === 1 ? "тему" : topicCount < 5 ? "темы" : "тем"}, примерно ${minutes} мин. Telegram ограничивает скорость, поэтому сообщения уходят постепенно. Приложение должно быть открыто; если закрыть его раньше, потом нажми «Отправить» ещё раз, и отправка продолжится с того же места.`
-                : "Всё уже отправлено. Новые сохранёнки появятся здесь после следующего импорта."}
-              {sentCount > 0 && ` Уже в группе: ${sentCount}.`}
-              {untagged > 0 && ` ${untagged} карточек ещё без AI-разметки попадут в тему «Разное»; лучше сначала нажать «Разметить».`}
+                ? L.plan(plan.length, topicCount, minutes)
+                : L.allSent}
+              {sentCount > 0 && L.alreadySent(sentCount)}
+              {untagged > 0 && L.untagged(untagged, otherTopic(state ?? undefined))}
             </p>
             <div className="dialog-buttons">
               <span className="spacer" />
               <button className="secondary" onClick={props.onClose}>
-                Закрыть
+                {T.common.close}
               </button>
               <button disabled={busy || props.running || !plan.length} onClick={() => props.onStart(opts)}>
-                {props.running ? "Уже отправляю…" : `Отправить ${plan.length}`}
+                {props.running ? L.sending : L.send(plan.length)}
               </button>
             </div>
           </>

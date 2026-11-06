@@ -1,5 +1,6 @@
 import type { Card } from "./types";
-import { ACTION_LABELS } from "./types";
+import { actionLabel } from "./types";
+import { T, locale } from "../i18n";
 import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic } from "./library";
 
 function csvCell(v: string): string {
@@ -18,7 +19,7 @@ export function toCsv(cards: Card[]): string {
       c.ai?.summary ?? "",
       effectiveTopic(c) ?? "",
       effectiveTags(c).join(", "),
-      action ? ACTION_LABELS[action] : "",
+      action ? actionLabel(action) : "",
       c.forwardedFrom ?? "",
       c.urls[0] ?? "",
       c.text,
@@ -28,13 +29,13 @@ export function toCsv(cards: Card[]): string {
   return "﻿" + [head.join(","), ...rows].join("\r\n");
 }
 
-export function toMarkdown(cards: Card[], title = "Избранное"): string {
+export function toMarkdown(cards: Card[], title = T.importer.savedMessages): string {
   const byTopic = new Map<string, Card[]>();
   for (const c of cards) {
-    const t = effectiveTopic(c) ?? "Без темы";
+    const t = effectiveTopic(c) ?? T.exporter.noTopic;
     byTopic.set(t, [...(byTopic.get(t) ?? []), c]);
   }
-  const parts = [`# ${title}`, "", `Экспортировано ${new Date().toLocaleString("ru-RU")}, карточек: ${cards.length}.`, ""];
+  const parts = [`# ${title}`, "", T.exporter.exported(new Date().toLocaleString(locale()), cards.length), ""];
   for (const [topic, list] of [...byTopic.entries()].sort((a, b) => b[1].length - a[1].length)) {
     parts.push(`## ${topic}`, "");
     for (const c of list) {

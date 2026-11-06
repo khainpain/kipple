@@ -9,6 +9,9 @@ import { Sidebar } from "./Sidebar";
 import { Icon } from "./Icon";
 import { SortMenu } from "./SortMenu";
 import { nextThemePref, setThemePref, THEME_ICONS, THEME_LABELS, useThemePref } from "../lib/theme";
+import { T, compareText, formatNumber } from "../i18n";
+import { BOARD_TITLE } from "../lib/telegram";
+import { actionLabel } from "../lib/types";
 import {
   OPEN_MODES,
   SMART_LISTS,
@@ -40,7 +43,7 @@ export function Workspace(props: {
   onImport: () => void;
   onExport: (kind: "csv" | "md", cards: Card[]) => void;
   onSettings: () => void;
-  /** Desktop only: opens «Отправить в Telegram». */
+  /** Desktop only: opens "Send to Telegram". */
   onTelegram?: () => void;
   onRunAi: () => void;
   /** Ask the AI to name one photo from its content (sends that picture). */
@@ -96,7 +99,7 @@ export function Workspace(props: {
       if (t) m.set(t, (m.get(t) ?? 0) + 1);
       else none++;
     }
-    return { topics: [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ru")), noTopic: none };
+    return { topics: [...m.entries()].sort((a, b) => b[1] - a[1] || compareText(a[0], b[0])), noTopic: none };
   }, [base]);
 
   const inScope = useMemo(() => base.filter((c) => matchesScope(c, scope)), [base, scope]);
@@ -108,7 +111,7 @@ export function Workspace(props: {
   const tags = useMemo(() => {
     const m = new Map<string, number>();
     for (const c of inType) for (const t of effectiveTags(c)) m.set(t, (m.get(t) ?? 0) + 1);
-    return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ru"));
+    return [...m.entries()].sort((a, b) => b[1] - a[1] || compareText(a[0], b[0]));
   }, [inType]);
 
   const visible = useMemo(() => sortCards(tag ? inType.filter((c) => effectiveTags(c).includes(tag)) : inType, sort), [inType, tag, sort]);
@@ -191,21 +194,21 @@ export function Workspace(props: {
 
       <section className="content">
         <header className="toolbar">
-          <button className="icon-btn" onClick={() => setSideOpen(!sideOpen)} title={sideOpen ? "Скрыть панель" : "Показать панель"}>
+          <button className="icon-btn" onClick={() => setSideOpen(!sideOpen)} title={sideOpen ? T.toolbar.hideSidebar : T.toolbar.showSidebar}>
             <Icon name="sidebar" />
           </button>
           <div className="heading">
             <h1>{heading}</h1>
             <span className="count">
-              {visible.length}
+              {formatNumber(visible.length)}
               {subtitle && <> · {subtitle}</>}
             </span>
           </div>
           <label className="search">
             <Icon name="search" />
-            <input ref={searchRef} placeholder="Поиск" value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input ref={searchRef} placeholder={T.toolbar.search} value={query} onChange={(e) => setQuery(e.target.value)} />
             {query ? (
-              <button className="clear" onClick={() => setQuery("")} aria-label="Очистить">
+              <button className="clear" onClick={() => setQuery("")} aria-label={T.toolbar.clear}>
                 <Icon name="close" size={14} />
               </button>
             ) : (
@@ -216,43 +219,43 @@ export function Workspace(props: {
           {props.job ? (
             <span className="job">
               <span className="progress" style={{ "--p": `${Math.round((props.job.done / Math.max(props.job.total, 1)) * 100)}%` } as React.CSSProperties} />
-              {props.job.label} {props.job.done}/{props.job.total}
+              {props.job.label} {formatNumber(props.job.done)}/{formatNumber(props.job.total)}
               <button className="secondary small-btn" onClick={props.onStop}>
-                Стоп
+                {T.common.stop}
               </button>
             </span>
           ) : (
             props.needAi > 0 &&
             props.aiEnabled && (
-              <button className="secondary small-btn" onClick={props.onRunAi} title="Разметить карточки без тем и описаний">
-                <Icon name="sparkle" size={14} /> Разметить {props.needAi}
+              <button className="secondary small-btn" onClick={props.onRunAi} title={T.toolbar.runAiHint}>
+                <Icon name="sparkle" size={14} /> {T.toolbar.runAi(props.needAi)}
               </button>
             )
           )}
-          <button className="icon-btn" onClick={props.onImport} title="Импортировать новый экспорт: правки и разметка сохранятся">
+          <button className="icon-btn" onClick={props.onImport} title={T.toolbar.import}>
             <Icon name="import" />
           </button>
           <div className="menu-wrap">
-            <button className="icon-btn" onClick={() => setExportOpen(!exportOpen)} title="Экспорт">
+            <button className="icon-btn" onClick={() => setExportOpen(!exportOpen)} title={T.toolbar.export}>
               <Icon name="export" />
             </button>
             {exportOpen && (
               <div className="menu" onMouseLeave={() => setExportOpen(false)}>
-                <small>{selected.size ? `Выбранные: ${exportCards.length}` : `Все на экране: ${exportCards.length}`}</small>
+                <small>{selected.size ? T.toolbar.exportSelected(exportCards.length) : T.toolbar.exportAll(exportCards.length)}</small>
                 <button onClick={() => (setExportOpen(false), props.onExport("md", exportCards))}>Markdown</button>
                 <button onClick={() => (setExportOpen(false), props.onExport("csv", exportCards))}>CSV</button>
               </div>
             )}
           </div>
           {props.onTelegram && (
-            <button className="icon-btn" onClick={props.onTelegram} title="Отправить в Telegram: разложить по темам в группе «Saved Board»">
+            <button className="icon-btn" onClick={props.onTelegram} title={T.toolbar.telegram(BOARD_TITLE)}>
               <Icon name="send" />
             </button>
           )}
-          <button className="icon-btn" onClick={() => setThemePref(nextThemePref(theme))} title={`Тема: ${THEME_LABELS[theme].toLowerCase()}. Нажми, чтобы переключить`}>
+          <button className="icon-btn" onClick={() => setThemePref(nextThemePref(theme))} title={T.theme.toggle(THEME_LABELS[theme])}>
             <Icon name={THEME_ICONS[theme]} />
           </button>
-          <button className="icon-btn" onClick={props.onSettings} title="Настройки">
+          <button className="icon-btn" onClick={props.onSettings} title={T.toolbar.settings}>
             <Icon name="settings" />
           </button>
         </header>
@@ -260,21 +263,21 @@ export function Workspace(props: {
         <div className="subbar">
           {selected.size > 0 ? (
             <div className="selection">
-              <b>Выбрано {selected.size}</b>
+              <b>{T.toolbar.selected(selected.size)}</b>
               <button className="pill" onClick={() => setSelected(new Set(visible.map((c) => c.id)))}>
-                Выбрать все {visible.length}
+                {T.toolbar.selectAll(visible.length)}
               </button>
               <button className="pill" onClick={() => onEdit([...selected], { action: "read_later" })}>
-                Прочитать позже
+                {actionLabel("read_later")}
               </button>
               <button className="pill" onClick={() => onEdit([...selected], { action: "idea" })}>
-                Идея
+                {actionLabel("idea")}
               </button>
               <button className="pill" onClick={() => (onEdit([...selected], { action: "junk" }), setSelected(new Set()))}>
-                В мусор
+                {T.toolbar.toJunk}
               </button>
               <button className="pill ghost" onClick={() => setSelected(new Set())}>
-                Отменить
+                {T.common.cancel}
               </button>
             </div>
           ) : (
@@ -295,7 +298,7 @@ export function Workspace(props: {
           )}
           <div className="spacer" />
           <SortMenu value={sort} onChange={setSort} />
-          <div className="segmented" role="radiogroup" aria-label="Вид">
+          <div className="segmented" role="radiogroup" aria-label={T.toolbar.view}>
             {VIEWS.map((v) => (
               <button key={v.key} role="radio" aria-checked={view === v.key} className={view === v.key ? "on" : ""} onClick={() => setView(v.key)} title={v.label}>
                 <Icon name={v.icon} />
