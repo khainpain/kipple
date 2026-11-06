@@ -8,7 +8,12 @@ import { en } from "../i18n/en";
 import { ru } from "../i18n/ru";
 import { T, lang as uiLang, type Lang } from "../i18n";
 
-export const AI_MODEL = "claude-haiku-5-5";
+/** Models the user can pick in Settings. Haiku is the default: cheapest and good enough for tagging. */
+export const AI_MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"] as const;
+export type AiModel = (typeof AI_MODELS)[number];
+export const DEFAULT_AI_MODEL: AiModel = "claude-haiku-5-5";
+/** A model id from settings, or the default if it is unknown (e.g. retired later). */
+export const aiModelOf = (m: string | undefined): AiModel => ((AI_MODELS as readonly string[]).includes(m ?? "") ? (m as AiModel) : DEFAULT_AI_MODEL);
 const BATCH = 40;
 const PARALLEL = 3;
 
@@ -96,10 +101,10 @@ export function vocabulary(cards: Card[], lang: AiLang = "source"): { topics: st
   return { topics: top(topics, 40), tags: top(tags, 80) };
 }
 
-async function classifyBatch(client: Anthropic, batch: Card[], vocab: { topics: string[]; tags: string[] }, lang: AiLang) {
+async function classifyBatch(client: Anthropic, model: AiModel, batch: Card[], vocab: { topics: string[]; tags: string[] }, lang: AiLang) {
   const input = batch.map((c) => JSON.stringify(describeCard(c))).join("\n");
   const res = await client.messages.parse({
-    model: AI_MODEL,
+    model,
     max_tokens: 16000,
     system: systemPrompt(lang),
     output_config: { effort: "low", format: zodOutputFormat(BatchSchema) },
@@ -116,7 +121,7 @@ async function classifyBatch(client: Anthropic, batch: Card[], vocab: { topics: 
 
 const vocabText = (v: { topics: string[]; tags: string[] }) => `Topic vocabulary: ${v.topics.join(", ") || "(empty so far)"}\nTag vocabulary: ${v.tags.join(", ") || "(empty so far)"}`;
 
-function toFields(it: z.infer<typeof ItemSchema>, at: string, lang: AiLang): AiFields {
+function toFields(it: z.infer<typeof ItemSchema>, at: string, lang: AiLang, model: AiModel): AiFields {
   return {
     title: it.title.slice(0, 120),
     summary: it.summary.slice(0, 400),
@@ -124,7 +129,7 @@ function toFields(it: z.infer<typeof ItemSchema>, at: string, lang: AiLang): AiF
     tags: it.tags.map((t) => t.toLowerCase().slice(0, 30)).slice(0, 6),
     action: it.action,
     priority: Math.min(3, Math.max(1, it.priority)) as 1 | 2 | 3,
-    model: AI_MODEL,
+    model,
     at,
     lang,
   };
@@ -144,6 +149,7 @@ export async function classifyCards(
   apiKey: string,
   all: Card[],
   lang: AiLang,
+  model: AiModel,
   onBatch: (p: AiProgress) => void,
   signal?: AbortSignal,
 ): Promise<AiProgress> {
@@ -158,7 +164,7 @@ export async function classifyCards(
     while (next < batches.length && !signal?.aborted) {
       const batch = batches[next++];
       try {
-        const items = await classifyBatch(client, batch, vocabulary(all, lang), lang);
+        const items = await classifyBatch(client, model, batch, vocabulary(all, lang), lang);
         const byId = new Map(items.map((it) => [it.id, it]));
         const at = new Date().toISOString();
         for (const c of batch) {
@@ -167,7 +173,7 @@ export async function classifyCards(
             progress.failed++;
             continue;
           }
-          c.ai = toFields(it, at, lang);
+          c.ai = toFields(it, at, lang, model);
           progress.done++;
         }
       } catch (e) {
@@ -227,7 +233,7 @@ async function toJpegBase64(blob: Blob): Promise<string> {
   }
 }
 
-async function nameImageBatch(client: Anthropic, batch: Array<{ card: Card; data: string }>, vocab: { topics: string[]; tags: string[] }, lang: AiLang) {
+async function nameImageBatch(client: Anthropic, model: AiModel, batch: Array<{ card: Card; data: string }>, vocab: { topics: string[]; tags: string[] }, lang: AiLang) {
   const content: Anthropic.ContentBlockParam[] = [{ type: "text", text: vocabText(vocab) }];
   for (const { card, data } of batch) {
     const info: Record<string, unknown> = { id: card.id, date: card.date.slice(0, 10) };
@@ -237,7 +243,7 @@ async function nameImageBatch(client: Anthropic, batch: Array<{ card: Card; data
     content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data } });
   }
   const res = await client.messages.parse({
-    model: AI_MODEL,
+    model,
     max_tokens: 4000,
     system: imageSystemPrompt(lang),
     output_config: { effort: "low", format: zodOutputFormat(BatchSchema) },
@@ -253,6 +259,7 @@ export async function nameImages(
   all: Card[],
   todo: Card[],
   lang: AiLang,
+  model: AiModel,
   read: (c: Card) => Promise<Blob>,
   onBatch: (p: AiProgress) => void,
   signal?: AbortSignal,
@@ -272,13 +279,13 @@ export async function nameImages(
     }
     if (batch.length) {
       try {
-        const items = await nameImageBatch(client, batch, vocabulary(all, lang), lang);
+        const items = await nameImageBatch(client, model, batch, vocabulary(all, lang), lang);
         const byId = new Map(items.map((it) => [it.id, it]));
         const at = new Date().toISOString();
         for (const { card } of batch) {
           const it = byId.get(card.id);
           if (it) {
-            card.ai = toFields(it, at, lang);
+            card.ai = toFields(it, at, lang, model);
             progress.done++;
           } else progress.failed++;
         }

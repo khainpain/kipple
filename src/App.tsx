@@ -9,7 +9,7 @@ import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type
 import { TelegramDialog } from "./components/TelegramDialog";
 import { importFolder, pickExportFolder } from "./lib/importer";
 import { fetchLinkMeta, needsPreview } from "./lib/linkmeta";
-import { AiKeyMissing, classifyCards, nameImages, pendingForAi, pendingImages } from "./lib/ai";
+import { AiKeyMissing, aiModelOf, classifyCards, nameImages, pendingForAi, pendingImages } from "./lib/ai";
 import { toCsv, toMarkdown } from "./lib/exporters";
 import { deleteApiKey, getApiKey, setApiKey } from "./lib/secrets";
 import { Workspace, type Job } from "./components/Workspace";
@@ -136,6 +136,7 @@ export default function App() {
         l.cards,
         todo,
         aiLang(),
+        aiModelOf(settings.aiModel),
         (c) => platform.readMedia(l.sourceDir, c.media!.path!),
         (p) => {
           setJob({ label: T.app.jobImages, done: p.done + p.failed, total: p.total });
@@ -182,6 +183,7 @@ export default function App() {
         key,
         l.cards,
         aiLang(),
+        aiModelOf(settings.aiModel),
         (p) => {
           setJob({ label: T.app.jobAi, done: p.done + p.failed, total: p.total });
           setRev((r) => r + 1);

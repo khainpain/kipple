@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { platform } from "@platform";
 import type { Settings } from "../lib/store";
+import { AI_MODELS, aiModelOf } from "../lib/ai";
 import { setThemePref, THEME_ICONS, THEME_LABELS, THEME_PREFS, useThemePref } from "../lib/theme";
 import { Icon } from "./Icon";
 import { LANGS, T, systemLang, type LangPref } from "../i18n";
@@ -77,6 +78,18 @@ export function SettingsDialog(props: {
             {L.aiLanguageSource}
           </label>
           {s.aiLanguage !== props.settings.aiLanguage && <p className="hint">{L.aiLanguageNote}</p>}
+        </fieldset>
+        <fieldset className="ai-lang" disabled={!s.aiEnabled}>
+          <legend>{L.aiModel}</legend>
+          {AI_MODELS.map((m) => (
+            <label key={m} className="check">
+              <input type="radio" name="ai-model" checked={aiModelOf(s.aiModel) === m} onChange={() => setS({ ...s, aiModel: m })} />
+              <span>
+                <b>{L.aiModels[m].name}</b> · {L.aiModels[m].hint}
+              </span>
+            </label>
+          ))}
+          {aiModelOf(s.aiModel) !== aiModelOf(props.settings.aiModel) && <p className="hint">{L.aiModelNote}</p>}
         </fieldset>
         <label className="check">
           <input type="checkbox" checked={s.aiImages} disabled={!s.aiEnabled} onChange={(e) => setS({ ...s, aiImages: e.target.checked })} />
