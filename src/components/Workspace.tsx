@@ -7,6 +7,7 @@ import { Grid } from "./Grid";
 import { Detail } from "./Detail";
 import { Sidebar } from "./Sidebar";
 import { Icon } from "./Icon";
+import { SortMenu } from "./SortMenu";
 import {
   SMART_LISTS,
   SORTS,
@@ -47,7 +48,7 @@ export function Workspace(props: {
   const [type, setType] = useState<TypeKey | null>(null);
   const [tag, setTag] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<SortKey>(() => loadPref("sort", ["new", "old", "title"] as const, "new"));
+  const [sort, setSort] = useState<SortKey>(() => loadPref("sort", SORTS.map((s) => s.key), "new"));
   const [view, setView] = useState<ViewKey>(() => loadPref("view", ["masonry", "grid", "list", "headlines"] as const, "masonry"));
   const [sideOpen, setSideOpen] = useState(() => loadPref("sidebar", ["open", "closed"] as const, "open") === "open");
   const [openId, setOpenId] = useState<number | null>(null);
@@ -281,13 +282,7 @@ export function Workspace(props: {
             </div>
           )}
           <div className="spacer" />
-          <select className="sort" value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label="Сортировка">
-            {SORTS.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+          <SortMenu value={sort} onChange={setSort} />
           <div className="segmented" role="radiogroup" aria-label="Вид">
             {VIEWS.map((v) => (
               <button key={v.key} role="radio" aria-checked={view === v.key} className={view === v.key ? "on" : ""} onClick={() => setView(v.key)} title={v.label}>

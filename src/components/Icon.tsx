@@ -37,6 +37,11 @@ const PATHS: Record<string, string> = {
   chart: "M4 20V10M10 20V4M16 20v-7M22 20H2",
   text: "M5 6h14M5 12h14M5 18h9",
   send: "M21 3L10 14M21 3l-7 18-4-7-7-4z",
+  flag: "M5 21V4M5 4h12l-2.5 4L17 12H5",
+  sortNew: "M9 9v3l2 1.5M15 12a6 6 0 1 1-12 0 6 6 0 0 1 12 0zM19 5v14M16.5 16.5L19 19l2.5-2.5",
+  sortOld: "M9 9v3l2 1.5M15 12a6 6 0 1 1-12 0 6 6 0 0 1 12 0zM19 19V5M16.5 7.5L19 5l2.5 2.5",
+  sortAz: "M3 10l3-7 3 7M4.3 7.5h3.4M3 14h6l-6 7h6M18 4v16M15.5 17.5L18 20l2.5-2.5",
+  sortZa: "M3 3h6l-6 7h6M3 21l3-7 3 7M4.3 18.5h3.4M18 4v16M15.5 17.5L18 20l2.5-2.5",
 };
 
 export type IconName = keyof typeof PATHS;
