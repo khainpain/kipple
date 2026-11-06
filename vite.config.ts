@@ -8,11 +8,14 @@ const host = process.env.TAURI_DEV_HOST;
 // https://vite.dev/config/
 const buildId = (process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || "local").slice(0, 7);
 
-// `vite build --mode web` makes the browser build (deployed to Vercel for quick UI checks);
+// `vite build --mode web` makes the browser build (deployed to Vercel under /app/: the landing
+// page's demo and quick UI checks);
 // every other mode is the desktop app inside Tauri.
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
-  base: "./",
+  // The browser build lives under /app/ on the site; the landing page (site/) sits at the root.
+  base: mode === "web" ? "/app/" : "./",
+  build: mode === "web" ? { outDir: "dist/app", emptyOutDir: true } : undefined,
   resolve: {
     alias: {
       "@platform": fileURLToPath(new URL(mode === "web" ? "./src/platform/web.ts" : "./src/platform/tauri.ts", import.meta.url)),

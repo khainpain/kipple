@@ -71,10 +71,18 @@ export default function App() {
     (async () => {
       try {
         const [l, s, k] = await Promise.all([loadLibrary(), loadSettings(), getApiKey().catch(() => null)]);
-        setLang(resolveLang(s.language));
+        // Links from the landing page: ?lang=en|ru (unless a language was picked in Settings)
+        // and ?demo, which opens the sample library straight away in the browser build.
+        const q = new URLSearchParams(location.search);
+        const qLang = q.get("lang");
+        setLang(resolveLang(s.language === "ru" || s.language === "en" ? s.language : qLang === "ru" || qLang === "en" ? qLang : s.language));
         setLib(l);
         setSettings(s);
         setHasKey(!!k);
+        if (platform.kind === "web" && q.has("demo")) {
+          history.replaceState(null, "", location.pathname); // "Exit demo" then leads to the normal start
+          return openDemo();
+        }
         if (!l) return;
         // Libraries imported before previews worked here (or by an older version) catch up in the background.
         const catchUp = () => {
