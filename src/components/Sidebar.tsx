@@ -106,6 +106,7 @@ export function Sidebar(props: {
       <Brand chatName={props.chatName} account={props.account} />
 
       <nav className="side-group">
+        <Item icon="home" label={T.nav.home} active={is({ kind: "home" })} onClick={() => props.onScope({ kind: "home" })} />
         {SMART_LISTS.map((l) => (
           <Item key={l.key} icon={l.icon} label={l.label} count={props.listCounts[l.key]} active={is({ kind: "list", key: l.key })} onClick={() => props.onScope({ kind: "list", key: l.key })} />
         ))}
@@ -145,6 +146,15 @@ export function Sidebar(props: {
             active={is({ kind: "list", key: "sensitive" })}
             onClick={() => props.onScope({ kind: "list", key: "sensitive" })}
             title={T.sidebar.sensitiveHint}
+          />
+        )}
+        {props.listCounts.duplicates > 0 && (
+          <Item
+            icon="copy"
+            label={T.nav.duplicates}
+            count={props.listCounts.duplicates}
+            active={is({ kind: "list", key: "duplicates" })}
+            onClick={() => props.onScope({ kind: "list", key: "duplicates" })}
           />
         )}
         <Item icon="trash" label={T.nav.junk} count={props.listCounts.junk} active={is({ kind: "list", key: "junk" })} onClick={() => props.onScope({ kind: "list", key: "junk" })} />

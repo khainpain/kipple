@@ -163,6 +163,11 @@ export const en: Dict = {
   },
 
   nav: {
+    home: "Overview",
+    important: "Important",
+    recent: "Recent",
+    unsorted: "To sort",
+    duplicates: "Possible duplicates",
     openCenter: "Open in the center",
     openSide: "Open on the side",
     openFull: "Open full screen",
@@ -210,6 +215,18 @@ export const en: Dict = {
     junk: "Junk",
   },
 
+  overview: {
+    emptyTitle: "Nothing to show yet",
+    emptyHint: "Import your saved messages and what needs attention shows up here.",
+    showAll: "All",
+    unsorted: "No topic or tags yet: tag them with AI or by hand.",
+    important: "Starred by you or marked important by the AI.",
+    readLater: "Articles and videos put off for later.",
+    todo: "Tasks and reminders.",
+    recent: "Saved in the last 30 days.",
+    duplicates: (groups) => `${num(groups)} ${groups === 1 ? "group" : "groups"}: the same link, file or text. Send the extras to the junk.`,
+  },
+
   sidebar: {
     signedIn: "Signed in to Telegram",
     topics: "Topics",
@@ -246,6 +263,9 @@ export const en: Dict = {
   },
 
   card: {
+    important: "Important",
+    pin: "Mark important",
+    unpin: "Remove from important",
     kindPhoto: "Photo",
     kindVideo: "Video",
     kindGif: "GIF",

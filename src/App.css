@@ -508,6 +508,19 @@ code {
 .pill.warn {
   color: var(--warn);
 }
+.pill.important {
+  color: var(--accent);
+  border-color: transparent;
+  padding-left: 0;
+  padding-right: 2px;
+}
+.pill.important .icon,
+.icon-btn.on .icon {
+  fill: currentColor;
+}
+.icon-btn.on {
+  color: var(--accent);
+}
 /* Sort: quiet toolbar button + dropdown with an icon and a radio mark per option */
 .sort-btn {
   display: inline-flex;
@@ -813,7 +826,7 @@ code {
   background: var(--accent);
   color: #fff;
 }
-.card.selected .ha:not(.on) {
+.card.selected .ha:not(.sel) {
   display: none;
 }
 
@@ -1362,4 +1375,96 @@ code {
 .own-key summary {
   cursor: pointer;
   margin: 4px 0 8px;
+}
+
+/* Overview: one row of cards per smart list, then topics as shelves */
+.overview {
+  padding: 4px 16px 32px;
+}
+.ov-section {
+  margin-top: 18px;
+}
+.ov-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+  min-width: 0;
+}
+.ov-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px;
+  margin-left: -4px;
+  background: transparent;
+  color: var(--ink);
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+button.ov-title:hover {
+  background: var(--hover);
+}
+.ov-title .icon {
+  color: var(--muted);
+  align-self: center;
+}
+.ov-title h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.ov-title small {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.ov-hint {
+  color: var(--muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.ov-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.ov-row {
+  display: grid;
+  gap: 16px;
+  align-items: stretch;
+}
+.ov-shelves {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+.ov-shelf {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--panel);
+  color: var(--ink);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  text-align: left;
+}
+.ov-shelf:hover {
+  box-shadow: var(--shadow-hover);
+}
+.ov-shelf .label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ov-shelf small {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }

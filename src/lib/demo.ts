@@ -19,6 +19,12 @@ export function demoLibrary(): Library {
   const cards = Array.from({ length: 60 }, (_, i) => {
     const c = structuredClone(base[i % base.length]);
     c.id = i + 1;
+    // The sample repeats; make the repeats distinct so only one pair shows up as a duplicate.
+    if (i >= base.length && i !== base.length) {
+      if (c.urls.length) c.urls = [`https://example.com/article-${i}`];
+      if (c.media?.size) c.media = { ...c.media, size: c.media.size + i };
+      else if (c.text) c.text += "\u200b".repeat(i); // invisible, but the texts no longer match
+    }
     if (c.kind === "link") c.link = { url: c.urls[0], title: D.article(i), siteName: "example.com", image: i % 3 ? swatch(i * 37, 1200, 630) : undefined, fetchedAt: "" };
     if (c.kind === "photo") {
       c.link = undefined;
@@ -40,11 +46,12 @@ export function demoLibrary(): Library {
         topic: topics[i % 5],
         tags: D.tags.slice(0, (i % 3) + 1),
         action: (["read_later", "idea", "reference", "todo"] as const)[i % 4],
-        priority: 2,
+        priority: i % 6 === 0 ? 1 : 2,
         model: "demo",
         at: "",
       };
-    c.date = new Date(Date.parse("2026-10-01T09:00:00Z") + i * 60_000 * (i % 5 === 0 ? 30 : 1)).toISOString();
+    // Spread over the last two months, so "Recent" has something but not everything.
+    c.date = new Date(Date.now() - 60 * 864e5 + i * 864e5 + (i % 5) * 3_600_000).toISOString();
     return c;
   });
   cards.reverse(); // the library is kept newest first

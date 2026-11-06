@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { platform } from "@platform";
 import type { Card, Library, UserFields } from "../lib/types";
-import { effectiveAction, effectiveTags, effectiveTopic } from "../lib/library";
+import { effectiveAction, effectiveTags, effectiveTopic, matchesFilter } from "../lib/library";
+import { countDuplicateGroups, findDuplicates, groupDuplicates, isImportant } from "../lib/smart";
+import { Overview, type OverviewSection } from "./Overview";
 import { buildIndex } from "../lib/search";
 import { Grid } from "./Grid";
 import { Detail } from "./Detail";
@@ -25,6 +27,7 @@ import {
   savePref,
   scopeTitle,
   sortCards,
+  type ListKey,
   type OpenMode,
   type Scope,
   type SortKey,
@@ -56,7 +59,7 @@ export function Workspace(props: {
   onEdit: (ids: number[], patch: UserFields) => void;
 }) {
   const { lib, rev, onEdit } = props;
-  const [scope, setScope] = useState<Scope>({ kind: "list", key: "all" });
+  const [scope, setScope] = useState<Scope>({ kind: "home" });
   const [type, setType] = useState<TypeKey | null>(null);
   const theme = useThemePref();
   const [tag, setTag] = useState<string | null>(null);
@@ -89,10 +92,13 @@ export function Workspace(props: {
     return list;
   }, [lib, rev, query, index]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Possible duplicates among the cards still in play (junk and hidden ones are already dealt with).
+  const dupes = useMemo(() => findDuplicates(base.filter((c) => matchesFilter(c, "all"))), [base]);
+
   const listCounts = useMemo(() => {
-    const keys = [...SMART_LISTS.map((l) => l.key), "junk", "sensitive"] as const;
-    return Object.fromEntries(keys.map((k) => [k, base.filter((c) => matchesScope(c, { kind: "list", key: k })).length]));
-  }, [base]);
+    const keys: ListKey[] = [...SMART_LISTS.map((l) => l.key), "junk", "sensitive", "recent", "unsorted", "duplicates"];
+    return Object.fromEntries(keys.map((k) => [k, base.filter((c) => matchesScope(c, { kind: "list", key: k }, dupes)).length]));
+  }, [base, dupes]);
 
   const { topics, noTopic } = useMemo(() => {
     const m = new Map<string, number>();
@@ -106,7 +112,12 @@ export function Workspace(props: {
     return { topics: [...m.entries()].sort((a, b) => b[1] - a[1] || compareText(a[0], b[0])), noTopic: none };
   }, [base]);
 
-  const inScope = useMemo(() => base.filter((c) => matchesScope(c, scope)), [base, scope]);
+  // Searching from the overview searches everything, shown as a board.
+  const home = scope.kind === "home" && !query.trim();
+  const shown: Scope = scope.kind === "home" && !home ? { kind: "list", key: "all" } : scope;
+  const isDupes = shown.kind === "list" && shown.key === "duplicates";
+
+  const inScope = useMemo(() => base.filter((c) => matchesScope(c, shown, dupes)), [base, JSON.stringify(shown), dupes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const typeCounts = useMemo(() => Object.fromEntries(TYPES.map((t) => [t.key, inScope.filter((c) => matchesType(c, t.key)).length])) as Record<TypeKey, number>, [inScope]);
 
@@ -118,7 +129,42 @@ export function Workspace(props: {
     return [...m.entries()].sort((a, b) => b[1] - a[1] || compareText(a[0], b[0]));
   }, [inType]);
 
-  const visible = useMemo(() => sortCards(tag ? inType.filter((c) => effectiveTags(c).includes(tag)) : inType, sort), [inType, tag, sort]);
+  const visible = useMemo(() => {
+    const list = tag ? inType.filter((c) => effectiveTags(c).includes(tag)) : inType;
+    // Duplicates stay next to each other so the extras are easy to spot.
+    return isDupes ? groupDuplicates(list, dupes) : sortCards(list, sort);
+  }, [inType, tag, sort, isDupes, dupes]);
+
+  const sections = useMemo((): OverviewSection[] => {
+    if (!home) return [];
+    const take = (key: ListKey, order?: (cs: Card[]) => Card[]) => {
+      const cs = base.filter((c) => matchesScope(c, { kind: "list", key }, dupes));
+      return (order ? order(cs) : cs).slice(0, 8);
+    };
+    const o = T.overview;
+    return [
+      {
+        key: "unsorted",
+        icon: "inbox",
+        title: T.nav.unsorted,
+        hint: o.unsorted,
+        count: listCounts.unsorted,
+        cards: take("unsorted"),
+      },
+      { key: "important", icon: "star", title: T.nav.important, hint: o.important, count: listCounts.important, cards: take("important") },
+      { key: "read_later", icon: "clock", title: T.nav.readLater, hint: o.readLater, count: listCounts.read_later, cards: take("read_later") },
+      { key: "todo", icon: "check", title: T.nav.todo, hint: o.todo, count: listCounts.todo, cards: take("todo") },
+      { key: "recent", icon: "sortNew", title: T.nav.recent, hint: o.recent, count: listCounts.recent, cards: take("recent") },
+      {
+        key: "duplicates",
+        icon: "copy",
+        title: T.nav.duplicates,
+        hint: o.duplicates(countDuplicateGroups(base, dupes)),
+        count: listCounts.duplicates,
+        cards: take("duplicates", (cs) => groupDuplicates(cs, dupes)),
+      },
+    ];
+  }, [home, base, dupes, listCounts]);
 
   const openIdx = openId == null ? -1 : visible.findIndex((c) => c.id === openId);
   const openCard = openId == null ? null : lib.cards.find((c) => c.id === openId) ?? null;
@@ -141,6 +187,10 @@ export function Workspace(props: {
       lastClicked.current = c.id;
       return next;
     });
+  }
+
+  function togglePin(c: Card) {
+    onEdit([c.id], { pinned: !isImportant(c) });
   }
 
   function toggleJunk(c: Card) {
@@ -177,7 +227,7 @@ export function Workspace(props: {
   }, [openId, openIdx, visible, selected, exportOpen]);
 
   const exportCards = selected.size ? visible.filter((c) => selected.has(c.id)) : visible;
-  const heading = scopeTitle(scope);
+  const heading = scopeTitle(home ? scope : shown);
   const subtitle = [type && TYPES.find((t) => t.key === type)?.label, tag && `#${tag}`].filter(Boolean).join(" · ");
 
   return (
@@ -267,12 +317,29 @@ export function Workspace(props: {
           </button>
         </header>
 
+        {home ? (
+          <Overview
+            lib={lib}
+            sections={sections}
+            topics={topics}
+            activeId={openId}
+            onScope={pickScope}
+            onOpen={(c) => setOpenId(c.id)}
+            onJunk={toggleJunk}
+            onPin={togglePin}
+            onOpenLink={(u) => void platform.openUrl(u)}
+          />
+        ) : (
+        <>
         <div className="subbar">
           {selected.size > 0 ? (
             <div className="selection">
               <b>{T.toolbar.selected(selected.size)}</b>
               <button className="pill" onClick={() => setSelected(new Set(visible.map((c) => c.id)))}>
                 {T.toolbar.selectAll(visible.length)}
+              </button>
+              <button className="pill" onClick={() => onEdit([...selected], { pinned: true })}>
+                <Icon name="star" size={13} /> {T.nav.important}
               </button>
               <button className="pill" onClick={() => onEdit([...selected], { action: "read_later" })}>
                 {actionLabel("read_later")}
@@ -315,7 +382,7 @@ export function Workspace(props: {
         </div>
 
         <Grid
-          key={`${JSON.stringify(scope)}|${type}|${tag}|${query}|${sort}|${view}`}
+          key={`${JSON.stringify(shown)}|${type}|${tag}|${query}|${sort}|${view}`}
           lib={lib}
           cards={visible}
           view={view}
@@ -324,8 +391,11 @@ export function Workspace(props: {
           onOpen={(c) => setOpenId(c.id)}
           onToggleSelect={toggleSelect}
           onJunk={toggleJunk}
+          onPin={togglePin}
           onOpenLink={(u) => void platform.openUrl(u)}
         />
+        </>
+        )}
       </section>
 
       {openCard && (

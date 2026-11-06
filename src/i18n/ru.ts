@@ -169,6 +169,11 @@ export const ru = {
   },
 
   nav: {
+    home: "Обзор",
+    important: "Важное",
+    recent: "Недавние",
+    unsorted: "Нужно разобрать",
+    duplicates: "Возможные дубли",
     openCenter: "Открывать по центру",
     openSide: "Открывать сбоку",
     openFull: "Открывать на весь экран",
@@ -216,6 +221,19 @@ export const ru = {
     junk: "Мусор",
   },
 
+  overview: {
+    emptyTitle: "Пока нечего показать",
+    emptyHint: "Импортируй сохранёнки, и здесь появится то, что стоит разобрать.",
+    showAll: "Все",
+    unsorted: "Без темы или тегов: разметь их AI или вручную.",
+    important: "Закреплённое звёздочкой и то, что AI счёл важным.",
+    readLater: "Статьи и видео, отложенные на потом.",
+    todo: "Задачи и напоминания.",
+    recent: "Сохранено за последние 30 дней.",
+    duplicates: (groups: number) =>
+      `${num(groups)} ${plural(groups, "группа", "группы", "групп")}: одна и та же ссылка, файл или текст. Лишнее можно отправить в мусор.`,
+  },
+
   sidebar: {
     signedIn: "Вход в Telegram выполнен",
     topics: "Темы",
@@ -252,6 +270,9 @@ export const ru = {
   },
 
   card: {
+    important: "Важное",
+    pin: "В важное",
+    unpin: "Убрать из важного",
     kindPhoto: "Фото",
     kindVideo: "Видео",
     kindGif: "GIF",
