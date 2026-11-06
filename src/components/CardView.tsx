@@ -9,6 +9,7 @@ import { instantImage } from "../lib/embeds";
 import { isImportant } from "../lib/smart";
 import { TopicMenu } from "./TopicMenu";
 import { Icon } from "./Icon";
+import { SiteIcon } from "./SiteIcon";
 import { hueOf, type ViewKey } from "./nav";
 
 const KIND_ICON: Record<string, string> = {
@@ -205,7 +206,7 @@ export function CardView(props: {
           </div>
         )}
         <div className="meta-row">
-          {site && card.link?.favicon && <img src={card.link.favicon} alt="" className="favicon" onError={(e) => (e.currentTarget.style.display = "none")} />}
+          {site && <SiteIcon url={card.urls[0]} favicon={card.link?.favicon} />}
           {site && <span className="site">{site}</span>}
           {!site && fileMeta && <span>{fileMeta}</span>}
           {!site && !fileMeta && card.forwardedFrom && <span className="site">{card.forwardedFrom}</span>}
