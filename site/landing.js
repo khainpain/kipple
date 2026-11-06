@@ -10,6 +10,20 @@
     });
   });
 
+  // The language menu closes on a click outside it or on Escape.
+  var langs = document.querySelector(".langs");
+  if (langs) {
+    document.addEventListener("click", function (e) {
+      if (langs.open && !langs.contains(e.target)) langs.open = false;
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && langs.open) {
+        langs.open = false;
+        langs.querySelector("summary").focus();
+      }
+    });
+  }
+
   var root = document.documentElement;
   if (!root.classList.contains("motion") || !Element.prototype.animate) return;
 

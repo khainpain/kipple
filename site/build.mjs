@@ -47,6 +47,7 @@ const ICON = {
   mic: '<svg viewBox="0 0 24 24" aria-hidden="true" class="line"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>',
   doc: '<svg viewBox="0 0 24 24" aria-hidden="true" class="line"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>',
   link: '<svg viewBox="0 0 24 24" aria-hidden="true" class="line"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>',
+  globe: '<svg viewBox="0 0 24 24" aria-hidden="true" class="line"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>',
   dl: '<svg viewBox="0 0 24 24" aria-hidden="true" class="line"><path d="M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 19h14"/></svg>',
 };
 
@@ -162,7 +163,13 @@ function page(c, other, rel, css, js) {
   <a class="logo" href="${c.path}" aria-label="Kipple">
     <picture><source srcset="/img/kipple-logo-dark.svg" media="(prefers-color-scheme: dark)"><img src="/img/kipple-logo-light.svg" alt="Kipple" width="131" height="38"></picture>
   </a>
-  <nav><a href="${other.path}" hreflang="${other.lang}" lang="${other.lang}">${t(c.other)}</a></nav>
+  <details class="langs">
+    <summary aria-label="${c.lang === "ru" ? "Язык" : "Language"}">${ICON.globe}<span>${c.lang.toUpperCase()}</span></summary>
+    <ul>
+      <li><a href="/" hreflang="en" lang="en"${c.lang === "en" ? ' aria-current="page"' : ""}>English</a></li>
+      <li><a href="/ru/" hreflang="ru" lang="ru"${c.lang === "ru" ? ' aria-current="page"' : ""}>Русский</a></li>
+    </ul>
+  </details>
 </header>
 
 <main id="main">
