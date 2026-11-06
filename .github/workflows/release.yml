@@ -62,3 +62,6 @@ jobs:
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
+          # The generic "windows-x86_64" entry in latest.json points to the NSIS setup.exe,
+          # not the MSI: a per-user NSIS install updates silently without admin rights.
+          updaterJsonPreferNsis: true
