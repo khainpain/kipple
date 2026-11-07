@@ -2250,9 +2250,15 @@ code {
   margin-left: 8px;
   padding: 3px 8px;
   border-radius: 8px;
-  background: var(--accent);
+  /* The deeper coral: white on the plain accent is under 4.5:1 at this size. */
+  background: var(--accent-ink);
   color: var(--on-accent);
   text-decoration: none;
+}
+/* Dark theme: white on light coral is too faint, dark text on the plain accent reads well. */
+:root[data-theme="dark"] .banner a.banner-link {
+  background: var(--accent);
+  color: var(--bg);
 }
 
 
@@ -2665,7 +2671,7 @@ button.ov-title:hover {
 
   /* Finger-sized targets for the controls used most. */
   .sort-btn,
-  .pill,
+  .subbar .pill,
   .prop-btn,
   .menu button {
     min-height: 36px;
@@ -2787,7 +2793,7 @@ button.ov-title:hover {
   .subbar .spacer {
     display: none;
   }
-  .pill {
+  .subbar .pill {
     padding: 6px 12px;
   }
   .sort-btn .label,

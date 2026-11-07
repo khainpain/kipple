@@ -571,6 +571,15 @@ export const ru = {
     summary: "Короткое описание того, что здесь сохранено и зачем к этому вернуться.",
     groups: ["Цвет и шрифты", "Сетки и вёрстка"],
     tags: ["css", "идеи", "референсы"],
+    /** The sample messages' own text, by message id in fixtures/saved_messages.json, and the channel they're forwarded from. */
+    messages: {
+      2: "Смотри статью про masonry #design",
+      4: "Референсы для лендинга",
+      6: "Как делать анимации",
+      10: "wifi дома пароль: correct-horse-battery",
+      11: "Идея: бот, который раз в неделю присылает три случайные сохранёнки",
+    } as Record<number, string>,
+    channel: "Дизайн-канал",
     textFile: "покупки.txt",
     textBody: "Список покупок\n\n- кофе\n- хлеб\n- лампочка E27\n\nТекстовые файлы видны прямо в карточке.",
     // A one-line message whose AI title and summary are longer than the message itself.

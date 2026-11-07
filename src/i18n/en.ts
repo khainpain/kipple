@@ -559,6 +559,14 @@ export const en: Dict = {
     summary: "A short note on what's saved here and why you'd come back to it.",
     groups: ["Color and type", "Grids and layout"],
     tags: ["css", "ideas", "references"],
+    messages: {
+      2: "Check out this article on masonry #design",
+      4: "References for the landing page",
+      6: "How to make animations",
+      10: "home wifi password: correct-horse-battery",
+      11: "Idea: a bot that sends three random saved messages once a week",
+    },
+    channel: "Design channel",
     textFile: "shopping.txt",
     textBody: "Shopping list\n\n- coffee\n- bread\n- E27 light bulb\n\nText files show right inside the card.",
     // A one-line message whose AI title and summary are longer than the message itself.
