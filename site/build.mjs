@@ -21,7 +21,7 @@ const SITE = (
 ).replace(/\/$/, "");
 
 async function latestRelease() {
-  const fallback = { ver: "0.1.15", bytes: 7_523_840 };
+  const fallback = { ver: "0.1.16", bytes: 7_523_840 };
   try {
     const r = await fetch("https://api.github.com/repos/khainpain/kipple/releases/latest", {
       headers: { accept: "application/vnd.github+json", "user-agent": "kipple-landing-build" },
@@ -37,12 +37,25 @@ async function latestRelease() {
 }
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-/** Escapes, then turns **x** into <b>x</b>. */
-const rich = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
-const plain = (s) => String(s).replace(/\*\*(.+?)\*\*/g, "$1");
+/** Escapes, then turns **x** into <b>x</b> and [text](https://…) into a link. */
+const rich = (s) =>
+  esc(s)
+    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+    .replace(/\[([^\]]+)\]\((https:\/\/[^)\s]+)\)/g, '<a href="$2" rel="noopener">$1</a>');
+const plain = (s) => String(s).replace(/\*\*(.+?)\*\*/g, "$1").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
 
-const mascot = (cls, size, eager) =>
-  `<picture class="${cls}"><source srcset="/img/kipple-mascot-dark.svg" media="(prefers-color-scheme: dark)"><img src="/img/kipple-mascot-light.svg" alt="" width="${size}" height="${size}"${eager ? "" : ' loading="lazy"'}></picture>`;
+// Kipple is drawn inline (not an <img>) so its eyes can blink and it can bob, flip and sulk like
+// the app's welcome screen (src/components/Welcome.tsx). Body from the brand file, with its two
+// theme colours turned into CSS variables; the face is drawn on top, calm and angry.
+const KIPPLE_BODY = (await readFile(here("./public/img/kipple-mascot-light.svg"), "utf8"))
+  .replace(/^<svg[^>]*>|<\/svg>\s*$/g, "")
+  .replace(/<path d="M(32\.5|56\.5|46) [^"]*"[^>]*\/>/g, "")
+  .replace(/fill="#D9573B"/g, 'style="fill:var(--accent)"')
+  .replace(/fill="#F2A58F"/g, 'style="fill:var(--kp-hat)"')
+  .trim();
+const KIPPLE_FACE = `<g class="kp-calm" fill="none" stroke="#23211E" stroke-linecap="round"><path class="kp-eye" d="M32.5 46 Q38 38.5 43.5 46" stroke-width="4.6"/><path class="kp-eye" d="M56.5 46 Q62 38.5 67.5 46" stroke-width="4.6"/><path d="M46 53 Q50 56.5 54 53" stroke-width="3.2"/></g><g class="kp-mad" fill="none" stroke="#23211E" stroke-linecap="round"><path d="M31 37.5 L43.5 42.5" stroke-width="4"/><path d="M69 37.5 L56.5 42.5" stroke-width="4"/><circle cx="38.5" cy="47.5" r="2.8" fill="#23211E" stroke="none"/><circle cx="61.5" cy="47.5" r="2.8" fill="#23211E" stroke="none"/><path d="M45 56.5 Q50 52 55 56.5" stroke-width="3.2"/><path d="M74 20 l4 -4 M80 24 l5 -2 M77 29 l5 1" stroke-width="2.4"/></g>`;
+const mascot = (cls, size) =>
+  `<div class="${cls} kp" aria-hidden="true"><div class="kp-bob"><div class="kp-body"><svg viewBox="0 0 100 100" width="${size}" height="${size}">${KIPPLE_BODY}${KIPPLE_FACE}</svg></div></div></div>`;
 const ICON = {
   play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>',
   mic: '<svg viewBox="0 0 24 24" aria-hidden="true" class="line"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>',
@@ -84,17 +97,19 @@ function stage(c) {
       <div class="junk" data-pile="44 48 24"><div class="cover art a5 short" style="--h:45"></div><b>${esc(P.link3)}</b></div>
       <div class="junk voice" data-pile="86 41 -16">${ICON.mic}<span class="wave"></span><span>${esc(P.voice)}</span></div>
       <div class="junk note" data-pile="52 76 -8">asdf</div>
-      ${mascot("kip", 160, true)}
+      ${mascot("kip", 160)}
     </div>`;
 }
 
 /** "What's new": a pill in the corner that opens into a small card. A <details>, so it works without script. */
 function news(c, rel) {
   const date = (d) => new Date(d + "T12:00:00Z").toLocaleDateString(c.lang === "ru" ? "ru-RU" : "en-GB", { day: "numeric", month: "long" });
+  // The newest released entry is highlighted, whether or not a "next" entry sits above it.
+  const latest = changelog.find((e) => e.ver !== "next");
   const entries = changelog
     .map((e, n) => {
       const head = e.ver === "next" ? `<b>${esc(c.news.next)}</b>` : `<b>v${esc(e.ver)}</b><time datetime="${e.date}">${esc(date(e.date))}</time>`;
-      return `<li class="rel${e.ver === "next" ? " soon" : ""}" style="--n:${n}"><div class="rel-head">${head}</div><ul>${e[c.lang].map((x) => `<li>${esc(x)}</li>`).join("")}</ul></li>`;
+      return `<li class="rel${e.ver === "next" ? " soon" : e === latest ? " latest" : ""}" style="--n:${n}"><div class="rel-head">${head}</div><ul>${e[c.lang].map((x) => `<li>${esc(x)}</li>`).join("")}</ul></li>`;
     })
     .join("");
   return `<details class="news" data-ver="${esc(rel.ver)}">
@@ -175,6 +190,7 @@ function page(c, other, rel, css, js) {
 <meta property="og:image:alt" content="${t(c.ogAlt)}">
 <meta name="twitter:card" content="summary_large_image">
 <script>if(!matchMedia("(prefers-reduced-motion: reduce)").matches)document.documentElement.classList.add("motion")</script>
+<script defer src="/_vercel/insights/script.js"></script>
 <script type="application/ld+json">${JSON.stringify(ld).replace(/</g, "\\u003c")}</script>
 <style>${css}</style>
 </head>
@@ -234,19 +250,67 @@ ${c.faq.items.map(([q, a]) => `    <details><summary>${t(q)}</summary><p>${r(a)}
   <section class="closing wrap reveal" aria-labelledby="closing-h">
     ${mascot("bob", 112)}
     <h2 id="closing-h">${t(c.closing.title)}</h2>
-    <p>${t(c.closing.text)}</p>
+    <p>${r(c.closing.text)}</p>
     ${actions("closing")}
   </section>
 </main>
 
 <footer class="wrap foot">
   <nav>
-${c.footer.links.map(([n, l]) => `    <a href="${LINKS[l]}">${t(n)}</a>`).join("\n")}
+${footLinks(c)}
   </nav>
   <p>${t(c.footer.note)}</p>
 </footer>
 ${news(c, rel)}
 <script>${js}</script>
+</body>
+</html>
+`;
+}
+
+function footLinks(c) {
+  return c.footer.links.map(([n, l]) => `    <a href="${l === "privacy" ? c.path + "privacy/" : LINKS[l]}">${esc(n)}</a>`).join("\n");
+}
+
+/** /privacy/ and /ru/privacy/: what leaves the computer, in plain words. */
+function privacyPage(c, css) {
+  const p = c.privacyPage;
+  const url = SITE + c.path + "privacy/";
+  return `<!doctype html>
+<html lang="${c.lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(p.title)} · Kipple</title>
+<meta name="description" content="${esc(p.lead)}">
+<link rel="canonical" href="${url}">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<script defer src="/_vercel/insights/script.js"></script>
+<style>${css}
+.legal { max-width: 720px; padding-block: 24px 56px; }
+.legal h1 { font-size: clamp(30px, 4vw, 44px); margin-bottom: 12px; }
+.legal .lead { color: var(--muted); font-size: 18px; margin-bottom: 32px; }
+.legal h2 { font-size: 20px; margin: 28px 0 8px; }
+.legal p { line-height: 1.6; }</style>
+</head>
+<body>
+<header class="top wrap"><div class="brand">
+  <a class="logo" href="${c.path}" aria-label="Kipple">
+    <picture><source srcset="/img/kipple-logo-dark.svg" media="(prefers-color-scheme: dark)"><img src="/img/kipple-logo-light.svg" alt="Kipple" width="131" height="38"></picture>
+  </a></div>
+</header>
+<main id="main" class="wrap legal">
+  <h1>${esc(p.title)}</h1>
+  <p class="lead">${esc(p.lead)}</p>
+${p.sections.map(([h, b]) => `  <h2>${esc(h)}</h2>\n  <p>${esc(b)}</p>`).join("\n")}
+</main>
+<footer class="wrap foot">
+  <nav>
+${footLinks(c)}
+  </nav>
+  <p>${esc(c.footer.note)}</p>
+</footer>
 </body>
 </html>
 `;
@@ -262,11 +326,20 @@ await mkdir(OUT + "ru", { recursive: true });
 await cp(here("./public/"), OUT, { recursive: true });
 await writeFile(OUT + "index.html", page(en, ru, rel, css, js));
 await writeFile(OUT + "ru/index.html", page(ru, en, rel, css, js));
-await writeFile(OUT + "robots.txt", `User-agent: *\nAllow: /\nDisallow: /app/\nSitemap: ${SITE}/sitemap.xml\n`);
+await mkdir(OUT + "privacy", { recursive: true });
+await mkdir(OUT + "ru/privacy", { recursive: true });
+await writeFile(OUT + "privacy/index.html", privacyPage(en, css));
+await writeFile(OUT + "ru/privacy/index.html", privacyPage(ru, css));
+// The stats dashboard (/stats/): a static page that reads /api/stats with a token.
+await mkdir(OUT + "stats", { recursive: true });
+await cp(here("./stats.html"), OUT + "stats/index.html");
+await cp(here("./stats.js"), OUT + "stats/stats.js");
+await writeFile(OUT + "robots.txt", `User-agent: *\nAllow: /\nDisallow: /app/\nDisallow: /stats/\nSitemap: ${SITE}/sitemap.xml\n`);
 const alt = `<xhtml:link rel="alternate" hreflang="en" href="${SITE}/"/><xhtml:link rel="alternate" hreflang="ru" href="${SITE}/ru/"/>`;
 await writeFile(
   OUT + "sitemap.xml",
   `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n` +
-    `<url><loc>${SITE}/</loc>${alt}</url>\n<url><loc>${SITE}/ru/</loc>${alt}</url>\n</urlset>\n`,
+    `<url><loc>${SITE}/</loc>${alt}</url>\n<url><loc>${SITE}/ru/</loc>${alt}</url>\n` +
+    `<url><loc>${SITE}/privacy/</loc></url>\n<url><loc>${SITE}/ru/privacy/</loc></url>\n</urlset>\n`,
 );
 console.log(`landing: ${SITE} (v${rel.ver}, ${rel.size.en})`);
