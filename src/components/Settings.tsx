@@ -12,6 +12,7 @@ import { Done, HoldToConfirm, Switch } from "./Motion";
 import "./Settings.css";
 import { LANGS, T, systemLang, type LangPref } from "../i18n";
 import { telegramErrorText } from "../lib/telegram";
+import { REPLY_CLEANUPS, type ReplyCleanup } from "../lib/tgReplies";
 import type { TelegramApi, TelegramStatus } from "../platform/types";
 
 export function SettingsDialog(props: {
@@ -214,6 +215,26 @@ export function SettingsDialog(props: {
                     </small>
                   </div>
                   <Switch label={L.fetchLinksTitle} checked={s.fetchLinks} onChange={(on) => setS({ ...s, fetchLinks: on })} />
+                </div>
+              </div>
+            </>
+          )}
+
+          {platform.telegram && (
+            <>
+              <h3 className="s2-sec">{L.secTelegram}</h3>
+              <div className="s2-panel">
+                <div className="s2-row">
+                  <div className="s2-text">
+                    <b id="s2-replies-label">{L.replyCleanupTitle}</b>
+                    <small>{L.replyCleanupDesc}</small>
+                  </div>
+                  <Select<ReplyCleanup>
+                    labelledBy="s2-replies-label"
+                    value={s.replyCleanup}
+                    options={REPLY_CLEANUPS.map((v) => ({ value: v, label: L.replyCleanup[v] }))}
+                    onChange={(v) => setS({ ...s, replyCleanup: v })}
+                  />
                 </div>
               </div>
             </>

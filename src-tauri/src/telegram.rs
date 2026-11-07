@@ -741,6 +741,109 @@ pub async fn tg_send_note(
     }
 }
 
+// ---- "Open in Telegram" ------------------------------------------------------------------
+//
+// Telegram has no link to a message inside Saved Messages that desktop apps follow (a link with
+// a message id only scrolls to the post in channels). So Kipple posts a short reply to the
+// original in Saved Messages and opens the chat: the reply is the newest message, and a tap on
+// its quote jumps to the original. The reply is deleted later (src/lib/tgService.ts).
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QuoteSent {
+    /// The reply's message id, to delete it later.
+    id: i32,
+    /// A tg:// link that opens Saved Messages (the account's own chat), when the account has a
+    /// username or the phone number is known.
+    open: Option<String>,
+}
+
+/// Replies to message `id` in Saved Messages with `text` and returns the reply's id and a link
+/// to the chat. "NO_ORIGINAL" when the original is gone.
+#[tauri::command]
+pub async fn tg_quote_saved(state: tauri::State<'_, TgState>, id: i32, text: String) -> Result<QuoteSent, String> {
+    let c = conn(&state).await?;
+    let rid = random_id();
+    let req = tl::functions::messages::SendMessage {
+        no_webpage: true,
+        silent: false,
+        background: false,
+        clear_draft: false,
+        noforwards: false,
+        update_stickersets_order: false,
+        invert_media: false,
+        allow_paid_floodskip: false,
+        peer: tl::enums::InputPeer::PeerSelf,
+        reply_to: Some(
+            tl::types::InputReplyToMessage {
+                reply_to_msg_id: id,
+                top_msg_id: None,
+                reply_to_peer_id: None,
+                quote_text: None,
+                quote_entities: None,
+                quote_offset: None,
+                monoforum_peer_id: None,
+                todo_item_id: None,
+                poll_option: None,
+            }
+            .into(),
+        ),
+        message: text,
+        random_id: rid,
+        reply_markup: None,
+        entities: None,
+        schedule_date: None,
+        schedule_repeat_period: None,
+        send_as: None,
+        quick_reply_shortcut: None,
+        effect: None,
+        allow_paid_stars: None,
+        suggested_post: None,
+        rich_message: None,
+    };
+    use tl::enums::Updates as U;
+    let sent = match c.client.invoke(&req).await {
+        Ok(U::UpdateShortSentMessage(m)) => m.id,
+        Ok(other) => sent_ids(&updates_parts(other).0, &[rid]).first().copied().ok_or_else(|| "SEND_NO_RESULT".to_string())?,
+        Err(e) if e.is("REPLY_MESSAGE_ID_INVALID") || e.is("MESSAGE_ID_INVALID") => return Err("NO_ORIGINAL".into()),
+        Err(e) => return Err(err(e)),
+    };
+    let me = tl::functions::users::GetUsers { id: vec![tl::enums::InputUser::UserSelf] };
+    let open = match c.client.invoke(&me).await {
+        Ok(users) => match users.into_iter().next() {
+            Some(tl::enums::User::User(u)) => saved_chat_link(u.username.as_deref(), u.phone.as_deref()),
+            _ => None,
+        },
+        // The reply is out already; without a link the app says where to find it.
+        Err(_) => None,
+    };
+    Ok(QuoteSent { id: sent, open })
+}
+
+/// tg:// link to the account's own chat (Saved Messages): by username, else by phone number.
+fn saved_chat_link(username: Option<&str>, phone: Option<&str>) -> Option<String> {
+    let username = username.filter(|u| !u.is_empty() && u.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'));
+    let phone = phone.map(|p| p.chars().filter(char::is_ascii_digit).collect::<String>()).filter(|p| !p.is_empty());
+    match (username, phone) {
+        (Some(u), _) => Some(format!("tg://resolve?domain={u}")),
+        (None, Some(p)) => Some(format!("tg://resolve?phone={p}")),
+        _ => None,
+    }
+}
+
+/// Deletes Kipple's own replies from Saved Messages (for everyone, i.e. on all devices).
+/// Ids that are already gone are fine.
+#[tauri::command]
+pub async fn tg_delete_saved(state: tauri::State<'_, TgState>, ids: Vec<i32>) -> Result<(), String> {
+    if ids.is_empty() {
+        return Ok(());
+    }
+    let c = conn(&state).await?;
+    let req = tl::functions::messages::DeleteMessages { revoke: true, id: ids };
+    c.client.invoke(&req).await.map_err(err)?;
+    Ok(())
+}
+
 // ---- Loading Saved Messages straight from Telegram -------------------------------------
 //
 // The import used to need a Telegram Desktop export (result.json). After signing in, the app
@@ -1142,6 +1245,14 @@ pub async fn tg_forget_media(app: tauri::AppHandle) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn saved_chat_link_prefers_username() {
+        assert_eq!(saved_chat_link(Some("misha_k"), Some("31600000000")).as_deref(), Some("tg://resolve?domain=misha_k"));
+        assert_eq!(saved_chat_link(None, Some("+31 6 0000 0000")).as_deref(), Some("tg://resolve?phone=31600000000"));
+        assert_eq!(saved_chat_link(Some(""), None), None);
+        assert_eq!(saved_chat_link(Some("bad&name"), None), None);
+    }
 
     #[test]
     fn qr_url_is_base64url_without_padding() {

@@ -76,6 +76,8 @@ export function Workspace(props: {
   onRunAi: () => void;
   /** Ask the AI to name one photo from its content (sends that picture). */
   onNameImage?: (card: Card) => void;
+  /** Signed in to Telegram: jump to the card's message in Saved Messages. */
+  onOpenInTelegram?: (card: Card) => void;
   onStop: () => void;
   onEdit: (ids: number[], patch: UserFields) => void;
   /** Merged topics and tags, and saving a change to them. */
@@ -590,6 +592,7 @@ export function Workspace(props: {
           onMode={setOpenMode}
           onClose={() => setOpenId(null)}
           onEdit={(p) => onEdit([openCard.id], p)}
+          onOpenInTelegram={props.onOpenInTelegram && !openCard.removed ? () => props.onOpenInTelegram!(openCard) : undefined}
           onPrev={openIdx > 0 ? () => setOpenId(visible[openIdx - 1].id) : undefined}
           onNext={openIdx >= 0 && openIdx < visible.length - 1 ? () => setOpenId(visible[openIdx + 1].id) : undefined}
         />

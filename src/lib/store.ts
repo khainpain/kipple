@@ -4,12 +4,14 @@ import { annotateContext, applyEdits, type Aliases } from "./library";
 import { emptyBoardState, type BoardState } from "./telegram";
 import type { LangPref } from "../i18n";
 import { DEFAULT_AI_MODEL, type AiModel } from "./ai";
+import { DEFAULT_REPLY_CLEANUP, type PendingReply, type ReplyCleanup } from "./tgReplies";
 
 const { exists, read, write: atomicWrite, append } = platform.data;
 const LIBRARY = "library.json";
 const EDITS = "edits.jsonl";
 const SETTINGS = "settings.json";
 const TELEGRAM = "telegram.json";
+const REPLIES = "telegram-replies.json";
 
 export interface Settings {
   /** AI tagging on. Only counts together with aiConsentAt: see aiAllowed. */
@@ -36,9 +38,11 @@ export interface Settings {
   topics?: string[];
   /** Anonymous usage statistics (src/lib/telemetry.ts); on unless turned off. */
   telemetry: boolean;
+  /** When "Open in Telegram" helper replies are deleted from Saved Messages (src/lib/tgReplies.ts). */
+  replyCleanup: ReplyCleanup;
 }
 
-export const DEFAULT_SETTINGS: Settings = { aiEnabled: false, fetchLinks: true, aiImages: false, language: "auto", aiLanguage: "ui", aiModel: DEFAULT_AI_MODEL, telemetry: true };
+export const DEFAULT_SETTINGS: Settings = { aiEnabled: false, fetchLinks: true, aiImages: false, language: "auto", aiLanguage: "ui", aiModel: DEFAULT_AI_MODEL, telemetry: true, replyCleanup: DEFAULT_REPLY_CLEANUP };
 
 export async function loadLibrary(): Promise<Library | null> {
   if (!(await exists(LIBRARY))) return null;
@@ -100,6 +104,21 @@ export async function loadBoardState(): Promise<BoardState> {
 
 export async function saveBoardState(s: BoardState) {
   await atomicWrite(TELEGRAM, JSON.stringify(s));
+}
+
+/** "Open in Telegram" helper replies still to delete from Saved Messages. */
+export async function loadPendingReplies(): Promise<PendingReply[]> {
+  if (!(await exists(REPLIES))) return [];
+  try {
+    const list = JSON.parse(await read(REPLIES)) as unknown;
+    return Array.isArray(list) ? (list as PendingReply[]) : [];
+  } catch {
+    return []; // a broken file only means a few helper replies stay; the user can delete them
+  }
+}
+
+export async function savePendingReplies(list: PendingReply[]) {
+  await atomicWrite(REPLIES, JSON.stringify(list));
 }
 
 export async function wipeAll() {
