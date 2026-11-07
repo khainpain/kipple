@@ -37,9 +37,12 @@ async function latestRelease() {
 }
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-/** Escapes, then turns **x** into <b>x</b>. */
-const rich = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
-const plain = (s) => String(s).replace(/\*\*(.+?)\*\*/g, "$1");
+/** Escapes, then turns **x** into <b>x</b> and [text](https://…) into a link. */
+const rich = (s) =>
+  esc(s)
+    .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+    .replace(/\[([^\]]+)\]\((https:\/\/[^)\s]+)\)/g, '<a href="$2" rel="noopener">$1</a>');
+const plain = (s) => String(s).replace(/\*\*(.+?)\*\*/g, "$1").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
 
 // Kipple is drawn inline (not an <img>) so its eyes can blink and it can bob, flip and sulk like
 // the app's welcome screen (src/components/Welcome.tsx). Body from the brand file, with its two
@@ -245,7 +248,7 @@ ${c.faq.items.map(([q, a]) => `    <details><summary>${t(q)}</summary><p>${r(a)}
   <section class="closing wrap reveal" aria-labelledby="closing-h">
     ${mascot("bob", 112)}
     <h2 id="closing-h">${t(c.closing.title)}</h2>
-    <p>${t(c.closing.text)}</p>
+    <p>${r(c.closing.text)}</p>
     ${actions("closing")}
   </section>
 </main>
