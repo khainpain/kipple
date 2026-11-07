@@ -117,6 +117,21 @@ function deps(tg: SyncDeps["tg"], saved: Library[] = []): SyncDeps {
   };
 }
 
+describe("link preview pictures", () => {
+  it("marks links whose Telegram preview has a picture and queues it with the photos", () => {
+    const link = (id: number, webPhoto: boolean) => msg(id, { text: "https://example.com/a", entities: [{ kind: "url", offset: 0, length: 21 }], webPhoto });
+    const lib = emptyTelegramLibrary();
+    addCards(lib, messagesToCards([link(1, true), link(2, false), msg(3, { media: { kind: "photo" } })]));
+    const byId = (id: number) => lib.cards.find((c) => c.id === id)!;
+    expect(byId(1).kind).toBe("link");
+    expect(byId(1).preview).toEqual({ inTelegram: true });
+    expect(byId(2).preview).toBeUndefined();
+    expect(pendingPhotos(lib).sort()).toEqual([1, 3]);
+    byId(1).preview!.path = "/data/telegram-media/1.jpg";
+    expect(pendingPhotos(lib)).toEqual([3]);
+  });
+});
+
 describe("syncSaved", () => {
   it("loads everything, downloads photos, then only what's new", async () => {
     const chat = fakeChat(8);

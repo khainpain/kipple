@@ -50,6 +50,8 @@ export interface SavedMessage {
   entities: Array<{ kind: "url" | "text_url" | "hashtag"; offset: number; length: number; url?: string | null }>;
   forwardedFrom?: string | null;
   groupedId?: string | null;
+  /** Telegram made a link preview with a picture; savedPhotos downloads it like a photo. */
+  webPhoto?: boolean;
   media?: {
     /** photo, video_file, animation, voice_message, video_message, audio_file, sticker, document, poll, location, contact */
     kind: string;
@@ -104,6 +106,7 @@ export interface TelegramApi {
   /** Up to 100 Saved Messages older than offsetId (0: from the newest) and newer than minId. */
   savedPage(offsetId: number, minId: number): Promise<SavedPage>;
   /** Downloads these messages' photos into the app's folder; returns absolute paths. Skips ones already there. */
+  /** Photos of these messages, or the pictures of their link previews. */
   savedPhotos(ids: number[]): Promise<Array<{ id: number; path: string }>>;
   /** Deletes the downloaded photos. */
   forgetMedia(): Promise<void>;

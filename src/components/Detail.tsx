@@ -205,7 +205,7 @@ export function Detail(props: {
         {embed ? (
           <LinkPlayer embed={embed} cover={cover} />
         ) : (
-          cover && <img className="detail-cover" src={cover} alt="" onError={(e) => (e.currentTarget.style.display = "none")} />
+          cover && <img className="detail-cover" src={cover} alt="" referrerPolicy="no-referrer" onError={(e) => (e.currentTarget.style.display = "none")} />
         )}
         {site && (
           <div className="detail-site">

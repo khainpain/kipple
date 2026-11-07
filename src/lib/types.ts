@@ -52,6 +52,8 @@ export interface LinkMeta {
   excerpt?: string;
   error?: string;
   fetchedAt: string;
+  /** Which parseHtml found the picture (linkmeta.ts PARSE_VERSION); missing means 1. */
+  v?: number;
 }
 
 export interface AiFields {
@@ -97,6 +99,11 @@ export interface Card {
   /** Present in an earlier import but missing from the latest one. */
   removed?: boolean;
   link?: LinkMeta;
+  /**
+   * Telegram's own picture for the link preview (loaded straight from Telegram): `path` is
+   * empty until it's downloaded. Shown before the page's og:image, which needs a request to the site.
+   */
+  preview?: MediaRef;
   /** Text of a nearby message, for photos and files sent without a caption. Derived, not saved. */
   context?: string;
   ai?: AiFields;
