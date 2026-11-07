@@ -163,8 +163,12 @@ export function CardView(props: {
   topics: string[];
   onMove: (topic: string) => void;
   onOpenLink: (url: string) => void;
+  /** Play the entrance animation. Read once on mount, so later re-renders don't cut it short. */
+  enter?: boolean;
+  onEntered?: () => void;
 }) {
   const { card, lib, view } = props;
+  const [enter] = useState(() => props.enter ?? false);
   const [moveAt, setMoveAt] = useState<HTMLElement | null>(null);
   const action = effectiveAction(card);
   const important = isImportant(card);
@@ -176,13 +180,16 @@ export function CardView(props: {
   const site = siteOf(card);
   const fileMeta = [formatSize(card.media?.size), card.kind === "video" ? "" : formatDuration(card.media?.duration)].filter(Boolean).join(" · ");
 
-  const cls = ["card", `view-${view}`, `kind-${card.kind}`, props.selected && "selected", props.active && "active", action === "junk" && "junk", props.selecting && "selecting", moveAt && "menu-open", !show("cover") && "no-cover", view === "list" && props.look?.coverSide === "right" && "cover-right"]
+  const cls = ["card", enter && "enter", `view-${view}`, `kind-${card.kind}`, props.selected && "selected", props.active && "active", action === "junk" && "junk", props.selecting && "selecting", moveAt && "menu-open", !show("cover") && "no-cover", view === "list" && props.look?.coverSide === "right" && "cover-right"]
     .filter(Boolean)
     .join(" ");
 
   return (
     <article
       className={cls}
+      onAnimationEnd={(e) => {
+        if (e.target === e.currentTarget && e.animationName === "k-card-in") props.onEntered?.();
+      }}
       onClick={(e) => {
         if (e.ctrlKey || e.metaKey || e.shiftKey || props.selecting) props.onToggleSelect(e.shiftKey);
         else props.onOpen();

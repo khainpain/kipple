@@ -42,7 +42,7 @@ export type CardHandlers = {
  * Virtualized board for all four views. Masonry uses the virtualizer's lanes; the uniform
  * grid virtualizes rows so cards line up; list and headlines are a single column.
  */
-export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?: CardLook; /** Instead of the usual "nothing here". */ empty?: { title: string; hint: string } }) {
+export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?: CardLook; /** Cards that already played their entrance; kept by the parent across searches. */ seen?: Set<number>; /** Instead of the usual "nothing here". */ empty?: { title: string; hint: string } }) {
   const { cards, view } = props;
   const parentRef = useRef<HTMLDivElement>(null);
   const [outer, setWidth] = useState(1000);
@@ -78,6 +78,15 @@ export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?
     paddingEnd: GAP * 2,
   });
 
+  // Cards rise in only the first time this board shows them (MOTION.md «Masonry»). Opening the
+  // side panel narrows the board, the column count changes and every item remounts; without this
+  // the whole screen would animate again on each open and close. A card counts as shown once its
+  // entrance has finished, so the re-flow right after mount (first width measurement) still plays it.
+  // The Grid is remounted on a section, filter or view change; Workspace then hands over a fresh set.
+  // It keeps the set while a search is typed, so found cards don't replay on every letter.
+  const own = useRef(new Set<number>());
+  const seen = props.seen ?? own.current;
+
   // Keep the card open in the side panel in view while stepping through with the arrow keys.
   useEffect(() => {
     if (props.activeId == null) return;
@@ -88,6 +97,8 @@ export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?
   const card = (c: Card) => (
     <CardView
       key={c.id}
+      enter={!seen.has(c.id)}
+      onEntered={() => seen.add(c.id)}
       lib={props.lib}
       card={c}
       view={view}
