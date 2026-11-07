@@ -87,6 +87,12 @@ export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?
   // then). Workspace hands over a fresh set on a section, filter or view change and keeps it while
   // a search is typed, so found cards don't replay on every letter.
   const seen = props.seen;
+  // The first screenful rises in one after another (MOTION.md: 50 ms apart); cards scrolled into
+  // view later come in without waiting. Short rows get a shorter step so a full screen of
+  // headlines still finishes in about half a second.
+  const born = useRef(performance.now());
+  const step = view === "headlines" ? 20 : view === "list" ? 35 : 50;
+  const delayAt = (k: number) => (performance.now() - born.current < 400 ? Math.min(k * step, 600) : 0);
 
   // Keep the card open in the side panel in view while stepping through with the arrow keys.
   useEffect(() => {
@@ -95,9 +101,10 @@ export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?
     if (i >= 0) virtualizer.scrollToIndex(rowMode ? Math.floor(i / cols) : i, { align: "auto" });
   }, [props.activeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const card = (c: Card) => (
+  const card = (c: Card, delay: number) => (
     <CardView
       key={c.id}
+      enterDelay={delay}
       enter={!seen.has(c.id)}
       onEntered={() => seen.add(c.id)}
       lib={props.lib}
@@ -131,7 +138,7 @@ export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?
   return (
     <div className={`grid-scroll board-${view}`} ref={parentRef}>
       <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
-        {virtualizer.getVirtualItems().map((item) => (
+        {virtualizer.getVirtualItems().map((item, k) => (
           <div
             key={item.key}
             data-index={item.index}
@@ -146,7 +153,7 @@ export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?
               ...(rowMode ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: GAP } : null),
             }}
           >
-            {rowMode ? cards.slice(item.index * cols, item.index * cols + cols).map(card) : card(cards[item.index])}
+            {rowMode ? cards.slice(item.index * cols, item.index * cols + cols).map((c) => card(c, delayAt(k))) : card(cards[item.index], delayAt(k))}
           </div>
         ))}
       </div>

@@ -165,11 +165,14 @@ export function CardView(props: {
   onOpenLink: (url: string) => void;
   /** Play the entrance animation. Read once on mount, so later re-renders don't cut it short. */
   enter?: boolean;
+  /** Entrance delay in ms (the stagger of the first screenful); read once on mount like enter. */
+  enterDelay?: number;
   /** Called when the entrance starts (or at once with reduced motion). */
   onEntered?: () => void;
 }) {
   const { card, lib, view } = props;
   const [enter] = useState(() => props.enter ?? false);
+  const [enterDelay] = useState(() => props.enterDelay ?? 0);
   // With reduced motion there is no animation to start; count the card as shown right away.
   useEffect(() => {
     if (enter && window.matchMedia("(prefers-reduced-motion: reduce)").matches) props.onEntered?.();
@@ -192,6 +195,7 @@ export function CardView(props: {
   return (
     <article
       className={cls}
+      style={enter && enterDelay ? { animationDelay: `${enterDelay}ms` } : undefined}
       onAnimationStart={(e) => {
         if (e.target === e.currentTarget && e.animationName === "k-card-in") props.onEntered?.();
       }}
