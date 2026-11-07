@@ -1,11 +1,15 @@
 import { useLayoutEffect, useRef, useState } from "react";
+import { useNarrow } from "../lib/narrow";
 import type { Card, Library } from "../lib/types";
 import { T, formatNumber } from "../i18n";
 import { CardView } from "./CardView";
 import { Icon } from "./Icon";
 import { hueOf, type ListKey, type Scope } from "./nav";
 
-const GAP = 16;
+const WIDE_GAP = 16;
+/** On a phone: two columns with a tighter gap, like a pinboard app. */
+const NARROW_GAP = 10;
+const NARROW_COL = 150;
 const MIN_COL = 220;
 const MAX_COLS = 6;
 
@@ -40,17 +44,20 @@ export function Overview(props: {
   onOpenLink: (url: string) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(1000);
+  const [outer, setWidth] = useState(1000);
+  const narrow = useNarrow();
+  const GAP = narrow ? NARROW_GAP : WIDE_GAP;
+  const width = outer - 2 * GAP;
 
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setWidth(el.clientWidth - 2 * GAP));
+    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
-  const cols = Math.min(MAX_COLS, Math.max(1, Math.floor((width + GAP) / (MIN_COL + GAP))));
+  const cols = Math.min(MAX_COLS, Math.max(1, Math.floor((width + GAP) / ((narrow ? NARROW_COL : MIN_COL) + GAP))));
   const sections = props.sections.filter((s) => s.count > 0);
 
   return (

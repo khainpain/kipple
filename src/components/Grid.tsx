@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useNarrow } from "../lib/narrow";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Card, Library } from "../lib/types";
 import { CardView } from "./CardView";
@@ -6,7 +7,10 @@ import { T } from "../i18n";
 import { instantImage } from "../lib/embeds";
 import type { CardLook, ViewKey } from "./nav";
 
-const GAP = 16;
+const WIDE_GAP = 16;
+/** On a phone: two columns with a tighter gap, like a pinboard app. */
+const NARROW_GAP = 10;
+const NARROW_COL = 150;
 const MIN_COL: Record<ViewKey, number> = { masonry: 240, grid: 230, list: 0, headlines: 0 };
 
 function estimate(c: Card, colW: number, view: ViewKey): number {
@@ -41,18 +45,21 @@ export type CardHandlers = {
 export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?: CardLook; /** Instead of the usual "nothing here". */ empty?: { title: string; hint: string } }) {
   const { cards, view } = props;
   const parentRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(1000);
+  const [outer, setWidth] = useState(1000);
+  const narrow = useNarrow();
+  const GAP = narrow ? NARROW_GAP : WIDE_GAP;
+  const width = outer - 2 * GAP;
 
   useLayoutEffect(() => {
     const el = parentRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => setWidth(el.clientWidth - 2 * GAP));
+    const ro = new ResizeObserver(() => setWidth(el.clientWidth));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
   const multi = view === "masonry" || view === "grid";
-  const cols = multi ? Math.max(1, Math.floor((width + GAP) / (MIN_COL[view] + GAP))) : 1;
+  const cols = multi ? Math.max(1, Math.floor((width + GAP) / ((narrow ? NARROW_COL : MIN_COL[view]) + GAP))) : 1;
   const colW = (width - GAP * (cols - 1)) / cols;
   const rowMode = view === "grid";
   const count = rowMode ? Math.ceil(cards.length / cols) : cards.length;

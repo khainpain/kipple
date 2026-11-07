@@ -623,7 +623,8 @@ export default function App() {
     <>
       {demoOnly && (
         <div className="banner demo">
-          {T.app.webDemoBanner}
+          <span className="wide-only">{T.app.webDemoBanner}</span>
+          <span className="narrow-only">{T.app.webDemoBannerShort}</span>
           <a className="banner-link" href="/download">
             {T.app.webDemoDownload}
           </a>

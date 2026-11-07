@@ -55,6 +55,8 @@ export const en: Dict = {
     webBanner: (version) =>
       `Web build for trying out the interface${version ? ` (${version})` : ""}. Data stays in this browser only, link previews aren't loaded, and photos show until the page is reloaded.`,
     webDemoBanner: "This is the Kipple demo: look around and try things, nothing is saved. Your own Saved Messages open in the Windows app.",
+    /** The same on a phone, where the long one takes a third of the screen. */
+    webDemoBannerShort: "A demo to try out: nothing is saved.",
     webDemoDownload: "Download for Windows",
     demoBanner: "This is the demo: look around and try things, but nothing is saved or touches your library.",
     demoExit: "Exit demo",
@@ -163,7 +165,7 @@ export const en: Dict = {
     aiImages:
       "Uncaptioned pictures get a title from what's in them. The pictures themselves then go to Anthropic as copies shrunk to 768 px; originals stay on this computer. Screenshots with personal data go too if they have no caption. With Haiku it costs about $0.15 per 1,000 pictures. When off, the title comes from a nearby message or is set to \"Photo, date\"; you can still name one picture with the button in its card.",
     fetchLinks: "Load link previews (page title, image, description)",
-    fetchLinksWeb: ". In the web build pages are fetched through this site's server, which only sees the link itself",
+    fetchLinksWeb: " In the web build pages are fetched through this site's server, which only sees the link itself.",
     version: (v) => `Kipple ${v}`,
     wipe: "Delete all data",
     wipeConfirm: "Delete the library and all edits from this computer? Your Telegram export itself won't be touched.",
@@ -557,6 +559,14 @@ export const en: Dict = {
     summary: "A short note on what's saved here and why you'd come back to it.",
     groups: ["Color and type", "Grids and layout"],
     tags: ["css", "ideas", "references"],
+    messages: {
+      2: "Check out this article on masonry #design",
+      4: "References for the landing page",
+      6: "How to make animations",
+      10: "home wifi password: correct-horse-battery",
+      11: "Idea: a bot that sends three random saved messages once a week",
+    },
+    channel: "Design channel",
     textFile: "shopping.txt",
     textBody: "Shopping list\n\n- coffee\n- bread\n- E27 light bulb\n\nText files show right inside the card.",
     // A one-line message whose AI title and summary are longer than the message itself.

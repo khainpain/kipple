@@ -5,6 +5,7 @@ import { mediaUrl } from "../lib/importer";
 import { Icon } from "./Icon";
 import { formatDuration, formatSize } from "./CardView";
 import { T } from "../i18n";
+import { useNarrow } from "../lib/narrow";
 
 const IMAGE = ["jpg", "jpeg", "png", "gif", "webp", "avif", "bmp", "svg"];
 const VIDEO = ["mp4", "webm", "mov", "m4v"];
@@ -84,6 +85,8 @@ function TextView({ blob }: { blob: Blob }) {
 export function Preview({ lib, card }: { lib: Library; card: Card }) {
   const m = card.media;
   const kind = previewKind(card);
+  // Phone browsers don't show a PDF inside a page (Android) or show one page that won't scroll (iOS).
+  const narrow = useNarrow();
   const needsBlob = kind === "pdf" || kind === "text";
   const { url: blobUrl, blob, error } = useBlob(lib, m?.path, kind === "pdf" ? "application/pdf" : undefined, needsBlob);
   const [failed, setFailed] = useState(false);
@@ -146,6 +149,7 @@ export function Preview({ lib, card }: { lib: Library; card: Card }) {
         </figure>
       );
     case "pdf":
+      if (narrow) return fileRow();
       return blobUrl ? (
         <figure className="preview">
           <iframe className="preview-pdf" src={blobUrl} title={m.fileName ?? "PDF"} />
