@@ -83,3 +83,7 @@ Windows installers (`.exe`, `.msi`) are also built by GitHub Actions on every pu
 - `src/components/`: grid, card, detail and settings UI
 - `src/platform/`: desktop (Tauri) and browser implementations of files, dialogs, secrets, HTTP and updates
 - `src-tauri/`: Tauri shell, OS credential store commands, updater; `src/telegram.rs` is the Telegram login and send commands
+
+## License
+
+[MIT](LICENSE). The adapted Claude agents and skills in `.claude/` keep their own MIT notices (`.claude/THIRD_PARTY_NOTICES.md`).
