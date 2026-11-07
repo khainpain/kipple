@@ -1,6 +1,7 @@
 import { T } from "../i18n";
 import type { Card, CardKind, MediaRef } from "./types";
 import { isAutoJunk, isSensitive } from "./rules";
+import { isKippleReply } from "./tgReplies";
 
 /** Loose shape of one message in Telegram Desktop's result.json. The format is undocumented, so every field is optional. */
 interface RawEntity {
@@ -165,6 +166,7 @@ export function messageToCard(msg: RawMessage): Card | null {
   if (msg.type && msg.type !== "message") return null;
   if (typeof msg.id !== "number") return null;
   const { text: bodyText, urls, hashtags } = extractText(msg);
+  if (isKippleReply(bodyText)) return null; // Kipple's own "open in Telegram" helper
   const text = bodyText || extraText(msg);
   const { kind, media } = kindAndMedia(msg, urls);
   const card: Card = {

@@ -192,6 +192,10 @@ export const ru = {
     secAi: "AI-разметка",
     secLinks: "Ссылки",
     secData: "Данные",
+    secTelegram: "Telegram",
+    replyCleanupTitle: "Сообщения «Открыть в Telegram»",
+    replyCleanupDesc: "Чтобы перейти к сообщению, Kipple пишет в Избранное ответ с цитатой. Когда его удалять:",
+    replyCleanup: { "1m": "Через минуту", "1h": "Через час", never: "Не удалять, удалю сам" },
     secStats: "Статистика",
     statsTitle: "Анонимная статистика",
     statsDesc:
@@ -496,6 +500,7 @@ export const ru = {
     noText: "(без текста)",
     messageId: (id: number) => `сообщение #${id}`,
     from: (name: string) => `из «${name}»`,
+    openInTelegram: "Открыть в Telegram",
     taggedBy: (model: string) => `разметка ${model}`,
     notSentToAi: "не отправлялось в AI",
     removed: "нет в последнем экспорте",
@@ -515,6 +520,9 @@ export const ru = {
   },
 
   telegram: {
+    replyHint: "нажми на цитату, чтобы перейти к сообщению",
+    replyNoOriginal: "Этого сообщения уже нет в Избранном",
+    replyNoChat: "Ответ с цитатой уже в Избранном: открой Telegram, он там последним",
     title: "Отправить в Telegram",
     intro: (board: string) =>
       `Приложение создаст у тебя закрытую группу «${board}» с темами по разделам библиотеки и перешлёт туда оригиналы сообщений из «Избранного». Под каждым будет короткое описание и хештеги. Вход идёт напрямую в Telegram, ключ сеанса хранится только на этом компьютере, в диспетчере учётных данных Windows.`,

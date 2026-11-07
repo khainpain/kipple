@@ -105,6 +105,14 @@ export interface TelegramApi {
   logout(): Promise<void>;
   /** Up to 100 Saved Messages older than offsetId (0: from the newest) and newer than minId. */
   savedPage(offsetId: number, minId: number): Promise<SavedPage>;
+  /**
+   * Posts `text` in Saved Messages as a reply to message `id`. Returns the reply's id and a tg://
+   * link that opens Saved Messages (null when the account has neither username nor phone).
+   * Rejects with "NO_ORIGINAL" when the original is gone.
+   */
+  quoteSaved(id: number, text: string): Promise<{ id: number; open: string | null }>;
+  /** Deletes these messages from Saved Messages, on all devices. */
+  deleteSaved(ids: number[]): Promise<void>;
   /** Downloads these messages' photos into the app's folder; returns absolute paths. Skips ones already there. */
   /** Photos of these messages, or the pictures of their link previews. */
   savedPhotos(ids: number[]): Promise<Array<{ id: number; path: string }>>;

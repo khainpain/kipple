@@ -34,6 +34,7 @@ export function Detail(props: {
   onNameImage?: () => void;
   onClose: () => void;
   onEdit: (patch: UserFields) => void;
+  onOpenInTelegram?: () => Promise<void> | void;
   onPrev?: () => void;
   onNext?: () => void;
 }) {
@@ -48,6 +49,7 @@ export function Detail(props: {
   const [tags, setTags] = useState(effectiveTags(card));
   const [note, setNote] = useState(card.user?.note ?? "");
   const action = effectiveAction(card);
+  const [opening, setOpening] = useState(false);
   const photos = card.kind === "photo" ? [card.media, ...(card.album ?? [])].filter((m): m is MediaRef => !!m?.path) : [];
   const cover = card.kind !== "photo" ? coverOf(lib, card).src : undefined;
   const site = siteOf(card);
@@ -198,6 +200,25 @@ export function Detail(props: {
         {card.media?.path && card.kind !== "photo" && (
           <button className="icon-btn" onClick={() => platform.openFile(lib.sourceDir, card.media!.path!)} title={T.detail.openFile}>
             <Icon name="file" />
+          </button>
+        )}
+        {props.onOpenInTelegram && (
+          <button
+            className="icon-btn"
+            disabled={opening}
+            aria-busy={opening}
+            onClick={async () => {
+              setOpening(true);
+              try {
+                await props.onOpenInTelegram!();
+              } finally {
+                setOpening(false);
+              }
+            }}
+            title={T.detail.openInTelegram}
+            aria-label={T.detail.openInTelegram}
+          >
+            <Icon name="send" />
           </button>
         )}
         {card.urls[0] && (

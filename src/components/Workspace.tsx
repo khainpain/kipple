@@ -78,6 +78,8 @@ export function Workspace(props: {
   onRunAi: () => void;
   /** Ask the AI to name one photo from its content (sends that picture). */
   onNameImage?: (card: Card) => void;
+  /** Signed in to Telegram: jump to the card's message in Saved Messages. */
+  onOpenInTelegram?: (card: Card) => void;
   onStop: () => void;
   onEdit: (ids: number[], patch: UserFields) => void;
   /** Merged topics and tags, and saving a change to them. */
@@ -206,6 +208,12 @@ export function Workspace(props: {
   const home = scope.kind === "home" && !query.trim();
   const shown: Scope = scope.kind === "home" && !home ? { kind: "list", key: "all" } : scope;
   const isDupes = shown.kind === "list" && shown.key === "duplicates";
+  // A new section, filter, sort or view gives a fresh board whose cards rise in again. Typing a
+  // search keeps the set, so cards already on screen don't replay the entrance on every letter.
+  const boardKey = `${JSON.stringify(shown)}|${sub}|${type}|${tag}|${sort}|${view}`;
+  const seenRef = useRef({ key: boardKey, ids: new Set<number>() });
+  if (seenRef.current.key !== boardKey) seenRef.current = { key: boardKey, ids: new Set<number>() };
+  const seen = seenRef.current.ids;
 
   // Every topic and tag in use (search aside), for tidying up.
   const names = useMemo(() => {
@@ -596,7 +604,8 @@ export function Workspace(props: {
         </div>
 
         <Grid
-          key={`${JSON.stringify(shown)}|${sub}|${type}|${tag}|${query}|${sort}|${view}`}
+          key={`${boardKey}|${query}`}
+          seen={seen}
           lib={lib}
           cards={visible}
           view={view}
@@ -660,6 +669,7 @@ export function Workspace(props: {
           onMode={setOpenMode}
           onClose={() => setOpenId(null)}
           onEdit={(p) => onEdit([openCard.id], p)}
+          onOpenInTelegram={props.onOpenInTelegram && !openCard.removed ? () => props.onOpenInTelegram!(openCard) : undefined}
           onPrev={openIdx > 0 ? () => setOpenId(visible[openIdx - 1].id) : undefined}
           onNext={openIdx >= 0 && openIdx < visible.length - 1 ? () => setOpenId(visible[openIdx + 1].id) : undefined}
         />

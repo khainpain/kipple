@@ -186,6 +186,10 @@ export const en: Dict = {
     secAi: "AI tagging",
     secLinks: "Links",
     secData: "Data",
+    secTelegram: "Telegram",
+    replyCleanupTitle: "“Open in Telegram” messages",
+    replyCleanupDesc: "To take you to a message, Kipple posts a reply quoting it in Saved Messages. Delete it:",
+    replyCleanup: { "1m": "After a minute", "1h": "After an hour", never: "Never, I'll delete it myself" },
     secStats: "Statistics",
     statsTitle: "Anonymous usage stats",
     statsDesc:
@@ -488,6 +492,7 @@ export const en: Dict = {
     noText: "(no text)",
     messageId: (id) => `message #${id}`,
     from: (name) => `from "${name}"`,
+    openInTelegram: "Open in Telegram",
     taggedBy: (model) => `tagged by ${model}`,
     notSentToAi: "not sent to the AI",
     removed: "not in the latest export",
@@ -507,6 +512,9 @@ export const en: Dict = {
   },
 
   telegram: {
+    replyHint: "tap the quote to jump to the message",
+    replyNoOriginal: "This message is no longer in Saved Messages",
+    replyNoChat: "A reply with a quote is in Saved Messages now: open Telegram, it's the latest one",
     title: "Send to Telegram",
     intro: (board) =>
       `The app will create a private group "${board}" for you, with a topic per library section, and forward the original messages from Saved Messages there. Each one gets a short summary and hashtags underneath. You sign in to Telegram directly; the session key is kept only on this computer, in Windows Credential Manager.`,

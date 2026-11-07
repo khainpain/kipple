@@ -6,7 +6,8 @@ import "./App.css";
 import type { Card, Library, UserFields } from "./lib/types";
 import type { Skips, TodayState } from "./lib/today";
 import { effectiveTags, effectiveTopic, findTopic, getOwnTopics, makeEdit, matchesFilter, mergeAlias, NO_ALIASES, setAliases, setOwnTopics, topicName, type Aliases } from "./lib/library";
-import { aiAllowed, appendEdit, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadSettings, saveBoardState, saveLibrary, saveSettings, wipeAll, type Settings } from "./lib/store";
+import { aiAllowed, appendEdit, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadPendingReplies, loadSettings, saveBoardState, saveLibrary, savePendingReplies, saveSettings, wipeAll, type Settings } from "./lib/store";
+import { dueReplies, nextDue, replyText, scheduleReply } from "./lib/tgReplies";
 import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type SendOptions } from "./lib/telegram";
 import { TelegramDialog } from "./components/TelegramDialog";
 import { importFolder, pickExportFolder } from "./lib/importer";
@@ -80,6 +81,32 @@ export default function App() {
     setToast(msg);
     setTimeout(() => setToast((t) => (t === msg ? null : t)), 6000);
   }, []);
+
+  // Deletes "Open in Telegram" helper replies from Saved Messages when they're due, while signed in.
+  const cleanupTimer = useRef<number | undefined>(undefined);
+  const cleanReplies = useCallback(async () => {
+    const tg = platform.telegram;
+    if (!tg) return;
+    window.clearTimeout(cleanupTimer.current);
+    const list = await loadPendingReplies();
+    const { ids, rest } = dueReplies(list, new Date());
+    let left = list;
+    if (ids.length) {
+      try {
+        await tg.deleteSaved(ids);
+        left = rest;
+        await savePendingReplies(rest);
+      } catch {
+        // Offline or signed out: they stay in the list and the next try deletes them.
+      }
+    }
+    const wait = nextDue(left, new Date());
+    if (wait !== null) cleanupTimer.current = window.setTimeout(() => void cleanReplies().catch(() => undefined), left === list && ids.length ? 60_000 : Math.max(wait, 1000));
+  }, []);
+  useEffect(() => {
+    if (tgAccount) void cleanReplies().catch(() => undefined);
+    return () => window.clearTimeout(cleanupTimer.current);
+  }, [tgAccount, cleanReplies]);
 
   useEffect(() => {
     (async () => {
@@ -231,6 +258,21 @@ export default function App() {
   }
 
   /** One photo, on the user's request from the card: sends just this picture. */
+  /** Posts a reply quoting the card's message in Saved Messages and opens that chat. */
+  async function openInTelegram(card: Card) {
+    const tg = platform.telegram;
+    if (!tg) return;
+    try {
+      const sent = await tg.quoteSaved(card.id, replyText());
+      await savePendingReplies(scheduleReply(await loadPendingReplies(), sent.id, new Date(), settingsRef.current.replyCleanup));
+      void cleanReplies().catch(() => undefined);
+      if (sent.open) await platform.openUrl(sent.open);
+      else notify(T.telegram.replyNoChat);
+    } catch (e) {
+      notify(/NO_ORIGINAL/.test(String(e)) ? T.telegram.replyNoOriginal : telegramErrorText(e));
+    }
+  }
+
   async function nameOne(card: Card) {
     if (!lib || !aiAllowed(settingsRef.current)) return;
     const auth = await getAiAuth();
@@ -725,6 +767,7 @@ export default function App() {
         onTelegram={platform.telegram && !demo ? () => setShowTelegram(true) : undefined}
         onRunAi={() => processAll(lib)}
         onNameImage={aiAllowed(settings) && !demo ? nameOne : undefined}
+        onOpenInTelegram={tgAccount && !demo ? openInTelegram : undefined}
         onStop={() => abortRef.current?.abort()}
         onEdit={edit}
         aliases={aliases}
