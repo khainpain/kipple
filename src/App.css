@@ -2622,11 +2622,76 @@ button.ov-title:hover {
   label {
     -webkit-tap-highlight-color: transparent;
   }
-  /* iOS zooms into any field with text under 16px; keep them at 16. */
+  /* iOS zooms into any field with text under 16px; keep them at 16, classed ones too. */
   input,
   textarea,
-  select {
+  select,
+  :is(input, textarea, select)[class] {
     font-size: 16px;
+  }
+
+  /* Taps leave :hover behind on touch screens: no grey box stuck on the last button. */
+  @media (hover: none) {
+    .icon-btn:hover:not(:disabled),
+    .pill:hover,
+    .side-item:hover,
+    .sort-btn:hover,
+    .menu button:hover,
+    .tag-x:hover,
+    .ov-title:hover {
+      background: transparent;
+    }
+    .pill.active:hover {
+      background: var(--ink);
+    }
+    /* No hover to reveal the photo arrows: show the usable ones, hide the disabled one. */
+    .carousel-arrow:not(:disabled) {
+      opacity: 0.92 !important;
+    }
+    .carousel-arrow:disabled {
+      opacity: 0 !important;
+    }
+    /* Removing a tag has to be visible without hover, with a finger-sized target. */
+    .tag-x {
+      opacity: 0.6;
+      position: relative;
+    }
+    .tag-x::after {
+      content: "";
+      position: absolute;
+      inset: -10px;
+    }
+  }
+
+  /* Finger-sized targets for the controls used most. */
+  .sort-btn,
+  .pill,
+  .prop-btn,
+  .menu button {
+    min-height: 36px;
+  }
+  .search .clear,
+  .prop-add {
+    position: relative;
+  }
+  .search .clear::after,
+  .prop-add::after {
+    content: "";
+    position: absolute;
+    inset: -10px;
+  }
+  .banner a.banner-link {
+    padding: 6px 10px;
+  }
+
+  /* Tidy-up sheet: title next to the close button, no gap under it. */
+  .modal.tidy h2 {
+    margin: 0;
+    padding-right: 36px;
+  }
+  .modal.tidy h2 + .hint,
+  .modal.tidy h2 + p {
+    margin-top: 0;
   }
 
   .banner {
@@ -2701,9 +2766,8 @@ button.ov-title:hover {
     width: 38px;
     height: 38px;
   }
-  /* Export and the AI run don't make sense in a phone demo. */
-  .toolbar-end .menu-wrap,
-  .toolbar-end .small-btn {
+  /* No room for "Run AI (N)" on a phone; a running job keeps its Stop button. */
+  .toolbar-end > .small-btn {
     display: none;
   }
 
@@ -2716,6 +2780,7 @@ button.ov-title:hover {
     flex: 1;
     min-width: 0;
     /* Pills that don't fit fade out under the sort button instead of being cut. */
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
     mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
     padding-right: 20px;
   }
@@ -2820,9 +2885,10 @@ button.ov-title:hover {
     transform: translateX(-100%);
   }
 }
-/* Touch screens have no hover: the card's quick actions would sit there invisible and
-   catch taps meant to open the card. Pin and move live in the opened card instead. */
-@media (hover: none) and (pointer: coarse) {
+/* Phones have no hover: the card's quick actions would sit there invisible and catch taps
+   meant to open the card. Pin, status and hiding live in the opened card. Phones only, so a
+   touch tablet or the desktop app on a touch screen keeps selection. */
+@media (hover: none) and (pointer: coarse) and (max-width: 640px) {
   .hover-actions {
     display: none;
   }

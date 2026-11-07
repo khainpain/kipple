@@ -165,7 +165,7 @@ export const en: Dict = {
     aiImages:
       "Uncaptioned pictures get a title from what's in them. The pictures themselves then go to Anthropic as copies shrunk to 768 px; originals stay on this computer. Screenshots with personal data go too if they have no caption. With Haiku it costs about $0.15 per 1,000 pictures. When off, the title comes from a nearby message or is set to \"Photo, date\"; you can still name one picture with the button in its card.",
     fetchLinks: "Load link previews (page title, image, description)",
-    fetchLinksWeb: ". In the web build pages are fetched through this site's server, which only sees the link itself",
+    fetchLinksWeb: " In the web build pages are fetched through this site's server, which only sees the link itself.",
     version: (v) => `Kipple ${v}`,
     wipe: "Delete all data",
     wipeConfirm: "Delete the library and all edits from this computer? Your Telegram export itself won't be touched.",

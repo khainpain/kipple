@@ -120,6 +120,8 @@ function Brand(props: { chatName: string; account?: TelegramAccount | null }) {
 }
 
 export function Sidebar(props: {
+  /** Phone: the sidebar is a drawer over the board, so it is announced as a modal dialog. */
+  drawer?: boolean;
   chatName: string;
   account?: TelegramAccount | null;
   scope: Scope;
@@ -155,7 +157,7 @@ export function Sidebar(props: {
   );
 
   return (
-    <aside className="sidebar">
+    <aside className="sidebar" {...(props.drawer ? { role: "dialog", "aria-modal": true, "aria-label": T.toolbar.showSidebar } : null)}>
       <Brand chatName={props.chatName} account={props.account} />
 
       <nav className="side-group">

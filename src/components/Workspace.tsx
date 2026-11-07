@@ -96,6 +96,19 @@ export function Workspace(props: {
   const narrow = useNarrow();
   const [drawer, setDrawer] = useState(false);
   const showSide = narrow ? drawer : sideOpen;
+  const sideToggle = useRef<HTMLButtonElement>(null);
+  // Turning the phone to landscape (wider than the breakpoint) forgets the drawer, so it doesn't
+  // pop back over the board on turning it back.
+  useEffect(() => {
+    if (!narrow) setDrawer(false);
+  }, [narrow]);
+  // The open drawer takes the focus (its first item), and gives it back to the toggle when it closes.
+  const drawerWas = useRef(false);
+  useEffect(() => {
+    if (drawer) document.querySelector<HTMLElement>(".workspace.narrow .sidebar .side-item")?.focus({ preventScroll: true });
+    else if (drawerWas.current) sideToggle.current?.focus({ preventScroll: true });
+    drawerWas.current = drawer;
+  }, [drawer]);
   const [openMode, setOpenMode] = useState<OpenMode>(() => loadPref("open", OPEN_MODES.map((m) => m.key), "center"));
   const [openId, setOpenId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -308,6 +321,7 @@ export function Workspace(props: {
       if (e.key === "Escape") {
         if (typing) (el as HTMLInputElement).blur();
         else if (openId != null) setOpenId(null);
+        else if (drawer) setDrawer(false);
         else if (selected.size) setSelected(new Set());
         else if (exportOpen) setExportOpen(false);
         return;
@@ -326,7 +340,7 @@ export function Workspace(props: {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [openId, openIdx, visible, selected, exportOpen]);
+  }, [openId, openIdx, visible, selected, exportOpen, drawer]);
 
   const exportCards = selected.size ? visible.filter((c) => selected.has(c.id)) : visible;
   const heading = scopeTitle(home ? scope : shown);
@@ -337,6 +351,7 @@ export function Workspace(props: {
       {narrow && drawer && <div className="drawer-scrim" onClick={() => setDrawer(false)} />}
       {showSide && (
         <Sidebar
+          drawer={narrow}
           chatName={lib.chatName}
           account={props.tgAccount}
           scope={scope}
@@ -361,10 +376,10 @@ export function Workspace(props: {
         />
       )}
 
-      <section className="content">
+      <section className="content" inert={narrow && drawer ? true : undefined}>
         <header className="toolbar">
           <div className="toolbar-start">
-            <button className="icon-btn" onClick={() => (narrow ? setDrawer(!drawer) : setSideOpen(!sideOpen))} title={showSide ? T.toolbar.hideSidebar : T.toolbar.showSidebar}>
+            <button ref={sideToggle} className="icon-btn" aria-expanded={showSide} aria-label={showSide ? T.toolbar.hideSidebar : T.toolbar.showSidebar} onClick={() => (narrow ? setDrawer(!drawer) : setSideOpen(!sideOpen))} title={showSide ? T.toolbar.hideSidebar : T.toolbar.showSidebar}>
               <Icon name="sidebar" />
             </button>
             <div className="heading" title={heading}>

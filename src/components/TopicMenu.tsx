@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { NARROW_QUERY } from "../lib/narrow";
 import { createPortal } from "react-dom";
 import { T, compareText } from "../i18n";
 import { Icon } from "./Icon";
@@ -36,7 +37,8 @@ export function TopicMenu(props: {
   }, [props.anchor]);
 
   useEffect(() => {
-    input.current?.focus();
+    // On a phone focusing the field opens the keyboard over the list; there people just tap a topic.
+    if (!window.matchMedia?.(NARROW_QUERY).matches) input.current?.focus();
     const close = () => props.onClose();
     // Scrolling the board would leave the menu floating away from its card. Scrolling the
     // menu's own list of topics is the menu working, not the board moving.
