@@ -2785,10 +2785,17 @@ button.ov-title:hover {
   .quick {
     flex: 1;
     min-width: 0;
-    /* Pills that don't fit fade out under the sort button instead of being cut. */
-    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
-    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
-    padding-right: 20px;
+    /* Pills that don't fit fade out at whichever edge has more of them, instead of being cut. */
+    --fade-l: 0px;
+    --fade-r: 0px;
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+    mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+  }
+  .quick[data-left] {
+    --fade-l: 24px;
+  }
+  .quick[data-right] {
+    --fade-r: 24px;
   }
   .subbar .spacer {
     display: none;

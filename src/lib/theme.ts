@@ -32,9 +32,19 @@ function readPref(): ThemePref {
 let pref = readPref();
 const listeners = new Set<() => void>();
 
+/** The browser's own bar (Safari, Chrome on phones) in the page colour, --bg in App.css. */
+const BAR = { light: "#f5f3ef", dark: "#171614" };
+
 function apply() {
   const dark = pref === "dark" || (pref === "system" && !!media?.matches);
   document.documentElement.dataset.theme = dark ? "dark" : "light";
+  let bar = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (!bar) {
+    bar = document.createElement("meta");
+    bar.name = "theme-color";
+    document.head.appendChild(bar);
+  }
+  bar.content = dark ? BAR.dark : BAR.light;
   // null lets the window follow the OS again, so "system" keeps live-updating.
   platform.setWindowTheme?.(pref === "system" ? null : pref)?.catch(() => {});
 }

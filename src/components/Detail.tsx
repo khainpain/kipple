@@ -61,13 +61,24 @@ export function Detail(props: {
   const text = card.text?.trim() ?? "";
   const short = !!text && text.length <= SHORT_TEXT && !text.includes("\n\n") && !photos.length && !cover && !card.media?.path && !card.urls.length;
 
+  // What this panel last saved, so the save on unmount doesn't repeat one a blur just made.
+  const saved = useRef<UserFields>({});
   function saveText() {
     const patch: UserFields = {};
-    if (title !== effectiveTitle(card)) patch.title = title.trim();
-    if (topic !== (effectiveTopic(card) ?? "")) patch.topic = topic.trim();
-    if (note !== (card.user?.note ?? "")) patch.note = note;
-    if (Object.keys(patch).length) props.onEdit(patch);
+    if (title !== effectiveTitle(card) && title.trim() !== saved.current.title) patch.title = title.trim();
+    if (topic !== (effectiveTopic(card) ?? "") && topic.trim() !== saved.current.topic) patch.topic = topic.trim();
+    if (note !== (card.user?.note ?? "") && note !== saved.current.note) patch.note = note;
+    if (Object.keys(patch).length) {
+      Object.assign(saved.current, patch);
+      props.onEdit(patch);
+    }
   }
+
+  // Text is saved on blur; a panel that goes away mid-edit (the phone turned, the next card
+  // opened by keyboard) saves what was typed instead of dropping it.
+  const saveRef = useRef(saveText);
+  saveRef.current = saveText;
+  useEffect(() => () => saveRef.current(), []);
 
   /** Width shared by the board and the panel: the workspace minus the sidebar. */
   function room(): number {
