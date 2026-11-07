@@ -10,6 +10,14 @@
     "core:window:allow-set-theme",
     "opener:default",
     {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "tg://resolve*"
+        }
+      ]
+    },
+    {
       "identifier": "opener:allow-open-path",
       "allow": [
         {
