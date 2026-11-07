@@ -76,6 +76,7 @@ export function demoLibrary(): Library {
     text: D.messages[c.id] ?? c.text,
     forwardedFrom: c.forwardedFrom ? D.channel : c.forwardedFrom,
   }));
+  const DEMO_BLOG = "blog.example.org";
   const DEMO_TXT = `data:text/plain;charset=utf-8,${encodeURIComponent(D.textBody)}`;
   const topics = D.topics;
   const cards = Array.from({ length: 60 }, (_, i) => {
@@ -146,6 +147,12 @@ export function demoLibrary(): Library {
   Object.assign(short, { id: 61, text: D.short.text, urls: [], link: undefined, media: undefined, forwardedFrom: undefined, sensitive: false, autoJunk: false, date: new Date(Date.now() - 3_600_000).toISOString() });
   short.ai = { title: D.short.title, summary: D.short.summary, topic: D.short.topic, tags: D.short.tags, action: "todo", priority: 2, model: "claude-haiku-5-5", at: "" };
   cards.push(short);
+  // Four articles from one blog still without a topic, so "Three for today" has a site to sort.
+  for (const c of cards.filter((c) => c.kind === "link" && c.id > base.length + 1 && c.ai && !c.urls[0].includes("youtube")).slice(0, 4)) {
+    c.urls = [`https://${DEMO_BLOG}/post-${c.id}`];
+    c.link = { ...c.link!, url: c.urls[0], siteName: DEMO_BLOG };
+    c.ai = { ...c.ai!, topic: "" };
+  }
   cards.reverse(); // the library is kept newest first
   annotateContext(cards);
   // The first topic comes already split into AI subgroups, to show how that looks.
