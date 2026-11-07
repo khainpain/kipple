@@ -21,7 +21,7 @@ const SITE = (
 ).replace(/\/$/, "");
 
 async function latestRelease() {
-  const fallback = { ver: "0.1.15", bytes: 7_523_840 };
+  const fallback = { ver: "0.1.16", bytes: 7_523_840 };
   try {
     const r = await fetch("https://api.github.com/repos/khainpain/telegram-saved-messages/releases/latest", {
       headers: { accept: "application/vnd.github+json", "user-agent": "kipple-landing-build" },
@@ -104,10 +104,12 @@ function stage(c) {
 /** "What's new": a pill in the corner that opens into a small card. A <details>, so it works without script. */
 function news(c, rel) {
   const date = (d) => new Date(d + "T12:00:00Z").toLocaleDateString(c.lang === "ru" ? "ru-RU" : "en-GB", { day: "numeric", month: "long" });
+  // The newest released entry is highlighted, whether or not a "next" entry sits above it.
+  const latest = changelog.find((e) => e.ver !== "next");
   const entries = changelog
     .map((e, n) => {
       const head = e.ver === "next" ? `<b>${esc(c.news.next)}</b>` : `<b>v${esc(e.ver)}</b><time datetime="${e.date}">${esc(date(e.date))}</time>`;
-      return `<li class="rel${e.ver === "next" ? " soon" : ""}" style="--n:${n}"><div class="rel-head">${head}</div><ul>${e[c.lang].map((x) => `<li>${esc(x)}</li>`).join("")}</ul></li>`;
+      return `<li class="rel${e.ver === "next" ? " soon" : e === latest ? " latest" : ""}" style="--n:${n}"><div class="rel-head">${head}</div><ul>${e[c.lang].map((x) => `<li>${esc(x)}</li>`).join("")}</ul></li>`;
     })
     .join("");
   return `<details class="news" data-ver="${esc(rel.ver)}">

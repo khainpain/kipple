@@ -251,8 +251,8 @@ h1 { font-size: clamp(40px, 7vw, 76px); letter-spacing: -0.035em; font-weight: 7
 .rel ul { display: grid; gap: 4px; }
 .rel ul li { position: relative; padding-left: 16px; font-size: 14px; color: var(--muted); line-height: 1.4; }
 .rel ul li::before { content: ""; position: absolute; left: 2px; top: 0.55em; width: 6px; height: 6px; border-radius: 50%; background: var(--line); }
-.rel:not(.soon):nth-child(2) ul li { color: var(--ink); }
-.rel:not(.soon):nth-child(2) ul li::before { background: var(--accent); }
+.rel.latest ul li { color: var(--ink); }
+.rel.latest ul li::before { background: var(--accent); }
 .news-all { padding: 12px 20px 16px; font-size: 14px; border-top: 1px solid var(--line); }
 
 .motion .news summary { animation: news-in 700ms var(--ease) 3.4s both; }
