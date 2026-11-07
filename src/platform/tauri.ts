@@ -23,6 +23,7 @@ const telegram: TelegramApi = {
   qrCancel: () => invoke("tg_qr_cancel"),
   logout: () => invoke("tg_logout"),
   savedPage: (offsetId, minId) => invoke("tg_saved_page", { offsetId, minId }),
+  sourceLink: (id) => invoke("tg_source_link", { id }),
   savedPhotos: (ids) => invoke("tg_saved_photos", { ids }),
   forgetMedia: () => invoke("tg_forget_media"),
   ensureBoard: (prev, title, about) => invoke("tg_ensure_board", { channelId: prev?.channelId ?? null, accessHash: prev?.accessHash ?? null, title, about }),

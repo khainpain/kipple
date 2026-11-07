@@ -439,6 +439,8 @@ export const ru = {
     noText: "(без текста)",
     messageId: (id: number) => `сообщение #${id}`,
     from: (name: string) => `из «${name}»`,
+    openSource: "Открыть пост в Telegram",
+    noSource: "Ссылки на пост нет: переслано не из канала или пост удалён",
     taggedBy: (model: string) => `разметка ${model}`,
     notSentToAi: "не отправлялось в AI",
     removed: "нет в последнем экспорте",

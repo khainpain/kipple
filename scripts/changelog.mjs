@@ -5,6 +5,11 @@
 // not how it was built.
 export const changelog = [
   {
+    ver: "next",
+    en: ["Open the original channel post in Telegram from a forwarded card"],
+    ru: ["Пересланную карточку можно открыть в исходном посте канала в Telegram"],
+  },
+  {
     ver: "0.1.17",
     date: "2026-11-07",
     en: ["Link cards show the page's preview picture"],

@@ -89,6 +89,7 @@ function fakeTg(opts: { floodOnce?: boolean; missing?: number[] } = {}) {
     status: async () => ({ hasApi: true, builtInApi: true, customApi: false, authorized: true, name: "Me" }),
     account: async () => ({ name: "Me" }),
     savedPage: async () => ({ messages: [], nextOffset: null, total: 0 }),
+    sourceLink: async () => null,
     savedPhotos: async () => [],
     forgetMedia: async () => undefined,
     setApi: async () => undefined,

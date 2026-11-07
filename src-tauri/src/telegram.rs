@@ -1017,6 +1017,63 @@ pub async fn tg_saved_page(state: tauri::State<'_, TgState>, offset_id: i32, min
     Ok(SavedPage { messages, next_offset, total })
 }
 
+/// A t.me link to the post a saved message was forwarded from, when that was a channel or
+/// a supergroup: `t.me/<username>/<post>` for public ones, `t.me/c/<id>/<post>` (opens only
+/// for members) otherwise. None for anything else (forwards from people, own notes).
+///
+/// Telegram can't link to a message inside Saved Messages itself (a link with a message id
+/// only scrolls to the post in channels), so the original post is the closest thing.
+#[tauri::command]
+pub async fn tg_source_link(state: tauri::State<'_, TgState>, id: i32) -> Result<Option<String>, String> {
+    let c = conn(&state).await?;
+    let req = tl::functions::messages::GetMessages {
+        id: vec![tl::types::InputMessageId { id }.into()],
+    };
+    use tl::enums::messages::Messages as R;
+    let (messages, chats) = match c.client.invoke(&req).await.map_err(err)? {
+        R::Messages(m) => (m.messages, m.chats),
+        R::Slice(m) => (m.messages, m.chats),
+        R::ChannelMessages(m) => (m.messages, m.chats),
+        R::NotModified(_) => return Ok(None),
+    };
+    let Some(tl::enums::Message::Message(m)) = messages.into_iter().next() else {
+        return Ok(None);
+    };
+    let Some(tl::enums::MessageFwdHeader::Header(h)) = m.fwd_from else {
+        return Ok(None);
+    };
+    Ok(source_link(&h, &chats))
+}
+
+/// The original post first (who wrote it), else where it was saved from.
+fn source_link(h: &tl::types::MessageFwdHeader, chats: &[tl::enums::Chat]) -> Option<String> {
+    let channel = |p: &Option<tl::enums::Peer>| match p {
+        Some(tl::enums::Peer::Channel(c)) => Some(c.channel_id),
+        _ => None,
+    };
+    let (channel_id, post) = match (channel(&h.from_id), h.channel_post) {
+        (Some(c), Some(post)) => (c, post),
+        _ => (channel(&h.saved_from_peer)?, h.saved_from_msg_id?),
+    };
+    let username = chats.iter().find_map(|c| match c {
+        tl::enums::Chat::Channel(ch) if ch.id == channel_id => public_username(ch),
+        _ => None,
+    });
+    Some(match username {
+        Some(u) => format!("https://t.me/{u}/{post}"),
+        None => format!("https://t.me/c/{channel_id}/{post}"),
+    })
+}
+
+fn public_username(ch: &tl::types::Channel) -> Option<String> {
+    ch.username.clone().or_else(|| {
+        ch.usernames.iter().flatten().find_map(|u| {
+            let tl::enums::Username::Username(u) = u;
+            u.active.then(|| u.username.clone())
+        })
+    })
+}
+
 /// A photo size to download: a custom location so we can ask for the ~800px version
 /// instead of grammers' default (the largest).
 struct PhotoFile {
@@ -1142,6 +1199,41 @@ pub async fn tg_forget_media(app: tauri::AppHandle) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn header(from: Option<tl::enums::Peer>, post: Option<i32>, saved: Option<tl::enums::Peer>, saved_msg: Option<i32>) -> tl::types::MessageFwdHeader {
+        tl::types::MessageFwdHeader {
+            imported: false,
+            saved_out: false,
+            from_id: from,
+            from_name: None,
+            date: 0,
+            channel_post: post,
+            post_author: None,
+            saved_from_peer: saved,
+            saved_from_msg_id: saved_msg,
+            saved_from_id: None,
+            saved_from_name: None,
+            saved_date: None,
+            psa_type: None,
+        }
+    }
+
+    fn channel(id: i64) -> Option<tl::enums::Peer> {
+        Some(tl::types::PeerChannel { channel_id: id }.into())
+    }
+
+    #[test]
+    fn source_link_points_at_the_channel_post() {
+        // Without the channel's username at hand: the members-only form.
+        assert_eq!(source_link(&header(channel(42), Some(7), None, None), &[]).as_deref(), Some("https://t.me/c/42/7"));
+        // The original post wins over where it was saved from.
+        assert_eq!(source_link(&header(channel(42), Some(7), channel(9), Some(3)), &[]).as_deref(), Some("https://t.me/c/42/7"));
+        // Forwarded from a person, but saved from a channel's comments or a supergroup.
+        let person = Some(tl::types::PeerUser { user_id: 5 }.into());
+        assert_eq!(source_link(&header(person.clone(), None, channel(9), Some(3)), &[]).as_deref(), Some("https://t.me/c/9/3"));
+        // A person's message with nowhere to link to.
+        assert_eq!(source_link(&header(person, None, None, None), &[]), None);
+    }
 
     #[test]
     fn qr_url_is_base64url_without_padding() {

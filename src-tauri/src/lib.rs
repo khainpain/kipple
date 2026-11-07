@@ -72,6 +72,7 @@ pub fn run() {
             telegram::tg_forward,
             telegram::tg_send_note,
             telegram::tg_saved_page,
+            telegram::tg_source_link,
             telegram::tg_saved_photos,
             telegram::tg_forget_media
         ])

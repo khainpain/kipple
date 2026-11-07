@@ -590,6 +590,7 @@ export function Workspace(props: {
           onMode={setOpenMode}
           onClose={() => setOpenId(null)}
           onEdit={(p) => onEdit([openCard.id], p)}
+          canOpenSource={!!props.tgAccount}
           onPrev={openIdx > 0 ? () => setOpenId(visible[openIdx - 1].id) : undefined}
           onNext={openIdx >= 0 && openIdx < visible.length - 1 ? () => setOpenId(visible[openIdx + 1].id) : undefined}
         />

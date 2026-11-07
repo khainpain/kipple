@@ -34,6 +34,8 @@ export function Detail(props: {
   onNameImage?: () => void;
   onClose: () => void;
   onEdit: (patch: UserFields) => void;
+  /** Signed in to Telegram: forwarded cards get a button to the original channel post. */
+  canOpenSource?: boolean;
   onPrev?: () => void;
   onNext?: () => void;
 }) {
@@ -48,6 +50,22 @@ export function Detail(props: {
   const [tags, setTags] = useState(effectiveTags(card));
   const [note, setNote] = useState(card.user?.note ?? "");
   const action = effectiveAction(card);
+  // "none" once Telegram said there's no channel post to link to (forwarded from a person, deleted).
+  const [source, setSource] = useState<"idle" | "busy" | "none">("idle");
+  const openSource = async () => {
+    const tg = platform.telegram;
+    if (!tg || source !== "idle") return;
+    setSource("busy");
+    try {
+      const url = await tg.sourceLink(card.id);
+      if (url) {
+        await platform.openUrl(url);
+        setSource("idle");
+      } else setSource("none");
+    } catch {
+      setSource("idle"); // offline or signed out: let the user try again
+    }
+  };
   const photos = card.kind === "photo" ? [card.media, ...(card.album ?? [])].filter((m): m is MediaRef => !!m?.path) : [];
   const cover = card.kind !== "photo" ? coverOf(lib, card).src : undefined;
   const site = siteOf(card);
@@ -198,6 +216,18 @@ export function Detail(props: {
         {card.media?.path && card.kind !== "photo" && (
           <button className="icon-btn" onClick={() => platform.openFile(lib.sourceDir, card.media!.path!)} title={T.detail.openFile}>
             <Icon name="file" />
+          </button>
+        )}
+        {props.canOpenSource && card.forwardedFrom && !card.removed && (
+          <button
+            className="icon-btn"
+            onClick={openSource}
+            disabled={source !== "idle"}
+            aria-busy={source === "busy"}
+            title={source === "none" ? T.detail.noSource : T.detail.openSource}
+            aria-label={T.detail.openSource}
+          >
+            <Icon name="send" />
           </button>
         )}
         {card.urls[0] && (

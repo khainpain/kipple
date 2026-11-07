@@ -105,6 +105,8 @@ export interface TelegramApi {
   logout(): Promise<void>;
   /** Up to 100 Saved Messages older than offsetId (0: from the newest) and newer than minId. */
   savedPage(offsetId: number, minId: number): Promise<SavedPage>;
+  /** t.me link to the channel post a saved message was forwarded from; null when there's none. */
+  sourceLink(id: number): Promise<string | null>;
   /** Downloads these messages' photos into the app's folder; returns absolute paths. Skips ones already there. */
   /** Photos of these messages, or the pictures of their link previews. */
   savedPhotos(ids: number[]): Promise<Array<{ id: number; path: string }>>;

@@ -431,6 +431,8 @@ export const en: Dict = {
     noText: "(no text)",
     messageId: (id) => `message #${id}`,
     from: (name) => `from "${name}"`,
+    openSource: "Open the post in Telegram",
+    noSource: "No link to the post: it wasn't forwarded from a channel, or it was deleted",
     taggedBy: (model) => `tagged by ${model}`,
     notSentToAi: "not sent to the AI",
     removed: "not in the latest export",
