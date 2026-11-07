@@ -189,7 +189,9 @@ export function Workspace(props: {
   // A new section, filter, sort or view gives a fresh board whose cards rise in again. Typing a
   // search keeps the set, so cards already on screen don't replay the entrance on every letter.
   const boardKey = `${JSON.stringify(shown)}|${sub}|${type}|${tag}|${sort}|${view}`;
-  const seen = useMemo(() => new Set<number>(), [boardKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const seenRef = useRef({ key: boardKey, ids: new Set<number>() });
+  if (seenRef.current.key !== boardKey) seenRef.current = { key: boardKey, ids: new Set<number>() };
+  const seen = seenRef.current.ids;
 
   // Every topic and tag in use (search aside), for tidying up.
   const names = useMemo(() => {

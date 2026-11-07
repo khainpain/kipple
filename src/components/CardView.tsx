@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Card, Library } from "../lib/types";
 import { actionLabel } from "../lib/types";
 import { T, formatNumber, locale } from "../i18n";
@@ -165,10 +165,15 @@ export function CardView(props: {
   onOpenLink: (url: string) => void;
   /** Play the entrance animation. Read once on mount, so later re-renders don't cut it short. */
   enter?: boolean;
+  /** Called when the entrance starts (or at once with reduced motion). */
   onEntered?: () => void;
 }) {
   const { card, lib, view } = props;
   const [enter] = useState(() => props.enter ?? false);
+  // With reduced motion there is no animation to start; count the card as shown right away.
+  useEffect(() => {
+    if (enter && window.matchMedia("(prefers-reduced-motion: reduce)").matches) props.onEntered?.();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [moveAt, setMoveAt] = useState<HTMLElement | null>(null);
   const action = effectiveAction(card);
   const important = isImportant(card);
@@ -187,7 +192,7 @@ export function CardView(props: {
   return (
     <article
       className={cls}
-      onAnimationEnd={(e) => {
+      onAnimationStart={(e) => {
         if (e.target === e.currentTarget && e.animationName === "k-card-in") props.onEntered?.();
       }}
       onClick={(e) => {
