@@ -4,10 +4,20 @@
 // not how it was built.
 export const changelog = [
   {
-    ver: "next",
-    date: null,
-    en: ["Saved videos play right in the card", "Opened card: content on the left, details on the right"],
-    ru: ["Сохранённые видео играют прямо в карточке", "Открытая карточка: содержимое слева, свойства справа"],
+    ver: "0.1.16",
+    date: "2026-11-07",
+    en: [
+      "Saved videos play right in the card",
+      "Opened card: content on the left, details on the right",
+      "Anonymous usage stats, easy to turn off in Settings",
+      "Fixed the language picker in Settings",
+    ],
+    ru: [
+      "Сохранённые видео играют прямо в карточке",
+      "Открытая карточка: содержимое слева, свойства справа",
+      "Анонимная статистика использования, отключается в настройках",
+      "Исправлен выбор языка в настройках",
+    ],
   },
   {
     ver: "0.1.15",
