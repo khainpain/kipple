@@ -47,7 +47,7 @@ jobs:
           fi
           node -e "const f='src-tauri/tauri.conf.json',fs=require('fs'),c=JSON.parse(fs.readFileSync(f));c.version='$VERSION';fs.writeFileSync(f,JSON.stringify(c,null,2))"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-      # English notes: "What's new" from site/changelog.mjs (this version's entry, else "next").
+      # English notes: "What's new" from scripts/changelog.mjs (this version's entry, else "next").
       - name: Release notes
         id: notes
         shell: bash
@@ -83,9 +83,10 @@ jobs:
         run: |
           setup-app/build.sh
           gh release upload "v$VERSION" "Install-Kipple-$VERSION.exe" --clobber
-      # The landing page reads the version and installer size from the latest release when it is
-      # built, so rebuild it now that the release exists. Needs a Vercel deploy hook URL in the
-      # VERCEL_DEPLOY_HOOK secret (Vercel → Settings → Git → Deploy Hooks, branch main); skipped without it.
+      # The landing page (its own Vercel project, khainpain/kipple-site) reads the version, installer
+      # size and "What's new" when it is built, so rebuild it now that the release exists. Needs that
+      # project's deploy hook URL in the VERCEL_DEPLOY_HOOK secret (Vercel → Settings → Git → Deploy
+      # Hooks, branch main); skipped without it.
       - name: Rebuild the website
         shell: bash
         env:

@@ -1,4 +1,5 @@
-// "What's new" on the landing page: short, user-facing notes per release, newest first.
+// "What's new": short, user-facing notes per release, newest first. The landing page (khainpain/kipple-site)
+// reads this file from main when it is built.
 // Add an entry before a release goes out (Actions → release): its "en" lines also become
 // the GitHub release notes. Keep each item to one line, about what people can do now,
 // not how it was built.
