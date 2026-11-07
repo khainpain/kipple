@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { platform } from "@platform";
 import type { Card, Library, UserFields } from "../lib/types";
 import { effectiveAction, effectiveTags, effectiveTopic, getOwnTopics, matchesFilter, tagName, topicName } from "../lib/library";
@@ -43,6 +43,15 @@ import {
   saveLook,
   type CardLook,
 } from "./nav";
+
+/** Marks a sideways-scrolling row as scrolled away from its start or end, for the edge fades. */
+function markEdges(el: HTMLElement | null) {
+  if (!el) return;
+  if (el.scrollLeft > 1) el.dataset.left = "";
+  else delete el.dataset.left;
+  if (el.scrollLeft + el.clientWidth < el.scrollWidth - 1) el.dataset.right = "";
+  else delete el.dataset.right;
+}
 
 /** Topics smaller than this aren't worth splitting into subgroups. */
 const GROUP_MIN = 12;
@@ -121,6 +130,9 @@ export function Workspace(props: {
   const [groupError, setGroupError] = useState<string | null>(null);
   const lastClicked = useRef<number | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  // The filter pills change with every scope: re-check which edges need a fade after each render.
+  const quickRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => markEdges(quickRef.current));
 
   // A merge in "Tidy up" renames topics and tags: follow the open topic and the chosen tag to
   // their new name, or the board would stay on a name no card has any more and look empty.
@@ -494,7 +506,7 @@ export function Workspace(props: {
               </button>
             </div>
           ) : (
-            <div className="quick">
+            <div className="quick" ref={quickRef} onScroll={(e) => markEdges(e.currentTarget)}>
               {TYPES.map((t) =>
                 typeCounts[t.key] ? (
                   <button key={t.key} className={`pill${type === t.key ? " active" : ""}`} onClick={() => setType(type === t.key ? null : t.key)}>
