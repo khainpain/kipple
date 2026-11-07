@@ -25,7 +25,7 @@ use grammers_client::{Client, InvocationError, SignInError};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{Mutex, MutexGuard};
 
-const SERVICE: &str = "com.khainpain.savedboard";
+const SERVICE: &str = crate::migrate::APP_ID;
 const SESSION_KEY: &str = "telegram_session";
 const API_ID_KEY: &str = "telegram_api_id";
 const API_HASH_KEY: &str = "telegram_api_hash";

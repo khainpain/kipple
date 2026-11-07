@@ -11,7 +11,7 @@ You review the boundary between the WebView2 UI and the Rust side of a Tauri 2 d
 
 ## Where to look
 
-- `src-tauri/tauri.conf.json`: CSP, `assetProtocol` scope, updater config, bundle/installer settings, `identifier` (must stay `com.khainpain.savedboard`: data dir, keyring and updater depend on it).
+- `src-tauri/tauri.conf.json`: CSP, `assetProtocol` scope, updater config, bundle/installer settings, `identifier` (must stay `io.getkipple.app`: data dir, keyring and web view storage depend on it; `src-tauri/src/migrate.rs` moves data over from the old `com.khainpain.savedboard`).
 - `src-tauri/capabilities/*.json`: permissions granted to the window.
 - `src-tauri/src/lib.rs`, `telegram.rs`: `#[tauri::command]` functions.
 - `src/platform/tauri.ts` and `src/platform/web.ts`: the UI side of each command; both platforms must keep the same interface (`src/platform/types.ts`).
