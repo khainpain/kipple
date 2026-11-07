@@ -57,7 +57,18 @@ export const en = {
   closing: { title: "Tame your kipple", text: "Kipple is Philip K. Dick's word for junk that multiplies by itself." },
   footer: {
     note: "Independent open-source project, not affiliated with Telegram.",
-    links: [["GitHub", "repo"], ["Releases", "releases"], ["Report a bug", "issues"]],
+    links: [["GitHub", "repo"], ["Releases", "releases"], ["Privacy", "privacy"], ["Report a bug", "issues"]],
+  },
+  privacyPage: {
+    title: "Privacy",
+    lead: "Your library stays on your computer. Here is everything that leaves it, and when.",
+    sections: [
+      ["Your messages", "Messages, photos, links, topics and tags are stored only on your computer. Kipple has no account and no server copy of your library."],
+      ["AI, only if you turn it on", "AI is off until you agree in a dialog. Then the text of messages goes to Claude by Anthropic, either with your own key or through the Kipple server, which passes it on and keeps nothing. Messages that look like passwords or card numbers are never sent."],
+      ["Anonymous usage stats", "Once a day the desktop app sends a few counters: app version, OS, interface language, the week it was installed, a rough library size (like 100–999) and how often features were used (searches, imports, exports). There is no id, no message text, no names, no links. The server adds the numbers to daily totals and keeps no single report and no IP address. Totals are deleted after 13 months. Turn it off on the start screen or in Settings, where you can also see the exact request."],
+      ["This website", "Page views are counted with Vercel Web Analytics, without cookies and without storing IP addresses. The download button counts clicks by the site you came from (for example, telegram)."],
+      ["Questions", "The code is open on GitHub, including what the app sends. Ask anything in the issues."],
+    ],
   },
 };
 
@@ -117,6 +128,17 @@ export const ru = {
   closing: { title: "Tame your kipple", text: "Kipple у Филипа К. Дика: хлам, который размножается сам." },
   footer: {
     note: "Независимый проект с открытым кодом, не связан с Telegram.",
-    links: [["GitHub", "repo"], ["Версии", "releases"], ["Сообщить об ошибке", "issues"]],
+    links: [["GitHub", "repo"], ["Версии", "releases"], ["Приватность", "privacy"], ["Сообщить об ошибке", "issues"]],
+  },
+  privacyPage: {
+    title: "Приватность",
+    lead: "Твоя библиотека остаётся на твоём компьютере. Здесь всё, что из него уходит, и когда.",
+    sections: [
+      ["Сообщения", "Сообщения, фото, ссылки, темы и теги хранятся только на твоём компьютере. В Kipple нет аккаунта и нет копии библиотеки на сервере."],
+      ["AI, только если включишь", "AI выключен, пока ты не согласишься в диалоге. Тогда текст сообщений уходит в Claude от Anthropic: с твоим ключом или через сервер Kipple, который передаёт его дальше и ничего не хранит. Сообщения, похожие на пароли и номера карт, не уходят никогда."],
+      ["Анонимная статистика", "Раз в день приложение отправляет несколько счётчиков: версию, систему, язык интерфейса, неделю установки, примерный размер библиотеки (например, 100–999) и сколько раз использовались функции (поиск, импорт, экспорт). Без id, текста сообщений, имён и ссылок. Сервер прибавляет числа к суммам за день и не хранит ни отдельных отчётов, ни IP-адресов. Суммы удаляются через 13 месяцев. Выключить можно на стартовом экране или в Настройках, там же видно, что именно отправляется."],
+      ["Этот сайт", "Просмотры страниц считает Vercel Web Analytics, без cookies и без хранения IP. Кнопка скачивания считает клики по сайту, с которого ты пришёл (например, telegram)."],
+      ["Вопросы", "Код открыт на GitHub, включая то, что отправляет приложение. Спрашивай в issues."],
+    ],
   },
 };

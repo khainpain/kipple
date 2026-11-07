@@ -265,3 +265,23 @@
     transition: none;
   }
 }
+
+/* Anonymous statistics: the exact request, shown on demand. */
+.s2-stats {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.s2-ping {
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--hover);
+  font-size: 11.5px;
+  line-height: 1.45;
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}

@@ -3,6 +3,7 @@ import { platform } from "@platform";
 import type { Settings } from "../lib/store";
 import { AI_MODELS, aiModelOf, builtinUsage, costEstimate } from "../lib/ai";
 import { getInstallId } from "../lib/secrets";
+import { pingPreview, telemetryEndpoint, telemetrySupported } from "../lib/telemetry";
 import { setThemePref, THEME_ICONS, THEME_LABELS, THEME_PREFS, useThemePref } from "../lib/theme";
 import { Icon } from "./Icon";
 import { Select } from "./Select";
@@ -30,11 +31,12 @@ export function SettingsDialog(props: {
   const [key, setKey] = useState("");
   /** Ticking AI on without an earlier consent first shows the consent dialog. */
   const [asking, setAsking] = useState(false);
+  const [showPing, setShowPing] = useState(false);
   const theme = useThemePref();
   const L = T.settings;
   const systemName = LANGS.find((l) => l.key === systemLang())?.name ?? "";
   // How much of today's built-in allowance is used; only asked when AI is on and there is no own key
-  // (in no-AI mode the app doesn't contact the Kipple server at all).
+  // (in no-AI mode the app doesn't send anything to the Kipple server for AI).
   const [used, setUsed] = useState<number | null>(null);
   const aiOn = props.settings.aiEnabled && !!props.settings.aiConsentAt;
   useEffect(() => {
@@ -244,6 +246,32 @@ export function SettingsDialog(props: {
               </HoldToConfirm>
             </div>
           </div>
+
+          {telemetrySupported() && (
+            <>
+              <h3 className="s2-sec">{L.secStats}</h3>
+              <div className="s2-panel">
+                <div className="s2-row">
+                  <div className="s2-text">
+                    <b>{L.statsTitle}</b>
+                    <small>{L.statsDesc}</small>
+                  </div>
+                  <Switch label={L.statsTitle} checked={s.telemetry} onChange={(on) => setS({ ...s, telemetry: on })} />
+                </div>
+                <div className="s2-row s2-stats">
+                  <button className="link-btn" onClick={() => setShowPing(!showPing)}>
+                    {showPing ? L.statsHide : L.statsShow}
+                  </button>
+                  {showPing && (
+                    <pre className="s2-ping">
+                      {`POST ${telemetryEndpoint()}\n`}
+                      {JSON.stringify({ ...pingPreview(), v: props.version }, null, 2)}
+                    </pre>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
 
           {platform.telegram && (
             <details className="s2-advanced">

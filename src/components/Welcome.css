@@ -711,3 +711,13 @@
     margin-top: 0;
   }
 }
+
+/* Anonymous statistics notice under the "stays on your computer" badge. */
+.w-stats {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.w-stats .link-btn {
+  font-size: inherit;
+}

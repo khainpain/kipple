@@ -90,7 +90,7 @@ type Cmd = (string | number)[];
 
 const memory = new Map<string, { n: number; until: number }>();
 
-async function redis(cmds: Cmd[]): Promise<(number | null)[]> {
+export async function redis(cmds: Cmd[]): Promise<(number | null)[]> {
   const url = env("KV_REST_API_URL") ?? env("UPSTASH_REDIS_REST_URL");
   const token = env("KV_REST_API_TOKEN") ?? env("UPSTASH_REDIS_REST_TOKEN");
   if (url && token) {
@@ -104,9 +104,10 @@ async function redis(cmds: Cmd[]): Promise<(number | null)[]> {
     const out = (await res.json()) as { result: unknown }[];
     return out.map((r) => (r.result == null ? null : Number(r.result)));
   }
-  // In-memory fallback with the same three commands.
+  // In-memory fallback with the same few commands (HINCRBY keeps each field as its own entry).
   const now = Date.now();
-  return cmds.map(([op, key, arg]) => {
+  return cmds.map(([op, key, arg, arg2]) => {
+    if (op === "HINCRBY") [op, key, arg] = ["INCRBY", `${key}\u0000${arg}`, arg2];
     const k = String(key);
     let e = memory.get(k);
     if (e && e.until < now) e = undefined;

@@ -20,6 +20,7 @@ import { T, compareText, formatNumber } from "../i18n";
 import { BOARD_TITLE } from "../lib/telegram";
 import type { TelegramAccount } from "../platform/types";
 import { actionLabel } from "../lib/types";
+import { track } from "../lib/telemetry";
 import {
   OPEN_MODES,
   SMART_LISTS,
@@ -108,6 +109,18 @@ export function Workspace(props: {
     if (scope.kind === "topic" && topicName(scope.name) !== scope.name) setScope({ kind: "topic", name: topicName(scope.name) });
     if (tag && tagName(tag) !== tag) setTag(tagName(tag));
   }, [props.aliases]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Anonymous statistics (lib/telemetry.ts): only that these were used, never what was searched or opened.
+  const searching = query.trim().length >= 2;
+  useEffect(() => {
+    if (searching) track("search_used");
+  }, [searching]);
+  useEffect(() => {
+    if (openId != null) track("card_opened");
+  }, [openId]);
+  useEffect(() => {
+    if (scope.kind === "topic" || tag) track("topic_filtered");
+  }, [scope.kind === "topic" ? scope.name : null, tag]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => savePref("sort", sort), [sort]);
   useEffect(() => savePref("layout", view), [view]);

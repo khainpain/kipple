@@ -2,8 +2,13 @@
 // Without script, or with reduced motion, the hero is simply the tidy board.
 (function () {
   var win = /Windows/i.test((navigator.userAgentData && navigator.userAgentData.platform) || navigator.userAgent);
+  // Where the visitor came from (?utm_source=telegram) goes along to /download, which counts
+  // downloads per source. Nothing else is passed or stored.
+  var src = (new URLSearchParams(location.search).get("utm_source") || "").toLowerCase();
+  if (!/^[a-z0-9_-]{1,32}$/.test(src)) src = "";
   document.querySelectorAll("[data-download]").forEach(function (a) {
     var id = a.getAttribute("data-download");
+    if (src) a.href = "/download?src=" + src;
     if (!win) document.querySelector('[data-notwin="' + id + '"]').hidden = false;
     a.addEventListener("click", function () {
       document.querySelector('[data-started="' + id + '"]').hidden = false;

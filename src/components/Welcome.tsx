@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import type { QrResult, TelegramApi } from "../platform/types";
 import { telegramErrorText } from "../lib/telegram";
+import { track } from "../lib/telemetry";
 import { qrPath } from "../lib/qr";
 import { ANGRY_MS, INITIAL_TAPS, SALTO_MS, tapMascot } from "../lib/mascot";
 import { nextThemePref, setThemePref, THEME_ICONS, THEME_LABELS, useThemePref } from "../lib/theme";
@@ -45,6 +46,9 @@ export function Welcome(props: {
   onSettings: () => void;
   onLanguage: (l: Lang) => void;
   openUrl: (url: string) => void;
+  /** Anonymous usage statistics on (desktop only; undefined hides the line). */
+  telemetry?: boolean;
+  onTelemetry?: (on: boolean) => void;
   /** Banners above the header (web build, update available). */
   top?: ReactNode;
   children?: ReactNode;
@@ -90,6 +94,14 @@ export function Welcome(props: {
                     </span>
                     {L.localOnly}
                   </span>
+                  {props.telemetry !== undefined && props.onTelemetry && (
+                    <p className="w-stats">
+                      {props.telemetry ? L.statsOn : L.statsOff}{" "}
+                      <button className="link-btn" onClick={() => props.onTelemetry!(!props.telemetry)}>
+                        {props.telemetry ? L.statsTurnOff : L.statsTurnOn}
+                      </button>
+                    </p>
+                  )}
                   {props.tg && <SignInCard tg={props.tg} active={screen === 0} onSettings={props.onSettings} onExport={() => setScreen(1)} onSignedIn={props.onSignedIn} />}
                   {props.tg && <div className="w-or">{L.orWithout}</div>}
                   <div className="w-tiles">
@@ -200,6 +212,22 @@ function SignInCard(props: { tg: TelegramApi; active: boolean; onSettings: () =>
   useEffect(() => {
     if (step === "done") onSignedIn?.(true);
   }, [step, onSignedIn]);
+
+  // Anonymous statistics: sign-in offered, finished, or failed (each at most once per visit).
+  const counted = useRef({ started: false, failed: false });
+  useEffect(() => {
+    if ((step === "qr" || step === "phone") && !counted.current.started) {
+      counted.current.started = true;
+      track("tg_signin_started");
+    }
+    if (step === "done" && counted.current.started) track("tg_signin_completed");
+  }, [step]);
+  useEffect(() => {
+    if (error && counted.current.started && !counted.current.failed) {
+      counted.current.failed = true;
+      track("tg_signin_failed");
+    }
+  }, [error]);
 
   // QR: poll while the code is on screen. Each call returns the current code, a fresh one
   // when it expires, or the result once the phone confirmed it.
