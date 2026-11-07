@@ -43,7 +43,8 @@ export class AiStop extends Error {}
  */
 export type AiAuth = { kind: "own"; key: string } | { kind: "builtin"; install: string };
 
-/** Where the built-in key lives: this same site in the browser build, the production site on desktop. */
+/** Where the built-in key lives: this same site in the browser build, the production site on desktop.
+ *  The domain is the Vercel project's, not the repo's: installed apps call it, so it stays as is. */
 export const PROXY_BASE: string =
   import.meta.env.VITE_AI_PROXY || (platform.kind === "web" ? `${location.origin}/api/claude` : "https://telegram-saved-messages.vercel.app/api/claude");
 

@@ -3,7 +3,7 @@
 // carries the version (Install-Kipple-0.1.15.exe), so there's no fixed "latest" link to it.
 // The answer is cached at the edge for 10 minutes, so GitHub's API is asked rarely; if it
 // can't be reached, the visitor lands on the releases page instead.
-const REPO = "khainpain/telegram-saved-messages";
+const REPO = "khainpain/kipple";
 const RELEASES = `https://github.com/${REPO}/releases/latest`;
 
 type Asset = { name: string; browser_download_url: string };
