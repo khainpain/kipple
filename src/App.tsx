@@ -27,6 +27,23 @@ import { initTelemetry, markImported, maybeSendPing, setTelemetryEnabled, setTel
 
 const isWeb = platform.kind === "web";
 
+/**
+ * Visitors of the browser build only get the demo: import works for real only in the desktop app.
+ * `?dev=1` brings back the full browser build for development (remembered in this browser,
+ * `?dev=0` forgets it).
+ */
+function webDevMode(): boolean {
+  const v = new URLSearchParams(location.search).get("dev");
+  try {
+    if (v === "1") localStorage.setItem("kipple.dev", "1");
+    else if (v === "0") localStorage.removeItem("kipple.dev");
+    return localStorage.getItem("kipple.dev") === "1";
+  } catch {
+    return v === "1";
+  }
+}
+const demoOnly = isWeb && !webDevMode();
+
 export default function App() {
   const [lib, setLib] = useState<Library | null>(null);
   const [rev, setRev] = useState(0); // bumps whenever cards change in place
@@ -85,7 +102,7 @@ export default function App() {
         setSettings(s);
         setHasKey(!!k);
         void startTelemetry(s, !!l);
-        if (platform.kind === "web" && q.has("demo")) {
+        if (demoOnly || (isWeb && q.has("demo"))) {
           history.replaceState(null, "", location.pathname); // "Exit demo" then leads to the normal start
           return openDemo();
         }
@@ -486,9 +503,12 @@ export default function App() {
     await platform.telegram?.forgetMedia().catch(() => undefined);
     await platform.telegram?.logout().catch(() => undefined);
     tgAutoRef.current = false;
-    setDemo(false);
-    setLib(null);
     setHasKey(false);
+    if (demoOnly) openDemo();
+    else {
+      setDemo(false);
+      setLib(null);
+    }
     setShowSettings(false);
     notify(T.app.wiped);
   }
@@ -612,12 +632,20 @@ export default function App() {
 
   const banners = (
     <>
-      {isWeb && (
+      {demoOnly && (
+        <div className="banner demo">
+          {T.app.webDemoBanner}
+          <a className="banner-link" href="/download">
+            {T.app.webDemoDownload}
+          </a>
+        </div>
+      )}
+      {isWeb && !demoOnly && (
         <div className="banner web">
           {T.app.webBanner(version)}
         </div>
       )}
-      {demo && (
+      {demo && !demoOnly && (
         <div className="banner demo">
           {T.app.demoBanner}
           <button className="small" onClick={exitDemo}>
