@@ -28,21 +28,10 @@ import { initTelemetry, markImported, maybeSendPing, setTelemetryEnabled, setTel
 const isWeb = platform.kind === "web";
 
 /**
- * Visitors of the browser build only get the demo: import works for real only in the desktop app.
- * `?dev=1` brings back the full browser build for development (remembered in this browser,
- * `?dev=0` forgets it).
+ * On the production site visitors only get the demo: import works for real only in the desktop app.
+ * Vercel previews (behind Vercel sign-in) and local builds keep the full browser build.
  */
-function webDevMode(): boolean {
-  const v = new URLSearchParams(location.search).get("dev");
-  try {
-    if (v === "1") localStorage.setItem("kipple.dev", "1");
-    else if (v === "0") localStorage.removeItem("kipple.dev");
-    return localStorage.getItem("kipple.dev") === "1";
-  } catch {
-    return v === "1";
-  }
-}
-const demoOnly = isWeb && !webDevMode();
+const demoOnly = isWeb && __WEB_DEMO_ONLY__;
 
 export default function App() {
   const [lib, setLib] = useState<Library | null>(null);

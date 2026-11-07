@@ -7,6 +7,9 @@ const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 const buildId = (process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || "local").slice(0, 7);
+// The site in production (getkipple.io/app/) is only the demo; Vercel previews and local builds
+// keep the full browser build with import, for checking changes.
+const webDemoOnly = process.env.VERCEL_ENV === "production";
 
 // `vite build --mode web` makes the browser build (deployed to Vercel under /app/: the landing
 // page's demo and quick UI checks);
@@ -21,7 +24,7 @@ export default defineConfig(({ mode }) => ({
       "@platform": fileURLToPath(new URL(mode === "web" ? "./src/platform/web.ts" : "./src/platform/tauri.ts", import.meta.url)),
     },
   },
-  define: { __BUILD_ID__: JSON.stringify(buildId) },
+  define: { __BUILD_ID__: JSON.stringify(buildId), __WEB_DEMO_ONLY__: JSON.stringify(webDemoOnly) },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
