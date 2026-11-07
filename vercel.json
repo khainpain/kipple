@@ -56,5 +56,16 @@
       "destination": "https://getkipple.io/img/:path*",
       "permanent": false
     }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
+    }
   ]
 }
