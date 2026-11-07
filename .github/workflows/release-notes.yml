@@ -25,7 +25,8 @@ jobs:
           R="$GITHUB_REPOSITORY"
           for tag in $(gh release list --limit 100 --json tagName --jq '.[].tagName'); do
             gh release view "$tag" --json body --jq .body > old.md
-            node scripts/release-notes.mjs translate "$tag" < old.md > new.md
+            sha=$(gh api "repos/$R/commits/$tag" --jq .sha)
+            node scripts/release-notes.mjs translate "$tag" "$sha" < old.md > new.md
             if ! diff -q <(tr -d '\r' < old.md | sed -e '$a\') new.md > /dev/null; then
               gh release edit "$tag" --notes-file new.md
               echo "$tag: notes updated"

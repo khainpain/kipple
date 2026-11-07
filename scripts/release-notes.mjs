@@ -1,12 +1,14 @@
 // Release notes for GitHub releases, in English.
 //
 //   node scripts/release-notes.mjs body <version> <ref> <sha>   -> notes for a new release (release.yml)
-//   node scripts/release-notes.mjs translate <version> < body    -> an old Russian body rewritten in English
+//   node scripts/release-notes.mjs translate <version> [sha] < body    -> an old Russian body rewritten in English
 //   node scripts/release-notes.mjs kipple <name>                  -> an old "Saved Board" name with Kipple
 //
 // "What's new" comes from scripts/changelog.mjs (also the landing page list): the entry for this
 // version, or the "next" entry when the version has none yet.
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { changelog } from "./changelog.mjs";
 
 export function whatsNew(version) {
@@ -42,21 +44,24 @@ const RULES = [
 // The app was called Saved Board before v0.1.12; releases and their files use Kipple now.
 export const kippleName = (s) => s.replace(/Saved[. ]Board/g, "Kipple");
 
-export function translate(text, version) {
+export function translate(text, version, sha) {
   let out = kippleName(text.replace(/\r\n/g, "\n").trim());
+  // A body without the install lines (v0.1.16 went out like that): rebuild it in full.
+  if (sha && !out.includes("Built from")) return body({ version, ref: "main", sha });
   if (out.startsWith("## What's new")) return out; // already rewritten
   for (const [re, to] of RULES) out = out.replace(re, to);
   if (/[А-Яа-яЁё]/.test(out)) throw new Error(`Untranslated text left in ${version}:\n${out}`);
   return withWhatsNew(whatsNew(version), out);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Compare paths, not URLs: on the Windows release runner argv[1] is "D:\\a\\...", not a file:// URL.
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   const [cmd, version, ref, sha] = process.argv.slice(2);
   if (cmd === "body") process.stdout.write(body({ version, ref, sha }) + "\n");
   else if (cmd === "kipple") process.stdout.write(kippleName(version) + "\n");
-  else if (cmd === "translate") process.stdout.write(translate(readFileSync(0, "utf8"), version) + "\n");
+  else if (cmd === "translate") process.stdout.write(translate(readFileSync(0, "utf8"), version, ref) + "\n");
   else {
-    console.error("usage: release-notes.mjs body <version> <ref> <sha> | translate <version> < body");
+    console.error("usage: release-notes.mjs body <version> <ref> <sha> | translate <version> [sha] < body | kipple <name>");
     process.exit(1);
   }
 }
