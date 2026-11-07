@@ -58,7 +58,7 @@ jobs:
         run: setup-app/build.sh
       - uses: actions/upload-artifact@v7
         with:
-          name: saved-board-windows
+          name: kipple-windows
           path: |
             src-tauri/target/release/bundle/nsis/*.exe
             src-tauri/target/release/bundle/msi/*.msi

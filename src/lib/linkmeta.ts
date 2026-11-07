@@ -67,7 +67,7 @@ export function parseHtml(html: string, url: string): Omit<LinkMeta, "fetchedAt"
   };
 }
 
-const UA = "Mozilla/5.0 (compatible; SavedBoard/0.1; link preview)";
+const UA = "Mozilla/5.0 (compatible; Kipple/0.1; link preview)";
 /** The address the response came from after redirects; the web proxy passes it in a header. */
 const finalUrl = (res: Response, url: string) => res.headers.get("x-final-url") || res.url || url;
 

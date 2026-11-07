@@ -8,7 +8,7 @@ import { isIP } from "node:net";
 
 const MAX_BYTES = 2_000_000;
 const ALLOWED_TYPE = /^(text\/html|application\/xhtml\+xml|application\/json|image\/)/i;
-const UA = "Mozilla/5.0 (compatible; SavedBoard/0.1; link preview)";
+const UA = "Mozilla/5.0 (compatible; Kipple/0.1; link preview)";
 
 function privateV4(ip: string): boolean {
   const [a, b, c] = ip.split(".").map(Number);

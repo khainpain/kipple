@@ -477,7 +477,7 @@ export default function App() {
 
   async function doExport(kind: "csv" | "md", cards: Card[]) {
     const path = await platform.saveTextFile(
-      kind === "csv" ? "saved-board.csv" : "saved-board.md",
+      kind === "csv" ? "kipple.csv" : "kipple.md",
       kind === "csv" ? { name: "CSV", ext: "csv" } : { name: "Markdown", ext: "md" },
       kind === "csv" ? toCsv(cards) : toMarkdown(cards, lib?.chatName),
     );
