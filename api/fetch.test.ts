@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
-import { GET, privateIp } from "./fetch";
+import { GET, privateIp } from "./fetch.js";
 
 describe("privateIp", () => {
   it("catches private IPv4", () => {

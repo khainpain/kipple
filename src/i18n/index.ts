@@ -1,11 +1,11 @@
 // Interface language. Strings live in ru.ts (the reference) and en.ts, which must have the
 // same shape; TypeScript fails the build if a key is missing in one of them.
 //
-// Usage: `import { T } from "../i18n"` and read `T.section.key` (or call it when the string
+// Usage: `import { T } from "../i18n/index.js"` and read `T.section.key` (or call it when the string
 // takes parameters) at render time. `T` is a live binding, so after setLang() the next render
 // picks up the new language; nothing needs to subscribe.
-import { ru, type Dict } from "./ru";
-import { en } from "./en";
+import { ru, type Dict } from "./ru.js";
+import { en } from "./en.js";
 
 export type Lang = "ru" | "en";
 /** What the user picked in Settings: a language, or follow the system. */

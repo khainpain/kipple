@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickInstaller } from "./download";
+import { pickInstaller } from "./download.js";
 
 const a = (name: string) => ({ name, browser_download_url: `https://example.com/${name}` });
 

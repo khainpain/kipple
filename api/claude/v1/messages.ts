@@ -7,7 +7,7 @@
 // no tools, a capped max_tokens. Each install has a daily allowance, and all installs together
 // a global one, so a copied install id or a scripted client can't run up the bill.
 // The SDK in the app calls `${baseURL}/v1/messages`, hence this path.
-import { allowedRequest, checkQuota, clientIp, env, quotaError, reserveUnits, settleUsage, unitsOf, type Usage } from "../../_lib/quota";
+import { allowedRequest, checkQuota, clientIp, env, quotaError, reserveUnits, settleUsage, unitsOf, type Usage } from "../../_lib/quota.js";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const MAX_BODY = 4_000_000; // Vercel takes 4.5 MB; six shrunk photos are well under 1 MB

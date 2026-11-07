@@ -2,7 +2,7 @@ name: release-notes
 
 # Runs only on demand: Actions -> release-notes -> Run workflow.
 # Rewrites the older Russian release descriptions in English (scripts/release-notes.mjs),
-# adds "What's new" from site/changelog.mjs, and renames old "Saved Board" release titles
+# adds "What's new" from scripts/changelog.mjs, and renames old "Saved Board" release titles
 # and installer files to Kipple. Anything already done is left alone, so it's safe to re-run.
 on:
   workflow_dispatch:

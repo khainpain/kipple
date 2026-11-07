@@ -16,7 +16,8 @@ const webDemoOnly = process.env.VERCEL_ENV === "production";
 // every other mode is the desktop app inside Tauri.
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
-  // The browser build lives under /app/ on the site; the landing page (site/) sits at the root.
+  // The browser build lives under /app/; the site root redirects to the landing page (getkipple.io),
+  // which passes /app/ through to this deployment.
   base: mode === "web" ? "/app/" : "./",
   build: mode === "web" ? { outDir: "dist/app", emptyOutDir: true } : undefined,
   resolve: {

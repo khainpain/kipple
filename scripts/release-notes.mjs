@@ -4,10 +4,10 @@
 //   node scripts/release-notes.mjs translate <version> < body    -> an old Russian body rewritten in English
 //   node scripts/release-notes.mjs kipple <name>                  -> an old "Saved Board" name with Kipple
 //
-// "What's new" comes from site/changelog.mjs (the landing page list): the entry for this
+// "What's new" comes from scripts/changelog.mjs (also the landing page list): the entry for this
 // version, or the "next" entry when the version has none yet.
 import { readFileSync } from "node:fs";
-import { changelog } from "../site/changelog.mjs";
+import { changelog } from "./changelog.mjs";
 
 export function whatsNew(version) {
   const v = String(version).replace(/^v/, "");

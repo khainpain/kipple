@@ -9,7 +9,7 @@
 // KV_REST_API_TOKEN, or UPSTASH_REDIS_REST_URL/_TOKEN). Without it they are kept in the
 // function's memory: fine for a handful of friends, but each instance counts on its own.
 
-import { appRequests } from "../../src/lib/prompts";
+import { appRequests } from "../../src/lib/prompts.js";
 
 declare const process: { env: Record<string, string | undefined> };
 export const env = (name: string): string | undefined => process.env[name] || undefined;

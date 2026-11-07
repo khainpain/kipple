@@ -27,9 +27,9 @@ CI (`.github/workflows/build.yml`) runs tests and both builds on every PR. Deskt
 ### Releasing a version
 
 1. Merge what goes in; main's CI is green.
-2. In `site/changelog.mjs`, turn the `"next"` entry into the new version (`ver: "0.1.N"`, `date: "YYYY-MM-DD"`), one user-facing line per change in `en` and `ru`. Merge that before the release: its `en` lines become the GitHub release notes and the landing's "What's new".
+2. In `scripts/changelog.mjs`, turn the `"next"` entry into the new version (`ver: "0.1.N"`, `date: "YYYY-MM-DD"`), one user-facing line per change in `en` and `ru`. Merge that before the release: its `en` lines become the GitHub release notes and the landing's "What's new".
 3. Actions → release → Run workflow with `version` = `0.1.N` (empty means `0.1.<run number>`).
-4. The site updates itself. The newest released entry in "What's new" gets the highlight (`.rel.latest`, picked in `site/build.mjs`). Every version number on the landing (the pill, `v{ver}` under the download button, structured data) comes from one source: the latest GitHub release, read when the site is built. Nothing to edit by hand. The release workflow rebuilds the site at the end through the `VERCEL_DEPLOY_HOOK` secret. Without it, redeploy main on Vercel once the release is out, or the site keeps showing the previous version.
+4. The site updates itself. The landing page lives in the private repo `khainpain/kipple-site` (its own Vercel project); it reads `scripts/changelog.mjs` from `main` and highlights the newest released entry. Every version number on the landing (the pill, `v{ver}` under the download button, structured data) comes from one source: the latest GitHub release, read when the site is built. Nothing to edit by hand. The release workflow rebuilds the site at the end through the `VERCEL_DEPLOY_HOOK` secret. Without it, redeploy the site project on Vercel once the release is out, or the site keeps showing the previous version.
 5. Check the landing: the pill shows the new version and the new entry is highlighted.
 
 ## Rules that are easy to break
@@ -39,7 +39,7 @@ CI (`.github/workflows/build.yml`) runs tests and both builds on every PR. Deskt
 - **Keep the identifier `com.khainpain.savedboard`.** Data dir, keyring entries and the updater depend on it, even though the app is now called Kipple.
 - **Secrets:** Anthropic key and Telegram session in the OS keyring; Telegram api id/hash from Actions secrets `TG_API_ID`/`TG_API_HASH`. Never commit or log secrets; test fixtures must be synthetic.
 - **Both languages.** Any new UI string goes into `ru.ts` and `en.ts`, written natively.
-- **UI taste:** quiet and polished; subtle focus states (no loud outlines); `prefers-reduced-motion` makes animations static. Visual design comes from the owner's Claude Design handoffs (`docs/design/`).
+- **UI taste:** quiet and polished; subtle focus states (no loud outlines); `prefers-reduced-motion` makes animations static. Visual design comes from the owner's Claude Design handoffs (kept in `khainpain/kipple-site`, `design/`).
 
 ## Agents and skills
 
@@ -49,5 +49,4 @@ Project agents live in `.claude/agents/`, skills in `.claude/skills/` (most adap
 - Design and decisions: `architect`, skills `architecture-decision-records` (`docs/adr/`) and `council`.
 - Before a PR: skill `verification-loop`; for UI text: `i18n-sync`.
 - UI/UX: skills `make-interfaces-feel-better`, `design-system`, `click-path-audit`, `motion-foundations`, `frontend-a11y`, `ui-demo` (demo videos).
-- Promotion: `marketing-agent`, `seo-specialist`, skills `product-lens`, `market-research`, `brand-voice`, `article-writing`, `content-engine`, `seo`.
 - Public repo hygiene: `opensource-sanitizer` before releases, `opensource-packager` for contributor docs.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { downloadSource, parsePing, pingCommands } from "./stats";
+import { downloadSource, parsePing, pingCommands } from "./stats.js";
 
 const ok = { v: "0.1.16", os: "windows", lang: "ru", cohort: "2026-W45", age: "14-29", library: "1k-5k", ai: "off", week: true, events: { search_used: 3, "import_completed:direct": 1 } };
 

@@ -1,8 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { allowedRequest, unitsOf } from "./quota";
-import { POST } from "../claude/v1/messages";
-import { groupsFormat, groupsSystemPrompt, imageSystemPrompt, outputFormat, synonymsFormat, synonymsSystemPrompt, systemPrompt } from "../../src/lib/prompts";
+import { allowedRequest, unitsOf } from "./quota.js";
+import { POST } from "../claude/v1/messages.js";
+import { groupsFormat, groupsSystemPrompt, imageSystemPrompt, outputFormat, synonymsFormat, synonymsSystemPrompt, systemPrompt } from "../../src/lib/prompts.js";
 
 const SYSTEM = systemPrompt("ru");
 const FORMAT = JSON.parse(JSON.stringify(outputFormat()));
