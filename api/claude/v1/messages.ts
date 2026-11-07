@@ -6,8 +6,10 @@
 // It only takes what the app itself sends: the allowed models, the app's own system prompts,
 // no tools, a capped max_tokens. Each install has a daily allowance, and all installs together
 // a global one, so a copied install id or a scripted client can't run up the bill.
+// Token counts and cost are added to totals (api/_lib/aiUsage.ts) — numbers only, no text.
 // The SDK in the app calls `${baseURL}/v1/messages`, hence this path.
-import { allowedRequest, checkQuota, clientIp, env, quotaError, reserveUnits, settleUsage, unitsOf, type Usage } from "../../_lib/quota.js";
+import { allowedRequest, checkQuota, clientIp, env, quotaError, redis, reserveUnits, settleUsage, unitsOf, type Usage } from "../../_lib/quota.js";
+import { itemCount, requestKind, usageCommands } from "../../_lib/aiUsage.js";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const MAX_BODY = 4_000_000; // Vercel takes 4.5 MB; six shrunk photos are well under 1 MB
@@ -74,9 +76,10 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const text = await res.text().catch(() => "");
+  let usage: Usage | undefined;
   if (res.ok) {
     try {
-      const usage = (JSON.parse(text) as { usage?: Usage }).usage;
+      usage = (JSON.parse(text) as { usage?: Usage }).usage;
       // No usage in a successful answer shouldn't happen; keep the reservation then.
       actual = usage ? unitsOf(model, usage) : reserved;
     } catch {
@@ -84,6 +87,9 @@ export async function POST(request: Request): Promise<Response> {
     }
   }
   await settle();
+  const kind = requestKind(body.system);
+  await redis(usageCommands({ model, kind, items: itemCount(kind, body), usage, ok: res.ok, install }))
+    .catch((e) => console.error("usage totals failed", e));
   if (res.status === 401 || res.status === 403) {
     // Our key, not the user's: don't let the app tell them their key is wrong.
     console.error("built-in Anthropic key rejected", res.status);
