@@ -2,6 +2,7 @@
 //
 //   node scripts/release-notes.mjs body <version> <ref> <sha>   -> notes for a new release (release.yml)
 //   node scripts/release-notes.mjs translate <version> < body    -> an old Russian body rewritten in English
+//   node scripts/release-notes.mjs kipple <name>                  -> an old "Saved Board" name with Kipple
 //
 // "What's new" comes from site/changelog.mjs (the landing page list): the entry for this
 // version, or the "next" entry when the version has none yet.
@@ -38,8 +39,11 @@ const RULES = [
   [/ \(если он не запускается, есть классический (`[^`]+`)\)/, " (if it doesn't start, use the classic $1)"],
 ];
 
+// The app was called Saved Board before v0.1.12; releases and their files use Kipple now.
+export const kippleName = (s) => s.replace(/Saved[. ]Board/g, "Kipple");
+
 export function translate(text, version) {
-  let out = text.replace(/\r\n/g, "\n").trim();
+  let out = kippleName(text.replace(/\r\n/g, "\n").trim());
   if (out.startsWith("## What's new")) return out; // already rewritten
   for (const [re, to] of RULES) out = out.replace(re, to);
   if (/[А-Яа-яЁё]/.test(out)) throw new Error(`Untranslated text left in ${version}:\n${out}`);
@@ -49,6 +53,7 @@ export function translate(text, version) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [cmd, version, ref, sha] = process.argv.slice(2);
   if (cmd === "body") process.stdout.write(body({ version, ref, sha }) + "\n");
+  else if (cmd === "kipple") process.stdout.write(kippleName(version) + "\n");
   else if (cmd === "translate") process.stdout.write(translate(readFileSync(0, "utf8"), version) + "\n");
   else {
     console.error("usage: release-notes.mjs body <version> <ref> <sha> | translate <version> < body");

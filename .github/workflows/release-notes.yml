@@ -1,8 +1,9 @@
 name: release-notes
 
 # Runs only on demand: Actions -> release-notes -> Run workflow.
-# Rewrites the older Russian release descriptions in English (scripts/release-notes.mjs)
-# and adds "What's new" from site/changelog.mjs. Releases already in English are left alone.
+# Rewrites the older Russian release descriptions in English (scripts/release-notes.mjs),
+# adds "What's new" from site/changelog.mjs, and renames old "Saved Board" release titles
+# and installer files to Kipple. Anything already done is left alone, so it's safe to re-run.
 on:
   workflow_dispatch:
 
@@ -21,13 +22,26 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          R="$GITHUB_REPOSITORY"
           for tag in $(gh release list --limit 100 --json tagName --jq '.[].tagName'); do
             gh release view "$tag" --json body --jq .body > old.md
             node scripts/release-notes.mjs translate "$tag" < old.md > new.md
-            if diff -q <(tr -d '\r' < old.md | sed -e '$a\') new.md > /dev/null; then
-              echo "$tag: already in English"
-            else
+            if ! diff -q <(tr -d '\r' < old.md | sed -e '$a\') new.md > /dev/null; then
               gh release edit "$tag" --notes-file new.md
-              echo "$tag: updated"
+              echo "$tag: notes updated"
             fi
+            name=$(gh release view "$tag" --json name --jq .name)
+            new_name=$(node scripts/release-notes.mjs kipple "$name")
+            if [ "$name" != "$new_name" ]; then
+              gh release edit "$tag" --title "$new_name"
+              echo "$tag: title -> $new_name"
+            fi
+            gh api "repos/$R/releases/tags/$tag" --jq '.assets[] | "\(.id) \(.name)"' |
+              while read -r id asset; do
+                new_asset=$(node scripts/release-notes.mjs kipple "$asset")
+                if [ "$asset" != "$new_asset" ]; then
+                  gh api -X PATCH "repos/$R/releases/assets/$id" -f name="$new_asset" > /dev/null
+                  echo "$tag: $asset -> $new_asset"
+                fi
+              done
           done
