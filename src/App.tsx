@@ -21,7 +21,7 @@ import { SettingsDialog } from "./components/Settings";
 import { AiConsentDialog } from "./components/AiConsent";
 import { Welcome } from "./components/Welcome";
 import { demoLibrary } from "./lib/demo";
-import { emptyTelegramLibrary, syncSaved } from "./lib/tgImport";
+import { backupSaved, emptyTelegramLibrary, syncSaved } from "./lib/tgImport";
 import { T, lang, resolveLang, setLang } from "./i18n";
 import type { AiLang } from "./lib/ai";
 import { Toast } from "./components/Motion";
@@ -387,6 +387,23 @@ export default function App() {
    * current one to fetch what's new), then downloads photos and runs previews and AI as after an import.
    * Stopping it keeps what was loaded; the next launch carries on.
    */
+  /** Brings the local backup of Saved Messages up to date, quietly, after each load from Telegram. */
+  const backupRun = useRef<AbortController | null>(null);
+  async function runBackup() {
+    const tg = platform.telegram;
+    if (!tg || demoRef.current || backupRun.current) return;
+    const ctl = new AbortController();
+    backupRun.current = ctl;
+    try {
+      await backupSaved({ tg, signal: ctl.signal });
+    } catch {
+      // Offline or signed out: the next launch carries on from where it stopped.
+    } finally {
+      backupRun.current = null;
+    }
+  }
+  useEffect(() => () => backupRun.current?.abort(), []);
+
   async function syncTelegram(l: Library, fresh: boolean, nothingNew?: () => void) {
     const tg = platform.telegram;
     if (!tg || demoRef.current) return;
@@ -421,6 +438,7 @@ export default function App() {
       setJob(null);
       setRev((r) => r + 1);
     }
+    void runBackup();
     if (ctl.signal.aborted || abortRef.current !== ctl) return;
     // AI only runs on its own after something new arrived, as after an import.
     if (fresh || added) await processAll(l);

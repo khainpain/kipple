@@ -115,6 +115,15 @@ export interface TelegramApi {
   /** Deletes these messages from Saved Messages, on all devices. Rejects with "OTHER_ACCOUNT"
    *  (and deletes nothing) when the signed-in account isn't `owner`. */
   deleteSaved(ids: number[], owner: number): Promise<void>;
+  /**
+   * Copies one page of Saved Messages that aren't in the local backup yet into it (the whole
+   * history on the first run, then only newer messages). Call until `done`. The backup only grows.
+   */
+  backupStep(): Promise<{ done: boolean; saved: number }>;
+  /** The backup folder and how many messages it holds. */
+  backupInfo(): Promise<{ dir: string; messages: number }>;
+  /** Opens the backup folder in the file manager. */
+  openBackup(dir: string): Promise<void>;
   /** Downloads these messages' photos into the app's folder; returns absolute paths. Skips ones already there. */
   /** Photos of these messages, or the pictures of their link previews. */
   savedPhotos(ids: number[]): Promise<Array<{ id: number; path: string }>>;

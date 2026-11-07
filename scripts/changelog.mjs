@@ -9,10 +9,12 @@ export const changelog = [
     en: [
       "Open in Telegram: jump from a card to its message in Saved Messages",
       "Three for today: a few small cleanup tasks on the overview each day",
+      "A local backup of your Saved Messages that only grows (Settings → Data)",
     ],
     ru: [
       "«Открыть в Telegram»: переход от карточки к её сообщению в Избранном",
       "«Три на сегодня»: каждый день несколько маленьких заданий по уборке на обзоре",
+      "Локальная резервная копия «Избранного», которая только пополняется (Настройки → Данные)",
     ],
   },
   {

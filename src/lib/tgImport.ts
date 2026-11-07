@@ -147,7 +147,7 @@ const PHOTO_BATCH = 10;
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 /** Runs a Telegram call, waiting out FLOOD_WAIT up to a few times. */
-async function withFloodWait<R>(fn: () => Promise<R>, deps: SyncDeps): Promise<R> {
+async function withFloodWait<R>(fn: () => Promise<R>, deps: Pick<SyncDeps, "signal" | "sleep">): Promise<R> {
   for (let attempt = 0; ; attempt++) {
     try {
       return await fn();
@@ -157,6 +157,21 @@ async function withFloodWait<R>(fn: () => Promise<R>, deps: SyncDeps): Promise<R
       await (deps.sleep ?? wait)(Number(flood[1]) * 1000 + 500);
     }
   }
+}
+
+/**
+ * Brings the local backup of Saved Messages up to date (src-tauri telegram.rs, "Local backup"):
+ * the whole history on the first run, then only newer messages. Returns how many were written.
+ * Errors are thrown; stopping (signal) keeps what's done, and the next run carries on.
+ */
+export async function backupSaved(deps: { tg: Pick<TelegramApi, "backupStep">; signal: AbortSignal; sleep?: (ms: number) => Promise<void> }): Promise<number> {
+  let saved = 0;
+  while (!deps.signal.aborted) {
+    const step = await withFloodWait(() => deps.tg.backupStep(), deps);
+    saved += step.saved;
+    if (step.done) break;
+  }
+  return saved;
 }
 
 /**
