@@ -315,7 +315,11 @@ await mkdir(OUT + "privacy", { recursive: true });
 await mkdir(OUT + "ru/privacy", { recursive: true });
 await writeFile(OUT + "privacy/index.html", privacyPage(en, css));
 await writeFile(OUT + "ru/privacy/index.html", privacyPage(ru, css));
-await writeFile(OUT + "robots.txt", `User-agent: *\nAllow: /\nDisallow: /app/\nSitemap: ${SITE}/sitemap.xml\n`);
+// The stats dashboard (/stats/): a static page that reads /api/stats with a token.
+await mkdir(OUT + "stats", { recursive: true });
+await cp(here("./stats.html"), OUT + "stats/index.html");
+await cp(here("./stats.js"), OUT + "stats/stats.js");
+await writeFile(OUT + "robots.txt", `User-agent: *\nAllow: /\nDisallow: /app/\nDisallow: /stats/\nSitemap: ${SITE}/sitemap.xml\n`);
 const alt = `<xhtml:link rel="alternate" hreflang="en" href="${SITE}/"/><xhtml:link rel="alternate" hreflang="ru" href="${SITE}/ru/"/>`;
 await writeFile(
   OUT + "sitemap.xml",
