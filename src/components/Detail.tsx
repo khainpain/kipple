@@ -28,6 +28,8 @@ export function Detail(props: {
   card: Card;
   topics: string[];
   mode: OpenMode;
+  /** Phone: always full screen, so the side/center/full switch is left out. */
+  narrow?: boolean;
   onMode: (m: OpenMode) => void;
   onNameImage?: () => void;
   onClose: () => void;
@@ -165,6 +167,7 @@ export function Detail(props: {
           <Icon name="down" />
         </button>
         <span className="spacer" />
+        {!props.narrow && (
         <div className="segmented small" role="radiogroup" aria-label={T.detail.openModes}>
           {OPEN_MODES.map((m) => (
             <button key={m.key} role="radio" aria-checked={props.mode === m.key} className={props.mode === m.key ? "on" : ""} onClick={() => props.onMode(m.key)} title={m.label}>
@@ -172,6 +175,7 @@ export function Detail(props: {
             </button>
           ))}
         </div>
+        )}
         <button
           className={`icon-btn${isImportant(card) ? " on" : ""}`}
           onClick={() => props.onEdit({ pinned: !isImportant(card) })}

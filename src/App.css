@@ -2598,3 +2598,238 @@ button.ov-title:hover {
 .topic-actions .topic-actions-row button.secondary {
   border: 1px solid var(--line);
 }
+
+/* ── Phones ──────────────────────────────────────────────────────────────────────
+   The browser demo on a phone. The desktop window never gets this narrow
+   (minWidth 720), so none of this reaches the app. Keep the width in sync with
+   NARROW_QUERY in src/lib/narrow.ts, which moves the sidebar into a drawer, opens
+   cards full screen and puts two columns on the board. */
+.narrow-only {
+  display: none;
+}
+@media (max-width: 640px) {
+  .wide-only {
+    display: none;
+  }
+  .narrow-only {
+    display: revert;
+  }
+  .app {
+    height: 100dvh;
+  }
+  button,
+  a,
+  label {
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* iOS zooms into any field with text under 16px; keep them at 16. */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  .banner {
+    padding: 8px 12px;
+    font-size: 12.5px;
+    line-height: 1.35;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+  .banner a.banner-link {
+    margin-left: auto;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  /* Sidebar: a drawer from the left over a dimmed board. */
+  .workspace.narrow {
+    position: relative;
+  }
+  .workspace.narrow .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 9;
+    width: min(300px, 84vw);
+    padding-top: max(12px, env(safe-area-inset-top));
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    box-shadow: var(--shadow-pop);
+    animation: drawer-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .workspace.narrow .side-item {
+    min-height: 40px;
+  }
+  .drawer-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 9;
+    background: var(--scrim);
+    animation: peek-fade 0.2s ease-out;
+  }
+
+  /* Toolbar: heading and a few actions on the first row, search across the second. */
+  .toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "start end" "search search";
+    gap: 6px 8px;
+    padding: 8px 10px 4px 6px;
+  }
+  .toolbar-start {
+    grid-area: start;
+  }
+  .toolbar-end {
+    grid-area: end;
+    gap: 2px;
+  }
+  .toolbar .search {
+    grid-area: search;
+    margin-left: 4px;
+    height: 40px;
+  }
+  .search kbd {
+    display: none;
+  }
+  .heading {
+    gap: 8px;
+  }
+  .heading h1 {
+    font-size: 19px;
+  }
+  .icon-btn {
+    width: 38px;
+    height: 38px;
+  }
+  /* Export and the AI run don't make sense in a phone demo. */
+  .toolbar-end .menu-wrap,
+  .toolbar-end .small-btn {
+    display: none;
+  }
+
+  /* Filters scroll sideways; sort and view stay at the right edge. */
+  .subbar {
+    padding: 2px 10px 6px;
+    gap: 6px;
+  }
+  .quick {
+    flex: 1;
+    min-width: 0;
+    /* Pills that don't fit fade out under the sort button instead of being cut. */
+    mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
+    padding-right: 20px;
+  }
+  .subbar .spacer {
+    display: none;
+  }
+  .pill {
+    padding: 6px 12px;
+  }
+  .sort-btn .label,
+  .sort-btn > span:not(.icon) {
+    display: none;
+  }
+
+  /* List: a smaller cover, and no room kept on the right for the hover actions. */
+  .card.view-list .cover {
+    width: 88px;
+  }
+  .card.view-list .card-body {
+    padding: 10px 12px;
+  }
+  .card.view-list h3 {
+    -webkit-line-clamp: 2;
+  }
+  /* Headlines: the title on its own line, tags and date under it. */
+  .card.view-headlines .card-body {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 3px;
+    padding: 9px 8px;
+    min-width: 0;
+  }
+  .card.view-headlines h3 {
+    flex: none;
+  }
+  .card.view-headlines .meta-row {
+    flex: none;
+    justify-content: flex-start;
+    font-size: 12px;
+  }
+
+  .overview {
+    padding: 0 10px 32px;
+  }
+  .ov-section {
+    margin-top: 16px;
+  }
+  .ov-row {
+    gap: 10px;
+  }
+  .ov-hint {
+    display: none;
+  }
+  .ov-all {
+    margin-left: auto;
+  }
+  .ov-shelves {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ov-notice {
+    flex-wrap: wrap;
+    font-size: 13.5px;
+  }
+
+  /* An opened card fills the screen. */
+  .peek-backdrop.mode-full {
+    padding: 0;
+  }
+  .detail-panel.mode-full {
+    height: 100dvh;
+  }
+  .detail-head {
+    padding-top: max(8px, env(safe-area-inset-top));
+  }
+  .detail-panel.mode-full .detail-scroll {
+    padding: 12px 16px calc(32px + env(safe-area-inset-bottom));
+  }
+  .detail-panel.mode-full .detail-title {
+    font-size: 21px;
+  }
+  .detail-panel.mode-full .carousel {
+    --max-h: 55vh;
+  }
+
+  /* Dialogs: a sheet from the bottom edge. */
+  .modal-backdrop {
+    place-items: end stretch;
+  }
+  .modal {
+    width: 100%;
+    max-height: 92dvh;
+    border-radius: 18px 18px 0 0;
+    padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+  }
+  .toast {
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    max-width: calc(100vw - 32px);
+  }
+}
+@keyframes drawer-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+/* Touch screens have no hover: the card's quick actions would sit there invisible and
+   catch taps meant to open the card. Pin and move live in the opened card instead. */
+@media (hover: none) and (pointer: coarse) {
+  .hover-actions {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace.narrow .sidebar,
+  .drawer-scrim {
+    animation: none;
+  }
+}

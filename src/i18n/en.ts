@@ -55,6 +55,8 @@ export const en: Dict = {
     webBanner: (version) =>
       `Web build for trying out the interface${version ? ` (${version})` : ""}. Data stays in this browser only, link previews aren't loaded, and photos show until the page is reloaded.`,
     webDemoBanner: "This is the Kipple demo: look around and try things, nothing is saved. Your own Saved Messages open in the Windows app.",
+    /** The same on a phone, where the long one takes a third of the screen. */
+    webDemoBannerShort: "A demo to try out: nothing is saved.",
     webDemoDownload: "Download for Windows",
     demoBanner: "This is the demo: look around and try things, but nothing is saved or touches your library.",
     demoExit: "Exit demo",

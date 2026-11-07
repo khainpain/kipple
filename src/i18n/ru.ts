@@ -59,6 +59,8 @@ export const ru = {
     webBanner: (version: string) =>
       `Веб-версия для проверки интерфейса${version ? ` (${version})` : ""}. Данные хранятся только в этом браузере, превью ссылок не загружаются, фото видны до перезагрузки страницы.`,
     webDemoBanner: "Это демо Kipple: смотри и пробуй, ничего не сохраняется. Свои сохранёнки открываются в приложении для Windows.",
+    /** The same on a phone, where the long one takes a third of the screen. */
+    webDemoBannerShort: "Это демо: смотри и пробуй, ничего не сохраняется.",
     webDemoDownload: "Скачать для Windows",
     demoBanner: "Это демо: можно смотреть и пробовать, но ничего не сохраняется и не влияет на твою библиотеку.",
     demoExit: "Выйти из демо",
