@@ -12,7 +12,7 @@ import { changelog } from "./changelog.mjs";
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const OUT = here("../dist/");
-const REPO = "https://github.com/khainpain/telegram-saved-messages";
+const REPO = "https://github.com/khainpain/kipple";
 const LINKS = { repo: REPO, releases: `${REPO}/releases`, issues: `${REPO}/issues` };
 // Canonical address: SITE_URL if set, else the Vercel production domain, else the default one.
 const SITE = (
@@ -23,7 +23,7 @@ const SITE = (
 async function latestRelease() {
   const fallback = { ver: "0.1.16", bytes: 7_523_840 };
   try {
-    const r = await fetch("https://api.github.com/repos/khainpain/telegram-saved-messages/releases/latest", {
+    const r = await fetch("https://api.github.com/repos/khainpain/kipple/releases/latest", {
       headers: { accept: "application/vnd.github+json", "user-agent": "kipple-landing-build" },
       signal: AbortSignal.timeout(5000),
     });

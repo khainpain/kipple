@@ -8,7 +8,7 @@
 import { redis } from "./_lib/quota";
 import { downloadCommands, downloadSource } from "./_lib/stats";
 
-const REPO = "khainpain/telegram-saved-messages";
+const REPO = "khainpain/kipple";
 const RELEASES = `https://github.com/${REPO}/releases/latest`;
 
 type Asset = { name: string; browser_download_url: string };
