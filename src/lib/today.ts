@@ -1,7 +1,7 @@
 import type { Card } from "./types";
 import { effectiveAction, effectiveTopic, getOwnTopics } from "./library";
 import { domainOf } from "./rules";
-import { findDuplicates } from "./smart";
+import { dupeKey, findDuplicates } from "./smart";
 
 /**
  * "Three for today": a few small cleanup tasks a day, each a single decision that sorts
@@ -20,10 +20,18 @@ export const DUPE_GROUPS = 3;
 export const PER_DAY = 3;
 /** A skipped task stays away this many days. */
 export const SKIP_DAYS = 7;
+/** "Read later" this old is asked about: still worth reading? */
+export const STALE_DAYS = 90;
+/** A to-do this old is asked about: done yet? */
+export const TODO_DAYS = 30;
+/** Cards in one "still relevant?" or "done?" task, so an old archive doesn't flood the day. */
+export const REVIEW_CARDS = 5;
 
 export type DailyTask =
   | { kind: "dupes"; key: "dupes"; groups: Array<{ key: string; cards: Card[] }> }
-  | { kind: "site"; key: string; site: string; cards: Card[]; suggest: string[] };
+  | { kind: "site"; key: string; site: string; cards: Card[]; suggest: string[] }
+  /** Old cards asked about one at a time: "read later" (stale) or "to do" (todo). Oldest first. */
+  | { kind: "review"; key: "stale" | "todo"; cards: Card[] };
 
 export interface TodayState {
   /** Local date the plan is for, YYYY-MM-DD. */
@@ -111,16 +119,43 @@ function dupeGroups(cards: Card[], skips: Skips, today: string): Array<{ key: st
   return [...groups].filter(([, g]) => g.length > 1).map(([key, g]) => ({ key, cards: g }));
 }
 
-/** Every task that could be offered now. */
+/** How a single card is set aside ("still want to read it"): by its link, file or text, else its id. */
+export function cardKey(c: Card): string {
+  const k = dupeKey(c);
+  return `c:${k ? k.slice(0, 120) : `id:${c.id}`}`;
+}
+
+/** The oldest few cards with this status, saved before the cut-off and not set aside. */
+function reviewTask(cards: Card[], key: "stale" | "todo", skips: Skips, today: string): Extract<DailyTask, { kind: "review" }> | null {
+  if (skipped(skips, key, today)) return null;
+  const action = key === "stale" ? "read_later" : "todo";
+  const before = addDays(today, -(key === "stale" ? STALE_DAYS : TODO_DAYS));
+  const old = cards
+    .filter((c) => inPlay(c) && effectiveAction(c) === action && c.date.slice(0, 10) < before && !skipped(skips, cardKey(c), today))
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id - b.id));
+  return old.length ? { kind: "review", key, cards: old.slice(0, REVIEW_CARDS) } : null;
+}
+
+/**
+ * Every task that could be offered now: duplicates first (one click clears a pair), then the
+ * biggest site, then the old "read later" and to-dos, then the other sites. Mixing them keeps a
+ * day from being all of one kind.
+ */
 export function candidates(cards: Card[], skips: Skips, today: string): DailyTask[] {
   const out: DailyTask[] = [];
   const groups = dupeGroups(cards, skips, today);
   if (groups.length && !skipped(skips, "dupes", today)) out.push({ kind: "dupes", key: "dupes", groups: groups.slice(0, DUPE_GROUPS) });
-  out.push(...siteTasks(cards, skips, today));
+  const [first, ...sites] = siteTasks(cards, skips, today);
+  if (first) out.push(first);
+  for (const k of ["stale", "todo"] as const) {
+    const t = reviewTask(cards, k, skips, today);
+    if (t) out.push(t);
+  }
+  out.push(...sites);
   return out;
 }
 
-/** A new plan: duplicates first when there are any (one click clears a pair), then the biggest sites. */
+/** A new plan: the first few candidates. */
 export function makePlan(cards: Card[], skips: Skips, today: string, exclude: string[] = []): TodayState {
   const keys = candidates(cards, skips, today)
     .filter((t) => !exclude.includes(t.key))
@@ -140,11 +175,11 @@ export function resolvePlan(plan: TodayState, cards: Card[], skips: Skips, today
   return plan.keys.map((k) => (plan.done.includes(k) ? null : all.get(k) ?? null));
 }
 
-/** Skips after setting a task (or one group) aside: for a week, or for good. */
-export function withSkip(skips: Skips, key: string, today: string, forever = false): Skips {
+/** Skips after setting a task (or one group or card) aside: for a week, for some days, or for good. */
+export function withSkip(skips: Skips, key: string, today: string, forever: boolean | number = false): Skips {
   // Old dates are dropped as we go, so the record doesn't grow for ever.
   const kept = Object.fromEntries(Object.entries(skips).filter(([, v]) => v === "never" || v > today));
-  return { ...kept, [key]: forever ? "never" : addDays(today, SKIP_DAYS) };
+  return { ...kept, [key]: forever === true ? "never" : addDays(today, typeof forever === "number" ? forever : SKIP_DAYS) };
 }
 
 const norm = (s: string | undefined) => (s ?? "").replace(/\s+/g, " ").trim();

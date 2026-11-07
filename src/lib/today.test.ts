@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Card } from "./types";
-import { addDays, candidates, copiesDiffer, localDate, makePlan, planFor, resolvePlan, withSkip } from "./today";
+import { REVIEW_CARDS, addDays, candidates, cardKey, copiesDiffer, localDate, makePlan, planFor, resolvePlan, withSkip } from "./today";
 
 const card = (id: number, over: Partial<Card> = {}): Card => ({ id, date: "2026-01-01", kind: "link", text: "", urls: [], hashtags: [], ...over });
 const ai = (topic: string) => ({ title: "", summary: "", topic, tags: ["x"], action: "reference" as const, priority: 2 as const, model: "m", at: "t" });
@@ -69,12 +69,43 @@ describe("plan", () => {
   });
 });
 
+describe("old read-later and to-dos", () => {
+  const later = (id: number, date: string, over: Partial<Card> = {}) => card(id, { date, text: `note ${id}`, user: { action: "read_later" }, ...over });
+
+  it("asks about read-later older than three months, oldest first, a few at a time", () => {
+    const cards = [
+      later(1, "2026-05-01"),
+      later(2, "2026-01-01"),
+      later(3, "2026-10-01"), // too new
+      ...Array.from({ length: 8 }, (_, i) => later(10 + i, `2025-0${i + 1}-01`)),
+      card(30, { date: "2025-01-01", user: { action: "read_later", hidden: true } }),
+    ];
+    const t = candidates(cards, {}, TODAY).find((x) => x.key === "stale");
+    expect(t?.kind === "review" && t.cards.map((c) => c.id)).toEqual([10, 11, 12, 13, 14].slice(0, REVIEW_CARDS));
+    expect(candidates([later(3, "2026-10-01")], {}, TODAY)).toEqual([]);
+  });
+
+  it("asks about to-dos older than a month and leaves out a card set aside", () => {
+    const todo = (id: number, date: string) => card(id, { date, text: `task ${id}`, user: { action: "todo" } });
+    const cards = [todo(1, "2026-09-01"), todo(2, "2026-09-02"), todo(3, "2026-10-20")];
+    const t = candidates(cards, withSkip({}, cardKey(cards[0]), TODAY, 30), TODAY);
+    expect(t.map((x) => x.key)).toEqual(["todo"]);
+    expect(t[0].kind === "review" && t[0].cards.map((c) => c.id)).toEqual([2]);
+  });
+
+  it("mixes kinds: the biggest site comes before old cards, the other sites after", () => {
+    const cards = [...site("a.com", 5, 1), ...site("b.com", 4, 10), later(40, "2025-01-01")];
+    expect(candidates(cards, {}, TODAY).map((t) => t.key)).toEqual(["s:a.com", "stale", "s:b.com"]);
+  });
+});
+
 describe("withSkip", () => {
   it("sets aside for a week or for good, and forgets old dates", () => {
     const s = withSkip({ old: "2026-01-01", keep: "never" }, "s:a.com", TODAY);
     expect(s).toEqual({ keep: "never", "s:a.com": "2026-11-14" });
     expect(candidates(site("a.com", 3, 1), s, TODAY)).toEqual([]);
     expect(candidates(site("a.com", 3, 1), s, "2026-11-14")).toHaveLength(1);
+    expect(withSkip({}, "c:x", TODAY, 30)).toEqual({ "c:x": "2026-12-07" });
   });
 });
 

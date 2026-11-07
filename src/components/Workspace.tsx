@@ -240,9 +240,9 @@ export function Workspace(props: {
     props.onToday({ today: next });
   }
 
-  function skipTask(key: string, how?: "week" | "never") {
+  function skipTask(key: string, how?: "week" | "never" | number) {
     if (!how) return;
-    const next = withSkip(skipsRef.current, key, day, how === "never");
+    const next = withSkip(skipsRef.current, key, day, how === "never" ? true : how === "week" ? false : how);
     skipsRef.current = next;
     props.onToday({ skips: next });
   }
@@ -638,7 +638,7 @@ export function Workspace(props: {
           onEdit={onEdit}
           onDone={(key, skip) => (saveDone(key, true), skipTask(key, skip))}
           onReopen={(key) => saveDone(key, false)}
-          onSkipGroup={(key) => skipTask(key, "never")}
+          onSkipGroup={(key, days) => skipTask(key, days ?? "never")}
           left={() => {
             const live = lib.cards.filter((c) => !c.removed && matchesFilter(c, "all"));
             return { unsorted: live.filter(isUnsorted).length, dupes: countDuplicateGroups(live, findDuplicates(live)) };

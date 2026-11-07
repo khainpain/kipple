@@ -140,6 +140,8 @@ export function demoLibrary(): Library {
     if (c.kind === "link" && c.link && !c.link.image && !c.urls[0].includes("youtube.com")) c.link.image = ogImage(i, c.ai?.title ?? c.link.title ?? "", c.link.siteName ?? "");
     // Spread over the last two months, so "Recent" has something but not everything.
     c.date = new Date(Date.now() - 60 * 864e5 + i * 864e5 + (i % 5) * 3_600_000).toISOString();
+    // …except a few "read later" saved months ago, for "Still worth reading?" in "Three for today".
+    if (i < 12 && i % 4 === 0) c.date = new Date(Date.now() - (200 - i * 8) * 864e5).toISOString();
     return c;
   });
   // A one-line note, like most real Saved Messages: the AI title and summary say more than the message.

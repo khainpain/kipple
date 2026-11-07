@@ -2565,6 +2565,10 @@ kbd {
 .today-cards .card {
   cursor: default;
 }
+.today-one {
+  width: min(300px, 100%);
+  margin: 0 auto;
+}
 .today-pair {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3218,6 +3222,9 @@ kbd {
 @media (max-width: 640px) {
   .today-pair {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .modal.today {
+    width: 100%;
   }
   .modal.today > .today-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;

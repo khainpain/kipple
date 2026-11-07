@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Card, Library, UserFields } from "../lib/types";
 import { effectiveAction } from "../lib/library";
-import { copiesDiffer, type DailyTask } from "../lib/today";
+import { STALE_DAYS, TODO_DAYS, cardKey, copiesDiffer, type DailyTask } from "../lib/today";
 import { T, formatNumber, locale } from "../i18n";
 import { CardView } from "./CardView";
 import { Icon } from "./Icon";
@@ -37,8 +37,8 @@ export function TodayDialog(props: {
   onDone: (key: string, skip?: "week" | "never") => void;
   /** Bring a finished task back (after Undo). */
   onReopen: (key: string) => void;
-  /** Set one group of duplicates aside for good. */
-  onSkipGroup: (groupKey: string) => void;
+  /** Set one group of duplicates aside for good, or one card for some days. */
+  onSkipGroup: (key: string, days?: number) => void;
   /** Counts for the last screen. */
   left: () => { unsorted: number; dupes: number };
   /** Another three, when there are more; undefined when there are none. */
@@ -59,6 +59,7 @@ export function TodayDialog(props: {
 
   const task = step < tasks.length ? tasks[step] : null;
   const pair = task?.kind === "dupes" ? task.groups[group] : undefined;
+  const one = task?.kind === "review" ? task.cards[group] : undefined;
   // Newest first; the oldest is the last one.
   const copies = pair ? [...pair.cards].sort((a, b) => (a.date < b.date ? 1 : -1)) : [];
   const differ = copies.length > 1 && copiesDiffer(copies);
@@ -121,9 +122,12 @@ export function TodayDialog(props: {
     else setPicked(topic);
   }
 
+  /** Steps within a task: duplicate pairs, or old cards one by one. */
+  const parts = task?.kind === "dupes" ? task.groups.length : task?.kind === "review" ? task.cards.length : 1;
+
   function finishGroup() {
-    if (task?.kind !== "dupes") return;
-    if (group + 1 < task.groups.length) {
+    if (!task) return;
+    if (group + 1 < parts) {
       setPicked(null);
       setGroup(group + 1);
     } else {
@@ -156,6 +160,23 @@ export function TodayDialog(props: {
     finishGroup();
   }
 
+  /** An old card: keep it as reference, set it aside for a while, or send it to Junk. */
+  function review(how: "reference" | "later" | "junk") {
+    if (task?.kind !== "review" || !one) return;
+    const last = group + 1 >= parts;
+    if (how === "later") {
+      props.onSkipGroup(cardKey(one), task.key === "stale" ? STALE_DAYS : TODO_DAYS);
+      if (last) props.onDone(task.key);
+      setUndo(null);
+      setNote(T.today.later);
+    } else {
+      change([one], () => ({ action: how }), last ? task.key : undefined);
+      if (last) props.onDone(task.key);
+      setNote(how === "junk" ? T.today.sortedDupes(1) : T.today.toReference);
+    }
+    finishGroup();
+  }
+
   function skip() {
     if (!task) return;
     props.onDone(task.key, "week");
@@ -182,7 +203,13 @@ export function TodayDialog(props: {
             { id: "old", label: T.today.keepOld, act: () => keep("old") },
             { id: "diff", label: T.today.different, act: different },
           ]
-        : [];
+        : task?.kind === "review"
+          ? [
+              { id: "ref", label: task.key === "stale" ? T.today.useful : T.today.didIt, act: () => review("reference") },
+              { id: "later", label: task.key === "stale" ? T.today.stillRead : T.today.stillTodo, act: () => review("later") },
+              { id: "junk", label: T.today.notNeeded, act: () => review("junk") },
+            ]
+          : [];
 
   // Keys: 1–4 pick, Enter applies the picked one, S skips, Ctrl+Z undoes, Esc closes. Caught before
   // the board's own shortcuts, and left alone while the topic filter has the focus.
@@ -247,6 +274,7 @@ export function TodayDialog(props: {
               <span className="hint today-count" aria-live="polite">
                 {T.today.step(step + 1, total)}
                 {task.kind === "dupes" && task.groups.length > 1 && <> · {T.today.pair(group + 1, task.groups.length)}</>}
+                {task.kind === "review" && task.cards.length > 1 && <> · {T.today.cardOf(group + 1, task.cards.length)}</>}
               </span>
               <button className="link-btn today-skip" onClick={skip}>
                 {T.today.skip} <kbd>S</kbd>
@@ -267,6 +295,16 @@ export function TodayDialog(props: {
                 {preview(task.cards)}
                 {task.cards.length > PREVIEW && <p className="hint">{T.today.moreCards(task.cards.length - PREVIEW)}</p>}
                 {task.suggest.length > 0 && <div className="today-label">{T.today.similar}</div>}
+              </>
+            ) : task.kind === "review" ? (
+              <>
+                <div className="today-q">
+                  <h2 id="today-q" tabIndex={-1} ref={heading}>
+                    {task.key === "stale" ? T.today.staleQ : T.today.todoQ}
+                  </h2>
+                  <p className="hint">{T.today.savedOn(dateOf(one!))}</p>
+                </div>
+                <div className="today-one">{preview([one!])}</div>
               </>
             ) : (
               <>
@@ -393,8 +431,11 @@ function Finale(props: {
 
 /** Used by the banner: how the task is named in its row, and what it counts. */
 export function taskRow(t: DailyTask): { icon: string; title: string; count: string } {
-  return t.kind === "dupes"
-    ? { icon: "copy", title: T.today.dupesTitle, count: T.today.dupesRow(t.groups.length) }
-    : { icon: "globe", title: T.today.siteTitle(t.site), count: T.today.cardsRow(t.cards.length) };
+  if (t.kind === "dupes") return { icon: "copy", title: T.today.dupesTitle, count: T.today.dupesRow(t.groups.length) };
+  if (t.kind === "review")
+    return t.key === "stale"
+      ? { icon: "clock", title: T.today.staleTitle, count: T.today.cardsRow(t.cards.length) }
+      : { icon: "check", title: T.today.todoTitle, count: T.today.cardsRow(t.cards.length) };
+  return { icon: "globe", title: T.today.siteTitle(t.site), count: T.today.cardsRow(t.cards.length) };
 }
 
