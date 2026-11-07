@@ -4,6 +4,7 @@ import { annotateContext, applyEdits, type Aliases } from "./library";
 import { emptyBoardState, type BoardState } from "./telegram";
 import type { LangPref } from "../i18n";
 import { DEFAULT_AI_MODEL, type AiModel } from "./ai";
+import type { Skips, TodayState } from "./today";
 import { DEFAULT_REPLY_CLEANUP, type PendingReply, type ReplyCleanup } from "./tgReplies";
 
 const { exists, read, write: atomicWrite, append } = platform.data;
@@ -38,6 +39,10 @@ export interface Settings {
   topics?: string[];
   /** Anonymous usage statistics (src/lib/telemetry.ts); on unless turned off. */
   telemetry: boolean;
+  /** Today's "Three for today" plan (src/lib/today.ts). */
+  today?: TodayState;
+  /** Cleanup tasks set aside, for a week or for good. */
+  taskSkips?: Skips;
   /** When "Open in Telegram" helper replies are deleted from Saved Messages (src/lib/tgReplies.ts). */
   replyCleanup: ReplyCleanup;
 }

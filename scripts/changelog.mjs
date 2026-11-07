@@ -6,8 +6,14 @@
 export const changelog = [
   {
     ver: "next",
-    en: ["Open in Telegram: jump from a card to its message in Saved Messages"],
-    ru: ["«Открыть в Telegram»: переход от карточки к её сообщению в Избранном"],
+    en: [
+      "Open in Telegram: jump from a card to its message in Saved Messages",
+      "Three for today: a few small cleanup tasks on the overview each day",
+    ],
+    ru: [
+      "«Открыть в Telegram»: переход от карточки к её сообщению в Избранном",
+      "«Три на сегодня»: каждый день несколько маленьких заданий по уборке на обзоре",
+    ],
   },
   {
     ver: "0.1.17",
