@@ -54,7 +54,7 @@ export const en = {
       ["What does the AI send?", "Nothing, unless you turn it on. Then message text goes to Claude by Anthropic for tags and topics. Messages that look like passwords or card numbers never do."],
     ],
   },
-  closing: { title: "Tame your kipple", text: "Kipple is Philip K. Dick's word for junk that multiplies by itself." },
+  closing: { title: "Tame your kipple", text: "Kipple is [Philip K. Dick's word](https://sf-encyclopedia.com/entry/kipple) for junk that multiplies by itself." },
   footer: {
     note: "Independent open-source project, not affiliated with Telegram.",
     links: [["GitHub", "repo"], ["Releases", "releases"], ["Report a bug", "issues"]],
@@ -114,7 +114,7 @@ export const ru = {
       ["Что отправляет AI?", "Ничего, пока ты его не включишь. Тогда текст сообщений уходит в Claude от Anthropic за темами и тегами. Сообщения, похожие на пароли и номера карт, не уходят никогда."],
     ],
   },
-  closing: { title: "Tame your kipple", text: "Kipple у Филипа К. Дика: хлам, который размножается сам." },
+  closing: { title: "Tame your kipple", text: "Kipple [у Филипа К. Дика](https://sf-encyclopedia.com/entry/kipple): хлам, который размножается сам." },
   footer: {
     note: "Независимый проект с открытым кодом, не связан с Telegram.",
     links: [["GitHub", "repo"], ["Версии", "releases"], ["Сообщить об ошибке", "issues"]],
