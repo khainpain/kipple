@@ -3,7 +3,7 @@
 // Every field is checked against the fixed lists in src/lib/telemetryEvents.ts; a ping with
 // anything else in it is refused whole.
 
-import { AGE_BUCKETS, AI_MODES, eventKey, isoWeek, LANGS, LEGACY_COHORT, LIBRARY_BUCKETS, OS, type Ping } from "../../src/lib/telemetryEvents";
+import { AGE_BUCKETS, AI_MODES, eventKey, isoWeek, LANGS, LEGACY_COHORT, LIBRARY_BUCKETS, OS, type Ping } from "../../src/lib/telemetryEvents.js";
 
 /** Totals are kept for about 13 months. */
 export const STATS_TTL = 400 * 86_400;

@@ -1,5 +1,5 @@
 // English interface strings. Same keys as ru.ts; the type makes the build fail on a missing one.
-import type { Dict } from "./ru";
+import type { Dict } from "./ru.js";
 
 const num = (n: number) => n.toLocaleString("en-US");
 const s = (n: number) => (n === 1 ? "" : "s");

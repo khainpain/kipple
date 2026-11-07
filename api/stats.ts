@@ -1,8 +1,8 @@
 // Vercel function: the statistics totals, for the weekly report. Needs the KIPPLE_STATS_TOKEN
 // environment variable and `Authorization: Bearer <it>`; without the variable it is switched off.
 // ?days=28 (up to 120) daily totals, plus the weekly totals and downloads of the same period.
-import { env } from "./_lib/quota";
-import { isoWeek } from "../src/lib/telemetryEvents";
+import { env } from "./_lib/quota.js";
+import { isoWeek } from "../src/lib/telemetryEvents.js";
 
 async function hgetall(keys: string[]): Promise<Record<string, Record<string, number>>> {
   const url = env("KV_REST_API_URL") ?? env("UPSTASH_REDIS_REST_URL");

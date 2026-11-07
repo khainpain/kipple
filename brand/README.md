@@ -17,4 +17,4 @@ The Windows icon (`icon.ico`: exe, shortcuts, taskbar, Start menu, title bar, in
 
 ## Windows installer art
 
-`src-tauri/installer/*.bmp` (NSIS sidebar and header, WiX banner and dialog) are generated from these SVGs by `python brand/build-installer-art.py` (needs `pip install cairosvg pillow`). Screenshots of the result are in `installer-preview/`. The silent auto-update (`/S`) shows no pages, so the art only appears on a first install from the downloaded `setup.exe`.
+`src-tauri/installer/*.bmp` (NSIS sidebar and header, WiX banner and dialog) are generated from these SVGs by `python brand/build-installer-art.py` (needs `pip install cairosvg pillow`). The silent auto-update (`/S`) shows no pages, so the art only appears on a first install from the downloaded `setup.exe`.

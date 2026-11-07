@@ -1,4 +1,4 @@
-import { T } from "../i18n";
+import { T } from "../i18n/index.js";
 
 export type CardKind =
   | "link"

@@ -1,6 +1,6 @@
 // Vercel function: how much of today's built-in-key allowance this install has used,
 // for the Settings screen. Takes only the install id; returns two numbers.
-import { usageToday } from "../_lib/quota";
+import { usageToday } from "../_lib/quota.js";
 
 export async function GET(request: Request): Promise<Response> {
   const install = request.headers.get("x-kipple-install") ?? "";

@@ -5,8 +5,8 @@
 // it can't be reached, the visitor lands on the releases page instead. The redirect itself is not
 // cached, so every click adds one to the day's download count, by where it came from (?src=, the
 // landing page passes its utm_source along). Only that count is kept: no IP, no cookie.
-import { redis } from "./_lib/quota";
-import { downloadCommands, downloadSource } from "./_lib/stats";
+import { redis } from "./_lib/quota.js";
+import { downloadCommands, downloadSource } from "./_lib/stats.js";
 
 const REPO = "khainpain/kipple";
 const RELEASES = `https://github.com/${REPO}/releases/latest`;

@@ -1,7 +1,7 @@
 // Vercel function: the desktop app's anonymous daily ping (src/lib/telemetry.ts). Adds it to
 // daily and weekly totals in Upstash (api/_lib/stats.ts). Keeps no single ping and no IP address.
-import { redis } from "./_lib/quota";
-import { MAX_PING_BYTES, parsePing, pingCommands } from "./_lib/stats";
+import { redis } from "./_lib/quota.js";
+import { MAX_PING_BYTES, parsePing, pingCommands } from "./_lib/stats.js";
 
 export async function POST(request: Request): Promise<Response> {
   const text = await request.text().catch(() => "");

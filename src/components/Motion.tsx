@@ -1,5 +1,5 @@
 /**
- * Kipple's motion kit (docs/design/kipple-welcome/MOTION.md): React Bits components with the
+ * Kipple's motion kit (the "kipple-welcome" design handoff, MOTION.md): React Bits components with the
  * settings from the design, plus small motion-based stand-ins where the React Bits component
  * needs GSAP or brings its own look (AnimatedContent, AnimatedList, BounceCards, Stepper).
  *

@@ -3,10 +3,10 @@
 // this exact schema, so the built-in key can't be used as a general-purpose Claude.
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { ACTIONS } from "./types";
-import { en } from "../i18n/en";
-import { ru } from "../i18n/ru";
-import type { Lang } from "../i18n";
+import { ACTIONS } from "./types.js";
+import { en } from "../i18n/en.js";
+import { ru } from "../i18n/ru.js";
+import type { Lang } from "../i18n/index.js";
 
 export const ItemSchema = z.object({
   id: z.number().int(),

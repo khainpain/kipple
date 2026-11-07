@@ -15,15 +15,46 @@
       "destination": "/api/download"
     }
   ],
-  "headers": [
+  "redirects": [
     {
-      "source": "/img/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=86400"
-        }
-      ]
+      "source": "/",
+      "destination": "https://getkipple.io/",
+      "permanent": false
+    },
+    {
+      "source": "/ru",
+      "destination": "https://getkipple.io/ru/",
+      "permanent": false
+    },
+    {
+      "source": "/ru/:path*",
+      "destination": "https://getkipple.io/ru/:path*",
+      "permanent": false
+    },
+    {
+      "source": "/privacy",
+      "destination": "https://getkipple.io/privacy/",
+      "permanent": false
+    },
+    {
+      "source": "/privacy/:path*",
+      "destination": "https://getkipple.io/privacy/:path*",
+      "permanent": false
+    },
+    {
+      "source": "/stats",
+      "destination": "https://getkipple.io/stats/",
+      "permanent": false
+    },
+    {
+      "source": "/stats/:path*",
+      "destination": "https://getkipple.io/stats/:path*",
+      "permanent": false
+    },
+    {
+      "source": "/img/:path*",
+      "destination": "https://getkipple.io/img/:path*",
+      "permanent": false
     }
   ]
 }
