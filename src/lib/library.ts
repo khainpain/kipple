@@ -18,6 +18,7 @@ export function mergeImport(prev: Library | null, next: Omit<Library, "version">
       ...c,
       ai: sameText ? o.ai : undefined,
       link: o.link && c.urls[0] === o.link.url ? o.link : undefined,
+      preview: c.preview ?? (c.urls[0] === o.urls[0] ? o.preview : undefined),
       user: o.user,
     };
   });

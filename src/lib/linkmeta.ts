@@ -26,8 +26,32 @@ function absolute(href: string | undefined, base: string): string | undefined {
   }
 }
 
+/**
+ * The page's preview picture: og:image and its cousins, else the first sizeable picture of
+ * the article (blogs without social tags usually lead with one).
+ */
+function pageImage(doc: Document): string | undefined {
+  const tagged =
+    meta(doc, "og:image", "og:image:url", "og:image:secure_url", "twitter:image", "twitter:image:src") ??
+    doc.querySelector('link[rel="image_src"]')?.getAttribute("href") ??
+    doc.querySelector('meta[itemprop="image"]')?.getAttribute("content") ??
+    undefined;
+  if (tagged?.trim()) return tagged.trim();
+  for (const img of Array.from(doc.querySelectorAll("article img"))) {
+    const src = img.getAttribute("src")?.trim();
+    const w = Number(img.getAttribute("width"));
+    if (!src || /^data:|\.svg(\?|$)/i.test(src) || (w && w < 200)) continue;
+    return src;
+  }
+  return undefined;
+}
+
+/** Bump when parseHtml learns to find more: links saved without a picture are tried once more. */
+export const PARSE_VERSION = 2;
+
 export function parseHtml(html: string, url: string): Omit<LinkMeta, "fetchedAt"> {
   const doc = new DOMParser().parseFromString(html, "text/html");
+  const image = pageImage(doc);
   const icon = doc.querySelector('link[rel~="icon"], link[rel="shortcut icon"], link[rel="apple-touch-icon"]')?.getAttribute("href") ?? "/favicon.ico";
   doc.querySelectorAll("script, style, noscript, nav, header, footer, aside, form").forEach((n) => n.remove());
   const main = doc.querySelector("article") ?? doc.querySelector("main") ?? doc.body;
@@ -36,7 +60,7 @@ export function parseHtml(html: string, url: string): Omit<LinkMeta, "fetchedAt"
     url,
     title: meta(doc, "og:title", "twitter:title") ?? doc.title?.trim() ?? undefined,
     description: meta(doc, "og:description", "twitter:description", "description"),
-    image: absolute(meta(doc, "og:image", "og:image:url", "twitter:image"), url),
+    image: absolute(image, url),
     siteName: meta(doc, "og:site_name"),
     favicon: absolute(icon, url),
     excerpt: excerpt || undefined,
@@ -107,34 +131,42 @@ async function instagram(url: string, code: string): Promise<Omit<LinkMeta, "fet
 }
 
 export async function fetchLinkMeta(url: string): Promise<LinkMeta> {
-  const fetchedAt = new Date().toISOString();
+  return { ...(await fetchMeta(url)), fetchedAt: new Date().toISOString(), v: PARSE_VERSION };
+}
+
+async function fetchMeta(url: string): Promise<Omit<LinkMeta, "fetchedAt">> {
   try {
     const u = new URL(url);
-    if (!/^https?:$/.test(u.protocol) || PRIVATE_HOST.test(u.hostname)) return { url, error: "skipped", fetchedAt };
+    if (!/^https?:$/.test(u.protocol) || PRIVATE_HOST.test(u.hostname)) return { url, error: "skipped" };
     const yt = youtubeId(url);
-    if (yt) return { ...(await youtube(url, yt)), fetchedAt };
+    if (yt) return await youtube(url, yt);
     const ig = instagramCode(url);
-    if (ig) return { ...(await instagram(url, ig)), fetchedAt };
+    if (ig) return await instagram(url, ig);
     const res = await fetch(url, {
       connectTimeout: 8000,
       headers: { "User-Agent": UA, Accept: "text/html,*/*;q=0.5" },
     });
     const type = res.headers.get("content-type") ?? "";
-    if (!res.ok) return { url, error: `HTTP ${res.status}`, fetchedAt };
-    if (!type.includes("html")) return { url, title: decodeURIComponent(u.pathname.split("/").pop() || u.hostname), siteName: u.hostname, fetchedAt };
+    if (!res.ok) return { url, error: `HTTP ${res.status}` };
+    if (!type.includes("html")) return { url, title: decodeURIComponent(u.pathname.split("/").pop() || u.hostname), siteName: u.hostname };
     const html = (await res.text()).slice(0, MAX_HTML);
-    return { ...parseHtml(html, finalUrl(res, url)), fetchedAt };
+    return parseHtml(html, finalUrl(res, url));
   } catch (e) {
-    return { url, error: String(e).slice(0, 200), fetchedAt };
+    return { url, error: String(e).slice(0, 200) };
   }
 }
 
 const DAY = 86_400_000;
 
-/** Cards whose preview is missing, or YouTube/Instagram ones an older version left without a picture. */
+/**
+ * Cards whose preview is missing; ones an older version left without a picture (once); and
+ * YouTube/Instagram ones without a picture (again after a day).
+ */
 export function needsPreview(c: Card): boolean {
   if (c.kind !== "link" || !c.urls[0] || c.removed) return false;
   if (!c.link) return true;
-  if (c.link.image || c.link.error === "skipped" || !wantsImage(c.urls[0])) return false;
+  if (c.link.image || c.link.error === "skipped") return false;
+  if ((c.link.v ?? 1) < PARSE_VERSION) return true;
+  if (!wantsImage(c.urls[0])) return false;
   return Date.now() - Date.parse(c.link.fetchedAt || "0") > DAY;
 }

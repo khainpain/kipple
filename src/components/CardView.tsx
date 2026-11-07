@@ -65,7 +65,8 @@ export function coverOf(lib: Library, card: Card): { src?: string; ratio?: numbe
   if (card.kind === "photo") return m?.missing ? { missing: T.card.photoMissing } : { src: mediaUrl(lib, m?.path), ratio };
   if (card.kind === "video" || card.kind === "animation") return { src: mediaUrl(lib, m?.thumb), ratio, missing: m?.missing ? T.card.videoMissing : undefined };
   if (card.kind === "link") {
-    const src = card.link?.image ?? instantImage(card.urls[0]);
+    // Telegram's own copy first (already on disk), then the page's og:image, then known sites.
+    const src = mediaUrl(lib, card.preview?.path) ?? card.link?.image ?? instantImage(card.urls[0]);
     if (src) return { src };
   }
   return {};
@@ -130,6 +131,7 @@ function Cover({ lib, card, view }: { lib: Library; card: Card; view: ViewKey })
         alt=""
         loading="lazy"
         decoding="async"
+        referrerPolicy="no-referrer"
         style={!fixed && c.ratio ? { aspectRatio: String(Math.max(c.ratio, 1 / 1.6)) } : undefined}
         onError={() => setFailed(true)}
       />

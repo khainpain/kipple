@@ -5,8 +5,58 @@ import { annotateContext } from "./library";
 import type { Library } from "./types";
 import { T } from "../i18n";
 
-const swatch = (hue: number, w: number, h: number) =>
-  `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'><rect width='100%' height='100%' fill='hsl(${hue},55%,70%)'/></svg>`)}`;
+const xml = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/'/g, "&apos;");
+
+/** Splits a headline into lines of about `max` characters, at most three. */
+function wrap(text: string, max: number): string[] {
+  const lines: string[] = [];
+  for (const word of text.split(/\s+/)) {
+    const last = lines[lines.length - 1];
+    if (last !== undefined && (last + " " + word).length <= max) lines[lines.length - 1] = last + " " + word;
+    else lines.push(word);
+  }
+  return lines.length > 3 ? [...lines.slice(0, 2), lines[2] + "…"] : lines;
+}
+
+/**
+ * A made-up link preview in the style of a site's og:image: a tinted picture with soft shapes,
+ * the headline and the site. Drawn here, so the demo needs nothing from the network.
+ */
+function ogImage(seed: number, title: string, site: string): string {
+  const h = (seed * 47) % 360;
+  const h2 = (h + 40) % 360;
+  const lines = wrap(title, 20);
+  const top = 315 - (lines.length * 68) / 2 + 48;
+  const text = lines.map((l, k) => `<tspan x='150' y='${top + k * 68}'>${xml(l)}</tspan>`).join("");
+  const cx = 860 + ((seed * 31) % 160);
+  const cy = 200 + ((seed * 17) % 220);
+  return `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='630' viewBox='0 0 1200 630'>` +
+      `<defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='hsl(${h},45%,24%)'/><stop offset='1' stop-color='hsl(${h2},55%,38%)'/></linearGradient></defs>` +
+      `<rect width='1200' height='630' fill='url(#g)'/>` +
+      `<circle cx='${cx}' cy='${cy}' r='230' fill='hsl(${h2},70%,62%)' opacity='.35'/>` +
+      `<circle cx='${cx + 120}' cy='${cy + 190}' r='130' fill='hsl(${h},80%,75%)' opacity='.25'/>` +
+      `<rect x='${cx - 150}' y='${cy - 40}' width='260' height='170' rx='22' fill='hsl(${h},30%,92%)' opacity='.18' transform='rotate(-8 ${cx} ${cy})'/>` +
+      `<text font-family='system-ui,-apple-system,Segoe UI,Roboto,sans-serif' font-size='56' font-weight='700' fill='white' letter-spacing='-1'>${text}</text>` +
+      `<text x='150' y='110' font-family='system-ui,-apple-system,Segoe UI,Roboto,sans-serif' font-size='26' font-weight='600' fill='white' opacity='.75'>${xml(site)}</text>` +
+      `<rect x='150' y='520' width='64' height='6' rx='3' fill='white' opacity='.6'/>` +
+      `</svg>`,
+  )}`;
+}
+
+/** A made-up picture for the demo's photos and video frames: a landscape with a sun. */
+function videoFrame(seed: number, w: number, h: number): string {
+  const hue = (seed * 53) % 360;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' viewBox='0 0 ${w} ${h}'>` +
+      `<defs><linearGradient id='s' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='hsl(${hue},60%,72%)'/><stop offset='1' stop-color='hsl(${(hue + 30) % 360},70%,86%)'/></linearGradient></defs>` +
+      `<rect width='100%' height='100%' fill='url(#s)'/>` +
+      `<circle cx='${w * 0.68}' cy='${h * 0.42}' r='${h * 0.14}' fill='hsl(${(hue + 50) % 360},90%,92%)'/>` +
+      `<path d='M0 ${h * 0.62} Q ${w * 0.25} ${h * 0.5} ${w * 0.5} ${h * 0.6} T ${w} ${h * 0.56} V ${h} H 0 Z' fill='hsl(${(hue + 180) % 360},30%,38%)'/>` +
+      `<path d='M0 ${h * 0.76} Q ${w * 0.3} ${h * 0.68} ${w * 0.6} ${h * 0.78} T ${w} ${h * 0.74} V ${h} H 0 Z' fill='hsl(${(hue + 190) % 360},35%,26%)'/>` +
+      `</svg>`,
+  )}`;
+}
 
 // A one-page PDF and a text file, so the in-card previews can be tried in the browser build.
 const DEMO_PDF = "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA0MjAgMjk3XSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4gPj4gPj4KZW5kb2JqCjQgMCBvYmoKPDwgL0xlbmd0aCAxMDQgPj4Kc3RyZWFtCkJUIC9GMSAyMiBUZiA0MCAyMjAgVGQgKERlbW8gcmVwb3J0KSBUaiAwIC0zNiBUZCAvRjEgMTIgVGYgKFRoaXMgUERGIG9wZW5zIHJpZ2h0IGluc2lkZSB0aGUgY2FyZC4pIFRqIEVUCmVuZHN0cmVhbQplbmRvYmoKNSAwIG9iago8PCAvVHlwZSAvRm9udCAvU3VidHlwZSAvVHlwZTEgL0Jhc2VGb250IC9IZWx2ZXRpY2EgPj4KZW5kb2JqCnhyZWYKMCA2CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAwOSAwMDAwMCBuIAowMDAwMDAwMDU4IDAwMDAwIG4gCjAwMDAwMDAxMTUgMDAwMDAgbiAKMDAwMDAwMDI0MSAwMDAwMCBuIAowMDAwMDAwMzk2IDAwMDAwIG4gCnRyYWlsZXIKPDwgL1NpemUgNiAvUm9vdCAxIDAgUiA+PgpzdGFydHhyZWYKNDY2CiUlRU9GCg==";
@@ -25,15 +75,16 @@ export function demoLibrary(): Library {
       if (c.media?.size) c.media = { ...c.media, size: c.media.size + i };
       else if (c.text) c.text += "\u200b".repeat(i); // invisible, but the texts no longer match
     }
-    if (c.kind === "link") c.link = { url: c.urls[0], title: D.article(i), siteName: "example.com", image: i % 3 ? swatch(i * 37, 1200, 630) : undefined, fetchedAt: "" };
+    if (c.kind === "link") c.link = { url: c.urls[0], title: D.article(i), siteName: "example.com", fetchedAt: "" };
     if (c.kind === "photo") {
       c.link = undefined;
       const [w, h] = i % 2 ? [800, 1000] : [1200, 800];
-      c.media = { ...c.media, path: swatch(i * 53, w, h), width: w, height: h, missing: false };
+      c.media = { ...c.media, path: videoFrame(i * 3, w, h), width: w, height: h, missing: false };
       // Some photos are albums of phone screenshots, to show the carousel.
-      c.album = i % 18 === 2 ? [1, 2, 3, 4].map((k) => ({ path: swatch(i * 53 + k * 40, 390, 844), width: 390, height: 844 })) : undefined;
-      if (c.album) c.media = { ...c.media, path: swatch(i * 53, 390, 844), width: 390, height: 844 };
+      c.album = i % 18 === 2 ? [1, 2, 3, 4].map((k) => ({ path: videoFrame(i * 3 + k, 390, 844), width: 390, height: 844 })) : undefined;
+      if (c.album) c.media = { ...c.media, path: videoFrame(i * 3, 390, 844), width: 390, height: 844 };
     }
+    if (c.kind === "video") c.media = { ...c.media, thumb: videoFrame(i, 1280, 720), width: 1280, height: 720, missing: false };
     if (c.kind === "document") {
       const txt = i % 2 === 1;
       c.media = { ...c.media, path: txt ? DEMO_TXT : DEMO_PDF, fileName: txt ? D.textFile : "report.pdf", mime: txt ? "text/plain" : "application/pdf", missing: false };
@@ -61,7 +112,7 @@ export function demoLibrary(): Library {
       c.album = undefined;
       c.urls = ["https://www.instagram.com/reel/C9demoReel1/"];
       c.text = c.urls[0];
-      c.link = { url: c.urls[0], title: D.reelTitle, description: D.reelDescription, siteName: "Instagram", image: swatch(330, 720, 1280), fetchedAt: "" };
+      c.link = { url: c.urls[0], title: D.reelTitle, description: D.reelDescription, siteName: "Instagram", image: videoFrame(17, 720, 1280), fetchedAt: "" };
       c.ai = undefined; // not tagged yet: the heading comes from the caption
     }
     if (i === 13) {
@@ -72,6 +123,8 @@ export function demoLibrary(): Library {
       c.text = c.urls[0];
       c.link = { url: c.urls[0], title: D.videoTitle, description: "Kipple Lab", siteName: "YouTube", fetchedAt: "" };
     }
+    // Every site gives a preview picture here; the placeholder is for pages that don't.
+    if (c.kind === "link" && c.link && !c.link.image && !c.urls[0].includes("youtube.com")) c.link.image = ogImage(i, c.ai?.title ?? c.link.title ?? "", c.link.siteName ?? "");
     // Spread over the last two months, so "Recent" has something but not everything.
     c.date = new Date(Date.now() - 60 * 864e5 + i * 864e5 + (i % 5) * 3_600_000).toISOString();
     return c;

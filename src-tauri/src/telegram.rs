@@ -793,6 +793,9 @@ pub struct SavedMessage {
     /// Messages sent together as an album share this id.
     grouped_id: Option<String>,
     media: Option<SavedMedia>,
+    /// The message has a link preview with a picture (Telegram's own copy of the page's
+    /// og:image); tg_saved_photos downloads it like a photo.
+    web_photo: bool,
 }
 
 #[derive(Serialize)]
@@ -948,6 +951,26 @@ fn saved_message(m: &tl::types::Message, names: &HashMap<i64, String>) -> SavedM
         forwarded_from: m.fwd_from.as_ref().and_then(|h| forwarded_from(h, names)),
         grouped_id: m.grouped_id.map(|g| g.to_string()),
         media: m.media.as_ref().and_then(media_of),
+        web_photo: m.media.as_ref().and_then(photo_of).is_some_and(|(_, web)| web),
+    }
+}
+
+/// The picture to download for a message: its photo, or the picture of its link preview
+/// (`true` in the second place).
+fn photo_of(media: &tl::enums::MessageMedia) -> Option<(&tl::types::Photo, bool)> {
+    match media {
+        tl::enums::MessageMedia::Photo(p) => match &p.photo {
+            Some(tl::enums::Photo::Photo(photo)) => Some((photo, false)),
+            _ => None,
+        },
+        tl::enums::MessageMedia::WebPage(w) => match &w.webpage {
+            tl::enums::WebPage::Page(page) => match &page.photo {
+                Some(tl::enums::Photo::Photo(photo)) => Some((photo, true)),
+                _ => None,
+            },
+            _ => None,
+        },
+        _ => None,
     }
 }
 
@@ -1047,7 +1070,7 @@ pub struct SavedPhoto {
     path: String,
 }
 
-/// Downloads the photos of these Saved Messages into the app's folder (telegram-media/<id>.jpg)
+/// Downloads the photos (or link preview pictures) of these Saved Messages into the app's folder (telegram-media/<id>.jpg)
 /// and returns where each one went. Photos already on disk are not downloaded again, so an
 /// interrupted run picks up where it stopped. Messages without a photo, or that no longer
 /// exist, are left out of the result.
@@ -1080,8 +1103,7 @@ pub async fn tg_saved_photos(app: tauri::AppHandle, state: tauri::State<'_, TgSt
     };
     for m in messages {
         let tl::enums::Message::Message(m) = m else { continue };
-        let Some(tl::enums::MessageMedia::Photo(media)) = &m.media else { continue };
-        let Some(tl::enums::Photo::Photo(photo)) = &media.photo else { continue };
+        let Some((photo, _)) = m.media.as_ref().and_then(photo_of) else { continue };
         let Some(thumb_size) = pick_photo_size(&photo.sizes) else { continue };
         let file = PhotoFile {
             location: tl::types::InputPhotoFileLocation {

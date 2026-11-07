@@ -75,7 +75,11 @@ export function toRawMessage(m: SavedMessage): RawMessage {
 export function messagesToCards(messages: SavedMessage[]): Card[] {
   const sorted = [...messages].sort((a, b) => a.id - b.id);
   const { cards } = parseExport({ name: T.importer.savedMessages, type: "saved_messages", messages: sorted.map(toRawMessage) });
-  for (const c of cards) for (const m of mediaOf(c)) m.ref.inTelegram = true;
+  const webPhoto = new Set(sorted.filter((m) => m.webPhoto).map((m) => m.id));
+  for (const c of cards) {
+    if (c.kind === "link" && webPhoto.has(c.id)) c.preview = { inTelegram: true };
+    for (const m of mediaOf(c)) m.ref.inTelegram = true;
+  }
   return cards;
 }
 
@@ -83,6 +87,7 @@ export function messagesToCards(messages: SavedMessage[]): Card[] {
 function mediaOf(c: Card): Array<{ id: number; ref: MediaRef }> {
   const out: Array<{ id: number; ref: MediaRef }> = [];
   if (c.media) out.push({ id: c.id, ref: c.media });
+  else if (c.preview) out.push({ id: c.id, ref: c.preview });
   c.album?.forEach((ref, i) => {
     const id = c.albumIds?.[i];
     if (id !== undefined) out.push({ id, ref });
@@ -107,12 +112,12 @@ export function newestId(lib: Library): number {
   return max;
 }
 
-/** Photos that still need downloading. */
+/** Photos (and link preview pictures) that still need downloading. */
 export function pendingPhotos(lib: Library): number[] {
   const skip = new Set(lib.telegram?.noPhoto ?? []);
   const ids: number[] = [];
   for (const c of lib.cards) {
-    if (c.kind !== "photo" || c.removed) continue;
+    if (!(c.kind === "photo" || (c.kind === "link" && c.preview)) || c.removed) continue;
     for (const { id, ref } of mediaOf(c)) if (!ref.path && !ref.missing && !skip.has(id)) ids.push(id);
   }
   return ids;
