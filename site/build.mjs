@@ -175,6 +175,7 @@ function page(c, other, rel, css, js) {
 <meta property="og:image:alt" content="${t(c.ogAlt)}">
 <meta name="twitter:card" content="summary_large_image">
 <script>if(!matchMedia("(prefers-reduced-motion: reduce)").matches)document.documentElement.classList.add("motion")</script>
+<script defer src="/_vercel/insights/script.js"></script>
 <script type="application/ld+json">${JSON.stringify(ld).replace(/</g, "\\u003c")}</script>
 <style>${css}</style>
 </head>
@@ -241,12 +242,60 @@ ${c.faq.items.map(([q, a]) => `    <details><summary>${t(q)}</summary><p>${r(a)}
 
 <footer class="wrap foot">
   <nav>
-${c.footer.links.map(([n, l]) => `    <a href="${LINKS[l]}">${t(n)}</a>`).join("\n")}
+${footLinks(c)}
   </nav>
   <p>${t(c.footer.note)}</p>
 </footer>
 ${news(c, rel)}
 <script>${js}</script>
+</body>
+</html>
+`;
+}
+
+function footLinks(c) {
+  return c.footer.links.map(([n, l]) => `    <a href="${l === "privacy" ? c.path + "privacy/" : LINKS[l]}">${esc(n)}</a>`).join("\n");
+}
+
+/** /privacy/ and /ru/privacy/: what leaves the computer, in plain words. */
+function privacyPage(c, css) {
+  const p = c.privacyPage;
+  const url = SITE + c.path + "privacy/";
+  return `<!doctype html>
+<html lang="${c.lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(p.title)} · Kipple</title>
+<meta name="description" content="${esc(p.lead)}">
+<link rel="canonical" href="${url}">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<script defer src="/_vercel/insights/script.js"></script>
+<style>${css}
+.legal { max-width: 720px; padding-block: 24px 56px; }
+.legal h1 { font-size: clamp(30px, 4vw, 44px); margin-bottom: 12px; }
+.legal .lead { color: var(--muted); font-size: 18px; margin-bottom: 32px; }
+.legal h2 { font-size: 20px; margin: 28px 0 8px; }
+.legal p { line-height: 1.6; }</style>
+</head>
+<body>
+<header class="top wrap"><div class="brand">
+  <a class="logo" href="${c.path}" aria-label="Kipple">
+    <picture><source srcset="/img/kipple-logo-dark.svg" media="(prefers-color-scheme: dark)"><img src="/img/kipple-logo-light.svg" alt="Kipple" width="131" height="38"></picture>
+  </a></div>
+</header>
+<main id="main" class="wrap legal">
+  <h1>${esc(p.title)}</h1>
+  <p class="lead">${esc(p.lead)}</p>
+${p.sections.map(([h, b]) => `  <h2>${esc(h)}</h2>\n  <p>${esc(b)}</p>`).join("\n")}
+</main>
+<footer class="wrap foot">
+  <nav>
+${footLinks(c)}
+  </nav>
+  <p>${esc(c.footer.note)}</p>
+</footer>
 </body>
 </html>
 `;
@@ -262,11 +311,16 @@ await mkdir(OUT + "ru", { recursive: true });
 await cp(here("./public/"), OUT, { recursive: true });
 await writeFile(OUT + "index.html", page(en, ru, rel, css, js));
 await writeFile(OUT + "ru/index.html", page(ru, en, rel, css, js));
+await mkdir(OUT + "privacy", { recursive: true });
+await mkdir(OUT + "ru/privacy", { recursive: true });
+await writeFile(OUT + "privacy/index.html", privacyPage(en, css));
+await writeFile(OUT + "ru/privacy/index.html", privacyPage(ru, css));
 await writeFile(OUT + "robots.txt", `User-agent: *\nAllow: /\nDisallow: /app/\nSitemap: ${SITE}/sitemap.xml\n`);
 const alt = `<xhtml:link rel="alternate" hreflang="en" href="${SITE}/"/><xhtml:link rel="alternate" hreflang="ru" href="${SITE}/ru/"/>`;
 await writeFile(
   OUT + "sitemap.xml",
   `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n` +
-    `<url><loc>${SITE}/</loc>${alt}</url>\n<url><loc>${SITE}/ru/</loc>${alt}</url>\n</urlset>\n`,
+    `<url><loc>${SITE}/</loc>${alt}</url>\n<url><loc>${SITE}/ru/</loc>${alt}</url>\n` +
+    `<url><loc>${SITE}/privacy/</loc></url>\n<url><loc>${SITE}/ru/privacy/</loc></url>\n</urlset>\n`,
 );
 console.log(`landing: ${SITE} (v${rel.ver}, ${rel.size.en})`);

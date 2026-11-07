@@ -34,9 +34,11 @@ export interface Settings {
   aliases?: Aliases;
   /** Topics the user made by hand: shown even when empty, offered to the AI first. */
   topics?: string[];
+  /** Anonymous usage statistics (src/lib/telemetry.ts); on unless turned off. */
+  telemetry: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { aiEnabled: false, fetchLinks: true, aiImages: false, language: "auto", aiLanguage: "ui", aiModel: DEFAULT_AI_MODEL };
+export const DEFAULT_SETTINGS: Settings = { aiEnabled: false, fetchLinks: true, aiImages: false, language: "auto", aiLanguage: "ui", aiModel: DEFAULT_AI_MODEL, telemetry: true };
 
 export async function loadLibrary(): Promise<Library | null> {
   if (!(await exists(LIBRARY))) return null;

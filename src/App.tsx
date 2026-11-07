@@ -23,6 +23,7 @@ import { emptyTelegramLibrary, syncSaved } from "./lib/tgImport";
 import { T, lang, resolveLang, setLang } from "./i18n";
 import type { AiLang } from "./lib/ai";
 import { Toast } from "./components/Motion";
+import { initTelemetry, markImported, maybeSendPing, setTelemetryEnabled, setTelemetrySuspended, telemetrySupported, track } from "./lib/telemetry";
 
 const isWeb = platform.kind === "web";
 
@@ -61,6 +62,10 @@ export default function App() {
   /** Settings as of now, for AI runs that start right after a save (state updates later). */
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+  const libRef = useRef(lib);
+  libRef.current = lib;
+  const hasKeyRef = useRef(hasKey);
+  hasKeyRef.current = hasKey;
 
   const notify = useCallback((msg: string) => {
     setToast(msg);
@@ -79,6 +84,7 @@ export default function App() {
         setLib(l);
         setSettings(s);
         setHasKey(!!k);
+        void startTelemetry(s, !!l);
         if (platform.kind === "web" && q.has("demo")) {
           history.replaceState(null, "", location.pathname); // "Exit demo" then leads to the normal start
           return openDemo();
@@ -112,6 +118,29 @@ export default function App() {
 
   useEffect(() => {
     platform.appVersion().then(setVersion, () => undefined);
+  }, []);
+
+  /** Anonymous statistics: today's ping on start, then checked every hour and when the window comes back. */
+  async function startTelemetry(s: Settings, hadLibrary: boolean) {
+    if (!telemetrySupported()) return;
+    const firstAfterUpdate = await initTelemetry({
+      enabled: s.telemetry,
+      hadLibrary,
+      context: () => ({
+        libraryCount: libRef.current?.cards.length ?? 0,
+        ai: aiAllowed(settingsRef.current) ? (hasKeyRef.current ? "own" : "builtin") : "off",
+        lang: lang(),
+      }),
+    });
+    if (firstAfterUpdate && s.telemetry) notify(T.app.statsNotice);
+    void maybeSendPing();
+  }
+  useEffect(() => {
+    if (!telemetrySupported()) return;
+    const send = () => void maybeSendPing();
+    const timer = setInterval(send, 3_600_000);
+    window.addEventListener("focus", send);
+    return () => (clearInterval(timer), window.removeEventListener("focus", send));
   }, []);
 
   async function installUpdate() {
@@ -229,8 +258,10 @@ export default function App() {
         signal,
       );
       if (res.failed) notify(T.app.aiFailed(res.failed));
+      track("ai_run_completed", auth.kind);
     } catch (e) {
       notify(e instanceof AiStop ? e.message : T.app.aiError(String(e)));
+      if (e instanceof AiStop && (e.message === T.ai.quotaUsed || e.message === T.ai.quotaGlobal)) track("ai_quota_hit");
       if (e instanceof AiStop) {
         await persist(l);
         return false;
@@ -250,6 +281,7 @@ export default function App() {
         // The first time there is something to tag, ask once; "No AI" is remembered and not asked again.
         setJob(null);
         const ok = await askConsent();
+        if (!ok) track("ai_consent_answered", "no"); // "yes" is counted in applySettings
         const s = settingsRef.current;
         await applySettings(ok ? { ...s, aiEnabled: true, aiConsentAt: new Date().toISOString(), aiAsked: true } : { ...s, aiAsked: true });
       }
@@ -267,12 +299,16 @@ export default function App() {
       const { lib: next, added, warning } = await importFolder(src, demoRef.current ? null : lib);
       await saveLibrary(next);
       demoRef.current = false; // before processAll below, which saves as it goes
+      setTelemetrySuspended(false);
       setDemo(false);
       setLib(next);
       setRev((r) => r + 1);
       notify(warning ?? T.app.imported(next.cards.length, added));
+      track("import_completed", "export_json");
+      markImported();
       void processAll(next);
     } catch (e) {
+      track("import_failed", "export_json");
       notify(e instanceof Error ? e.message : String(e));
     }
   }
@@ -303,7 +339,12 @@ export default function App() {
       });
       added = res.added;
       if (fresh || added) notify(T.app.tgLoaded(l.cards.length, added));
+      if (fresh && l.cards.length) {
+        track("import_completed", "direct");
+        markImported();
+      }
     } catch (e) {
+      if (fresh) track("import_failed", "direct");
       notify(T.app.tgLoadFailed(telegramErrorText(e)));
       // Nothing came in on the first load: back to the start, where the export file still works.
       if (fresh && !l.cards.length) setLib(null);
@@ -320,6 +361,7 @@ export default function App() {
   async function openDemo() {
     const next = demoLibrary();
     demoRef.current = true;
+    setTelemetrySuspended(true);
     setDemo(true);
     setLib(next);
     setRev((r) => r + 1);
@@ -328,6 +370,7 @@ export default function App() {
   function exitDemo() {
     abortRef.current?.abort();
     demoRef.current = false;
+    setTelemetrySuspended(false);
     setDemo(false);
     setLib(null);
   }
@@ -339,6 +382,7 @@ export default function App() {
       for (const c of lib.cards) if (set.has(c.id)) c.user = { ...c.user, ...patch };
       setRev((r) => r + 1);
       if (demoRef.current) return;
+      track("item_edited", "tags" in patch ? "tag" : "topic" in patch ? "topic" : "action" in patch ? "status" : "other");
       for (const id of ids) void appendEdit(makeEdit(id, patch)).catch((e) => notify(T.app.editFailed(String(e))));
     },
     [lib, notify],
@@ -351,6 +395,7 @@ export default function App() {
       kind === "csv" ? toCsv(cards) : toMarkdown(cards, lib?.chatName),
     );
     if (!path) return;
+    track("export_completed", kind);
     notify(T.app.exported(cards.length, path));
   }
 
@@ -386,6 +431,8 @@ export default function App() {
   }
 
   async function applySettings(s: Settings) {
+    if (s.aiConsentAt && !settingsRef.current.aiConsentAt) track("ai_consent_answered", "yes");
+    setTelemetryEnabled(s.telemetry);
     await saveSettings(s);
     setLang(resolveLang(s.language));
     settingsRef.current = s;
@@ -611,6 +658,8 @@ export default function App() {
           void syncTelegram(emptyTelegramLibrary(), true);
         }}
         onDemo={openDemo}
+        telemetry={telemetrySupported() ? settings.telemetry : undefined}
+        onTelemetry={(on) => void applySettings({ ...settingsRef.current, telemetry: on })}
         onSettings={() => setShowSettings(true)}
         onLanguage={(l) => void onSaveSettings({ ...settingsRef.current, language: l }, null)}
         openUrl={(u) => void platform.openUrl(u)}
