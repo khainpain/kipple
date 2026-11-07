@@ -44,7 +44,7 @@ export const en = {
     alt: "Kipple window: Telegram Saved Messages as a grid of cards with titles, statuses and tags, and topics in the sidebar",
     cta: "Open the live demo",
   },
-  privacy: ["Stays on your PC", "No account", "AI off until you allow it", "Open source"],
+  privacy: ["Stays on your PC", "No sign-up", "AI off until you allow it", "Open source"],
   faq: {
     title: "Questions",
     items: [
