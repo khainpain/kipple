@@ -83,3 +83,12 @@ jobs:
         run: |
           setup-app/build.sh
           gh release upload "v$VERSION" "Install-Kipple-$VERSION.exe" --clobber
+      # The landing page reads the version and installer size from the latest release when it is
+      # built, so rebuild it now that the release exists. Needs a Vercel deploy hook URL in the
+      # VERCEL_DEPLOY_HOOK secret (Vercel → Settings → Git → Deploy Hooks, branch main); skipped without it.
+      - name: Rebuild the website
+        shell: bash
+        env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [ -n "$HOOK" ]; then curl -fsS -X POST "$HOOK" >/dev/null && echo "Website rebuild started"; else echo "No VERCEL_DEPLOY_HOOK secret, skipping"; fi

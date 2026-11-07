@@ -24,6 +24,14 @@ cd src-tauri && cargo check
 
 CI (`.github/workflows/build.yml`) runs tests and both builds on every PR. Desktop releases are **manual**: Actions → release → Run workflow. Vercel deploys the web build automatically.
 
+### Releasing a version
+
+1. Merge what goes in; main's CI is green.
+2. In `site/changelog.mjs`, turn the `"next"` entry into the new version (`ver: "0.1.N"`, `date: "YYYY-MM-DD"`), one user-facing line per change in `en` and `ru`. Merge that before the release: its `en` lines become the GitHub release notes and the landing's "What's new".
+3. Actions → release → Run workflow with `version` = `0.1.N` (empty means `0.1.<run number>`).
+4. The site updates itself. The newest released entry in "What's new" gets the highlight (`.rel.latest`, picked in `site/build.mjs`). Every version number on the landing (the pill, `v{ver}` under the download button, structured data) comes from one source: the latest GitHub release, read when the site is built. Nothing to edit by hand. The release workflow rebuilds the site at the end through the `VERCEL_DEPLOY_HOOK` secret. Without it, redeploy main on Vercel once the release is out, or the site keeps showing the previous version.
+5. Check the landing: the pill shows the new version and the new entry is highlighted.
+
 ## Rules that are easy to break
 
 - **Privacy first.** User content leaves the device only for AI calls after the consent dialog (`aiAllowed()` in `src/lib/store.ts`); no-AI is the default. Sensitive-looking messages are never sent. No third-party services that see user data (no analytics, no favicon services, no runtime CDNs). New hosts in the CSP need a reason.
