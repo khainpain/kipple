@@ -2245,6 +2245,15 @@ code {
   color: var(--ink);
   font-weight: 500;
 }
+/* "Download for Windows" in the browser demo's banner: looks like a small button. */
+.banner a.banner-link {
+  margin-left: 8px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--on-accent);
+  text-decoration: none;
+}
 
 
 /* Collapsible sections in Settings */
