@@ -26,15 +26,15 @@ The paper-plane button in the toolbar lays the library out inside Telegram: the 
 
 | What | Where |
 | --- | --- |
-| Library (imported cards, AI fields, link previews) | `%APPDATA%\com.khainpain.savedboard\library.json` |
-| Your edits (append-only log, replayed on load) | `%APPDATA%\com.khainpain.savedboard\edits.jsonl` |
+| Library (imported cards, AI fields, link previews) | `%APPDATA%\io.getkipple.app\library.json` |
+| Your edits (append-only log, replayed on load) | `%APPDATA%\io.getkipple.app\edits.jsonl` |
 | Your Anthropic API key (if any), install id for the built-in allowance, Telegram session and api_id/api_hash | OS credential store |
-| What was sent to the Telegram group | `%APPDATA%\com.khainpain.savedboard\telegram.json` |
+| What was sent to the Telegram group | `%APPDATA%\io.getkipple.app\telegram.json` |
 | Photos and files from an export | Read in place from the Telegram export folder, never copied |
-| Photos loaded from Telegram | `%APPDATA%\com.khainpain.savedboard\telegram-media\<message id>.jpg` |
-| Backup of Saved Messages (only grows, never deleted by the app) | `%APPDATA%\com.khainpain.savedboard\telegram-backup\<user id>.jsonl` |
+| Photos loaded from Telegram | `%APPDATA%\io.getkipple.app\telegram-media\<message id>.jpg` |
+| Backup of Saved Messages (only grows, never deleted by the app) | `%APPDATA%\io.getkipple.app\telegram-backup\<user id>.jsonl` |
 
-The folder and credential-store entries are named after the app identifier `com.khainpain.savedboard`, from before the app was called Kipple. It stays as is on purpose: changing it would make the app lose the library, the keys and the Telegram session on update.
+The folder and credential-store entries are named after the app identifier `io.getkipple.app`. Versions up to 0.1.17 used `com.khainpain.savedboard`; on the first launch after the update the app copies that folder, the credentials and the window settings over (`src-tauri/src/migrate.rs`) and leaves the old folder in place.
 
 Settings → «Удалить все данные» removes the library, edits, downloaded photos and the key, and signs out of Telegram.
 

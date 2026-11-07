@@ -36,7 +36,7 @@ CI (`.github/workflows/build.yml`) runs tests and both builds on every PR. Deskt
 
 - **Privacy first.** User content leaves the device only for AI calls after the consent dialog (`aiAllowed()` in `src/lib/store.ts`); no-AI is the default. Sensitive-looking messages are never sent. No third-party services that see user data (no analytics, no favicon services, no runtime CDNs). New hosts in the CSP need a reason.
 - **Do not edit prompts casually.** The proxy accepts only the exact system prompts from `src/lib/prompts.ts`; changing one breaks older installed apps that use the built-in key.
-- **Keep the identifier `com.khainpain.savedboard`.** Data dir, keyring entries and the updater depend on it, even though the app is now called Kipple.
+- **Keep the identifier `io.getkipple.app`.** Data dir, keyring entries and web view storage depend on it. It replaced `com.khainpain.savedboard` after v0.1.17; `src-tauri/src/migrate.rs` copies the old data over on first launch, so never remove that migration or change the identifier again without a new one.
 - **Secrets:** Anthropic key and Telegram session in the OS keyring; Telegram api id/hash from Actions secrets `TG_API_ID`/`TG_API_HASH`. Never commit or log secrets; test fixtures must be synthetic.
 - **Both languages.** Any new UI string goes into `ru.ts` and `en.ts`, written natively.
 - **UI taste:** quiet and polished; subtle focus states (no loud outlines); `prefers-reduced-motion` makes animations static. Visual design comes from the owner's Claude Design handoffs (kept in `khainpain/kipple-site`, `design/`).
