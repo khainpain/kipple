@@ -756,6 +756,21 @@ pub struct QuoteSent {
     /// A tg:// link that opens Saved Messages (the account's own chat), when the account has a
     /// username or the phone number is known.
     open: Option<String>,
+    /// The signed-in account's user id: the reply is deleted later only while this account is
+    /// signed in (message ids are per account). None when it couldn't be read; then the reply stays.
+    owner: Option<i64>,
+}
+
+/// The signed-in account's user, or None when it can't be read right now.
+async fn self_user(c: &Conn) -> Option<tl::types::User> {
+    let me = tl::functions::users::GetUsers { id: vec![tl::enums::InputUser::UserSelf] };
+    match c.client.invoke(&me).await {
+        Ok(users) => match users.into_iter().next() {
+            Some(tl::enums::User::User(u)) => Some(u),
+            _ => None,
+        },
+        Err(_) => None,
+    }
 }
 
 /// Replies to message `id` in Saved Messages with `text` and returns the reply's id and a link
@@ -808,16 +823,10 @@ pub async fn tg_quote_saved(state: tauri::State<'_, TgState>, id: i32, text: Str
         Err(e) if e.is("REPLY_MESSAGE_ID_INVALID") || e.is("MESSAGE_ID_INVALID") => return Err("NO_ORIGINAL".into()),
         Err(e) => return Err(err(e)),
     };
-    let me = tl::functions::users::GetUsers { id: vec![tl::enums::InputUser::UserSelf] };
-    let open = match c.client.invoke(&me).await {
-        Ok(users) => match users.into_iter().next() {
-            Some(tl::enums::User::User(u)) => saved_chat_link(u.username.as_deref(), u.phone.as_deref()),
-            _ => None,
-        },
-        // The reply is out already; without a link the app says where to find it.
-        Err(_) => None,
-    };
-    Ok(QuoteSent { id: sent, open })
+    // The reply is out already; without a link the app says where to find it.
+    let me = self_user(&c).await;
+    let open = me.as_ref().and_then(|u| saved_chat_link(u.username.as_deref(), u.phone.as_deref()));
+    Ok(QuoteSent { id: sent, open, owner: me.map(|u| u.id) })
 }
 
 /// tg:// link to the account's own chat (Saved Messages): by username, else by phone number.
@@ -832,13 +841,19 @@ fn saved_chat_link(username: Option<&str>, phone: Option<&str>) -> Option<String
 }
 
 /// Deletes Kipple's own replies from Saved Messages (for everyone, i.e. on all devices).
-/// Ids that are already gone are fine.
+/// Ids that are already gone are fine. `owner` is the account that posted them: message ids are
+/// per account, so with another account signed in nothing is deleted ("OTHER_ACCOUNT").
 #[tauri::command]
-pub async fn tg_delete_saved(state: tauri::State<'_, TgState>, ids: Vec<i32>) -> Result<(), String> {
+pub async fn tg_delete_saved(state: tauri::State<'_, TgState>, ids: Vec<i32>, owner: i64) -> Result<(), String> {
     if ids.is_empty() {
         return Ok(());
     }
     let c = conn(&state).await?;
+    match self_user(&c).await {
+        Some(u) if u.id == owner => {}
+        Some(_) => return Err("OTHER_ACCOUNT".into()),
+        None => return Err("NO_ACCOUNT".into()),
+    }
     let req = tl::functions::messages::DeleteMessages { revoke: true, id: ids };
     c.client.invoke(&req).await.map_err(err)?;
     Ok(())

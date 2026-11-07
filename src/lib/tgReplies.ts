@@ -19,8 +19,20 @@ const DELAY: Record<ReplyCleanup, number | null> = { "1m": 60_000, "1h": 3_600_0
 /** A helper reply waiting to be deleted (kept in telegram-replies.json). */
 export interface PendingReply {
   id: number;
+  /** The Telegram user id of the account that posted it. Message ids are per account, so a reply
+   *  is deleted only while that account is signed in (checked again in tg_delete_saved). */
+  owner: number;
   /** When to delete it, ISO time. */
   at: string;
+}
+
+/** Keeps only well-formed entries of a stored list (a damaged file must not delete or loop). */
+export function validReplies(list: unknown): PendingReply[] {
+  if (!Array.isArray(list)) return [];
+  return list.filter(
+    (p): p is PendingReply =>
+      !!p && Number.isInteger(p.id) && Number.isInteger(p.owner) && typeof p.at === "string" && !Number.isNaN(Date.parse(p.at)),
+  );
 }
 
 export const replyText = () => `${REPLY_MARK} · ${T.telegram.replyHint}`;
@@ -30,16 +42,23 @@ export function isKippleReply(text: string | undefined): boolean {
 }
 
 /** The pending list with this reply added, or unchanged when replies are kept. */
-export function scheduleReply(list: PendingReply[], id: number, now: Date, cleanup: ReplyCleanup): PendingReply[] {
+export function scheduleReply(list: PendingReply[], id: number, owner: number, now: Date, cleanup: ReplyCleanup): PendingReply[] {
   const delay = DELAY[cleanup] ?? null;
   if (delay === null) return list;
-  return [...list.filter((p) => p.id !== id), { id, at: new Date(now.getTime() + delay).toISOString() }];
+  return [...list.filter((p) => !(p.id === id && p.owner === owner)), { id, owner, at: new Date(now.getTime() + delay).toISOString() }];
 }
 
-/** Splits the list into replies to delete now and the rest. */
-export function dueReplies(list: PendingReply[], now: Date): { ids: number[]; rest: PendingReply[] } {
-  const t = now.toISOString();
-  return { ids: list.filter((p) => p.at <= t).map((p) => p.id), rest: list.filter((p) => p.at > t) };
+/** Replies due now, grouped by the account that posted them. */
+export function dueReplies(list: PendingReply[], now: Date): Map<number, number[]> {
+  const t = now.getTime();
+  const due = new Map<number, number[]>();
+  for (const p of list) if (Date.parse(p.at) <= t) due.set(p.owner, [...(due.get(p.owner) ?? []), p.id]);
+  return due;
+}
+
+/** The list without these replies of this account. */
+export function withoutReplies(list: PendingReply[], owner: number, ids: number[]): PendingReply[] {
+  return list.filter((p) => !(p.owner === owner && ids.includes(p.id)));
 }
 
 /** Milliseconds until the next reply is due, or null when nothing is waiting. */

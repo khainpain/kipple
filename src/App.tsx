@@ -7,7 +7,7 @@ import type { Card, Library, UserFields } from "./lib/types";
 import type { Skips, TodayState } from "./lib/today";
 import { effectiveTags, effectiveTopic, findTopic, getOwnTopics, makeEdit, matchesFilter, mergeAlias, NO_ALIASES, setAliases, setOwnTopics, topicName, type Aliases } from "./lib/library";
 import { aiAllowed, appendEdit, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadPendingReplies, loadSettings, saveBoardState, saveLibrary, savePendingReplies, saveSettings, wipeAll, type Settings } from "./lib/store";
-import { dueReplies, nextDue, replyText, scheduleReply } from "./lib/tgReplies";
+import { dueReplies, nextDue, replyText, scheduleReply, withoutReplies, type PendingReply } from "./lib/tgReplies";
 import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type SendOptions } from "./lib/telegram";
 import { TelegramDialog } from "./components/TelegramDialog";
 import { importFolder, pickExportFolder } from "./lib/importer";
@@ -83,29 +83,43 @@ export default function App() {
   }, []);
 
   // Deletes "Open in Telegram" helper replies from Saved Messages when they're due, while signed in.
+  // Every change to the pending list goes through one queue, so a reply added while a cleanup
+  // waits on the network isn't overwritten.
+  const repliesQueue = useRef<Promise<void>>(Promise.resolve());
+  const updateReplies = useCallback((change: (list: PendingReply[]) => PendingReply[]) => {
+    const next = repliesQueue.current.then(async () => savePendingReplies(change(await loadPendingReplies())));
+    repliesQueue.current = next.catch(() => undefined);
+    return next;
+  }, []);
   const cleanupTimer = useRef<number | undefined>(undefined);
+  const cleanupOn = useRef(false);
   const cleanReplies = useCallback(async () => {
     const tg = platform.telegram;
-    if (!tg) return;
-    window.clearTimeout(cleanupTimer.current);
-    const list = await loadPendingReplies();
-    const { ids, rest } = dueReplies(list, new Date());
-    let left = list;
-    if (ids.length) {
+    if (!tg || !cleanupOn.current) return;
+    let failed = false;
+    for (const [owner, ids] of dueReplies(await loadPendingReplies(), new Date())) {
       try {
-        await tg.deleteSaved(ids);
-        left = rest;
-        await savePendingReplies(rest);
-      } catch {
-        // Offline or signed out: they stay in the list and the next try deletes them.
+        await tg.deleteSaved(ids, owner);
+        await updateReplies((l) => withoutReplies(l, owner, ids));
+      } catch (e) {
+        // Another account is signed in: its messages have other ids, so these are left alone and
+        // dropped from the list. Offline: they stay and the next try deletes them.
+        if (/OTHER_ACCOUNT/.test(String(e))) await updateReplies((l) => withoutReplies(l, owner, ids));
+        else failed = true;
       }
     }
-    const wait = nextDue(left, new Date());
-    if (wait !== null) cleanupTimer.current = window.setTimeout(() => void cleanReplies().catch(() => undefined), left === list && ids.length ? 60_000 : Math.max(wait, 1000));
-  }, []);
+    if (!cleanupOn.current) return;
+    const wait = nextDue(await loadPendingReplies(), new Date());
+    window.clearTimeout(cleanupTimer.current);
+    if (wait !== null) cleanupTimer.current = window.setTimeout(() => void cleanReplies().catch(() => undefined), failed ? 60_000 : Math.max(wait, 1000));
+  }, [updateReplies]);
   useEffect(() => {
+    cleanupOn.current = !!tgAccount;
     if (tgAccount) void cleanReplies().catch(() => undefined);
-    return () => window.clearTimeout(cleanupTimer.current);
+    return () => {
+      cleanupOn.current = false;
+      window.clearTimeout(cleanupTimer.current);
+    };
   }, [tgAccount, cleanReplies]);
 
   useEffect(() => {
@@ -257,17 +271,21 @@ export default function App() {
     await persist(l);
   }
 
-  /** One photo, on the user's request from the card: sends just this picture. */
   /** Posts a reply quoting the card's message in Saved Messages and opens that chat. */
   async function openInTelegram(card: Card) {
     const tg = platform.telegram;
     if (!tg) return;
     try {
       const sent = await tg.quoteSaved(card.id, replyText());
-      await savePendingReplies(scheduleReply(await loadPendingReplies(), sent.id, new Date(), settingsRef.current.replyCleanup));
-      void cleanReplies().catch(() => undefined);
-      if (sent.open) await platform.openUrl(sent.open);
-      else notify(T.telegram.replyNoChat);
+      const owner = sent.owner;
+      // Without the account id the reply can't be matched to its account later, so it stays.
+      if (owner !== null) {
+        await updateReplies((l) => scheduleReply(l, sent.id, owner, new Date(), settingsRef.current.replyCleanup));
+        void cleanReplies().catch(() => undefined);
+      }
+      // The reply is posted either way; if the chat doesn't open, say where to find it.
+      const opened = sent.open ? await platform.openUrl(sent.open).then(() => true, () => false) : false;
+      if (!opened) notify(T.telegram.replyNoChat);
     } catch (e) {
       notify(/NO_ORIGINAL/.test(String(e)) ? T.telegram.replyNoOriginal : telegramErrorText(e));
     }

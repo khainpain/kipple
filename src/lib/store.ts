@@ -5,7 +5,7 @@ import { emptyBoardState, type BoardState } from "./telegram";
 import type { LangPref } from "../i18n";
 import { DEFAULT_AI_MODEL, type AiModel } from "./ai";
 import type { Skips, TodayState } from "./today";
-import { DEFAULT_REPLY_CLEANUP, type PendingReply, type ReplyCleanup } from "./tgReplies";
+import { DEFAULT_REPLY_CLEANUP, validReplies, type PendingReply, type ReplyCleanup } from "./tgReplies";
 
 const { exists, read, write: atomicWrite, append } = platform.data;
 const LIBRARY = "library.json";
@@ -115,8 +115,7 @@ export async function saveBoardState(s: BoardState) {
 export async function loadPendingReplies(): Promise<PendingReply[]> {
   if (!(await exists(REPLIES))) return [];
   try {
-    const list = JSON.parse(await read(REPLIES)) as unknown;
-    return Array.isArray(list) ? (list as PendingReply[]) : [];
+    return validReplies(JSON.parse(await read(REPLIES)));
   } catch {
     return []; // a broken file only means a few helper replies stay; the user can delete them
   }
@@ -130,4 +129,5 @@ export async function wipeAll() {
   await atomicWrite(LIBRARY, "null");
   await atomicWrite(EDITS, "");
   await atomicWrite(TELEGRAM, "null");
+  await atomicWrite(REPLIES, "[]");
 }
