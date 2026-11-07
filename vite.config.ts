@@ -11,11 +11,18 @@ const buildId = (process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || 
 // keep the full browser build with import, for checking changes.
 const webDemoOnly = process.env.VERCEL_ENV === "production";
 
+// The browser build is a demo, not a page for search engines: the landing (getkipple.io) is.
+// vercel.json also sends X-Robots-Tag: noindex for everything this deployment serves.
+const noindex = {
+  name: "kipple-noindex",
+  transformIndexHtml: () => [{ tag: "meta", attrs: { name: "robots", content: "noindex" }, injectTo: "head" as const }],
+};
+
 // `vite build --mode web` makes the browser build (deployed to Vercel under /app/: the landing
 // page's demo and quick UI checks);
 // every other mode is the desktop app inside Tauri.
 export default defineConfig(({ mode }) => ({
-  plugins: [react()],
+  plugins: [react(), ...(mode === "web" ? [noindex] : [])],
   // The browser build lives under /app/; the site root redirects to the landing page (getkipple.io),
   // which passes /app/ through to this deployment.
   base: mode === "web" ? "/app/" : "./",
