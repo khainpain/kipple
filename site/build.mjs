@@ -41,8 +41,18 @@ const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 const rich = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
 const plain = (s) => String(s).replace(/\*\*(.+?)\*\*/g, "$1");
 
-const mascot = (cls, size, eager) =>
-  `<picture class="${cls}"><source srcset="/img/kipple-mascot-dark.svg" media="(prefers-color-scheme: dark)"><img src="/img/kipple-mascot-light.svg" alt="" width="${size}" height="${size}"${eager ? "" : ' loading="lazy"'}></picture>`;
+// Kipple is drawn inline (not an <img>) so its eyes can blink and it can bob, flip and sulk like
+// the app's welcome screen (src/components/Welcome.tsx). Body from the brand file, with its two
+// theme colours turned into CSS variables; the face is drawn on top, calm and angry.
+const KIPPLE_BODY = (await readFile(here("./public/img/kipple-mascot-light.svg"), "utf8"))
+  .replace(/^<svg[^>]*>|<\/svg>\s*$/g, "")
+  .replace(/<path d="M(32\.5|56\.5|46) [^"]*"[^>]*\/>/g, "")
+  .replace(/fill="#D9573B"/g, 'style="fill:var(--accent)"')
+  .replace(/fill="#F2A58F"/g, 'style="fill:var(--kp-hat)"')
+  .trim();
+const KIPPLE_FACE = `<g class="kp-calm" fill="none" stroke="#23211E" stroke-linecap="round"><path class="kp-eye" d="M32.5 46 Q38 38.5 43.5 46" stroke-width="4.6"/><path class="kp-eye" d="M56.5 46 Q62 38.5 67.5 46" stroke-width="4.6"/><path d="M46 53 Q50 56.5 54 53" stroke-width="3.2"/></g><g class="kp-mad" fill="none" stroke="#23211E" stroke-linecap="round"><path d="M31 37.5 L43.5 42.5" stroke-width="4"/><path d="M69 37.5 L56.5 42.5" stroke-width="4"/><circle cx="38.5" cy="47.5" r="2.8" fill="#23211E" stroke="none"/><circle cx="61.5" cy="47.5" r="2.8" fill="#23211E" stroke="none"/><path d="M45 56.5 Q50 52 55 56.5" stroke-width="3.2"/><path d="M74 20 l4 -4 M80 24 l5 -2 M77 29 l5 1" stroke-width="2.4"/></g>`;
+const mascot = (cls, size) =>
+  `<div class="${cls} kp" aria-hidden="true"><div class="kp-bob"><div class="kp-body"><svg viewBox="0 0 100 100" width="${size}" height="${size}">${KIPPLE_BODY}${KIPPLE_FACE}</svg></div></div></div>`;
 const ICON = {
   play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>',
   mic: '<svg viewBox="0 0 24 24" aria-hidden="true" class="line"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>',
@@ -84,7 +94,7 @@ function stage(c) {
       <div class="junk" data-pile="44 48 24"><div class="cover art a5 short" style="--h:45"></div><b>${esc(P.link3)}</b></div>
       <div class="junk voice" data-pile="86 41 -16">${ICON.mic}<span class="wave"></span><span>${esc(P.voice)}</span></div>
       <div class="junk note" data-pile="52 76 -8">asdf</div>
-      ${mascot("kip", 160, true)}
+      ${mascot("kip", 160)}
     </div>`;
 }
 

@@ -70,6 +70,67 @@
     io.observe(el);
   });
 
+  // Kipple's easter eggs, as in the app (src/lib/mascot.ts): quick clicks in a row make it flip
+  // on the 7th and sulk on the 13th; a pause longer than 1.5 s starts the count again.
+  // Every click throws a few sparks (the app's ClickSpark: 8 sparks, radius 36, 550 ms).
+  var accent = getComputedStyle(root).getPropertyValue("--accent").trim() || "#d9573b";
+  function spark(x, y) {
+    var R = 36, S = 10, size = (R + S) * 2, dpr = window.devicePixelRatio || 1;
+    var c = document.createElement("canvas");
+    c.className = "spark";
+    c.width = c.height = size * dpr;
+    c.style.cssText = "width:" + size + "px;height:" + size + "px;left:" + (x - size / 2) + "px;top:" + (y - size / 2) + "px";
+    document.body.appendChild(c);
+    var ctx = c.getContext("2d");
+    ctx.scale(dpr, dpr);
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    var t0 = performance.now();
+    (function frame(now) {
+      var t = Math.min(1, (now - t0) / 550), e = 1 - Math.pow(1 - t, 3), len = S * (1 - e);
+      ctx.clearRect(0, 0, size, size);
+      for (var i = 0; i < 8; i++) {
+        var a = (i * Math.PI) / 4, d = e * R, cx = size / 2, cy = size / 2;
+        ctx.strokeStyle = i % 2 ? "#f2a58f" : accent;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(a) * d, cy + Math.sin(a) * d);
+        ctx.lineTo(cx + Math.cos(a) * (d + len), cy + Math.sin(a) * (d + len));
+        ctx.stroke();
+      }
+      if (t < 1) requestAnimationFrame(frame);
+      else c.remove();
+    })(t0);
+  }
+  document.querySelectorAll(".kp").forEach(function (kp) {
+    var body = kp.querySelector(".kp-body");
+    var count = 0, last = -Infinity, angryUntil = -Infinity, timer;
+    kp.addEventListener("click", function (ev) {
+      spark(ev.clientX, ev.clientY);
+      var now = Date.now();
+      if (now < angryUntil) return;
+      count = now - last > 1500 ? 1 : count + 1;
+      last = now;
+      if (count >= 13) {
+        clearTimeout(timer);
+        count = 0;
+        angryUntil = now + 2600;
+        body.classList.remove("flip");
+        body.classList.add("angry");
+        timer = setTimeout(function () {
+          body.classList.remove("angry");
+        }, 2600);
+      } else if (count === 7) {
+        clearTimeout(timer);
+        body.classList.remove("flip");
+        void body.offsetWidth; // restart the animation
+        body.classList.add("flip");
+        timer = setTimeout(function () {
+          body.classList.remove("flip");
+        }, 1100);
+      }
+    });
+  });
+
   var stage = document.querySelector(".stage");
   if (!stage) return;
   var kip = stage.querySelector(".kip");
