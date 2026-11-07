@@ -5,6 +5,12 @@
 // not how it was built.
 export const changelog = [
   {
+    ver: "0.1.17",
+    date: "2026-11-07",
+    en: ["Link cards show the page's preview picture"],
+    ru: ["Карточки ссылок показывают картинку превью страницы"],
+  },
+  {
     ver: "0.1.16",
     date: "2026-11-07",
     en: [
