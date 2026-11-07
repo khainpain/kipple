@@ -1,0 +1,33 @@
+name: release-notes
+
+# Runs only on demand: Actions -> release-notes -> Run workflow.
+# Rewrites the older Russian release descriptions in English (scripts/release-notes.mjs)
+# and adds "What's new" from site/changelog.mjs. Releases already in English are left alone.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rewrite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Rewrite release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for tag in $(gh release list --limit 100 --json tagName --jq '.[].tagName'); do
+            gh release view "$tag" --json body --jq .body > old.md
+            node scripts/release-notes.mjs translate "$tag" < old.md > new.md
+            if diff -q <(tr -d '\r' < old.md | sed -e '$a\') new.md > /dev/null; then
+              echo "$tag: already in English"
+            else
+              gh release edit "$tag" --notes-file new.md
+              echo "$tag: updated"
+            fi
+          done
