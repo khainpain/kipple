@@ -7,6 +7,13 @@ import { T } from "../i18n";
 
 const xml = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/'/g, "&apos;");
 
+/**
+ * Earthy hues that sit next to Kipple's coral, cream and ink: terracotta, ochre, olive, sage,
+ * teal, slate, plum, sand. Kept muted so screenshots of the demo stay calm.
+ */
+const HUES = [14, 38, 70, 140, 178, 212, 330, 28];
+const hueAt = (seed: number) => HUES[Math.abs(seed) % HUES.length];
+
 /** Splits a headline into lines of about `max` characters, at most three. */
 function wrap(text: string, max: number): string[] {
   const lines: string[] = [];
@@ -23,8 +30,8 @@ function wrap(text: string, max: number): string[] {
  * the headline and the site. Drawn here, so the demo needs nothing from the network.
  */
 function ogImage(seed: number, title: string, site: string): string {
-  const h = (seed * 47) % 360;
-  const h2 = (h + 40) % 360;
+  const h = hueAt(seed);
+  const h2 = (h + 18) % 360;
   const lines = wrap(title, 20);
   const top = 315 - (lines.length * 68) / 2 + 48;
   const text = lines.map((l, k) => `<tspan x='150' y='${top + k * 68}'>${xml(l)}</tspan>`).join("");
@@ -32,10 +39,10 @@ function ogImage(seed: number, title: string, site: string): string {
   const cy = 200 + ((seed * 17) % 220);
   return `data:image/svg+xml;utf8,${encodeURIComponent(
     `<svg xmlns='http://www.w3.org/2000/svg' width='1200' height='630' viewBox='0 0 1200 630'>` +
-      `<defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='hsl(${h},45%,24%)'/><stop offset='1' stop-color='hsl(${h2},55%,38%)'/></linearGradient></defs>` +
+      `<defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='hsl(${h},22%,22%)'/><stop offset='1' stop-color='hsl(${h2},26%,34%)'/></linearGradient></defs>` +
       `<rect width='1200' height='630' fill='url(#g)'/>` +
-      `<circle cx='${cx}' cy='${cy}' r='230' fill='hsl(${h2},70%,62%)' opacity='.35'/>` +
-      `<circle cx='${cx + 120}' cy='${cy + 190}' r='130' fill='hsl(${h},80%,75%)' opacity='.25'/>` +
+      `<circle cx='${cx}' cy='${cy}' r='230' fill='hsl(${h2},35%,60%)' opacity='.3'/>` +
+      `<circle cx='${cx + 120}' cy='${cy + 190}' r='130' fill='hsl(${h},40%,72%)' opacity='.22'/>` +
       `<rect x='${cx - 150}' y='${cy - 40}' width='260' height='170' rx='22' fill='hsl(${h},30%,92%)' opacity='.18' transform='rotate(-8 ${cx} ${cy})'/>` +
       `<text font-family='system-ui,-apple-system,Segoe UI,Roboto,sans-serif' font-size='56' font-weight='700' fill='white' letter-spacing='-1'>${text}</text>` +
       `<text x='150' y='110' font-family='system-ui,-apple-system,Segoe UI,Roboto,sans-serif' font-size='26' font-weight='600' fill='white' opacity='.75'>${xml(site)}</text>` +
@@ -46,14 +53,14 @@ function ogImage(seed: number, title: string, site: string): string {
 
 /** A made-up picture for the demo's photos and video frames: a landscape with a sun. */
 function videoFrame(seed: number, w: number, h: number): string {
-  const hue = (seed * 53) % 360;
+  const hue = hueAt(seed);
   return `data:image/svg+xml;utf8,${encodeURIComponent(
     `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' viewBox='0 0 ${w} ${h}'>` +
-      `<defs><linearGradient id='s' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='hsl(${hue},60%,72%)'/><stop offset='1' stop-color='hsl(${(hue + 30) % 360},70%,86%)'/></linearGradient></defs>` +
+      `<defs><linearGradient id='s' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='hsl(${hue},28%,74%)'/><stop offset='1' stop-color='hsl(${(hue + 20) % 360},35%,88%)'/></linearGradient></defs>` +
       `<rect width='100%' height='100%' fill='url(#s)'/>` +
-      `<circle cx='${w * 0.68}' cy='${h * 0.42}' r='${h * 0.14}' fill='hsl(${(hue + 50) % 360},90%,92%)'/>` +
-      `<path d='M0 ${h * 0.62} Q ${w * 0.25} ${h * 0.5} ${w * 0.5} ${h * 0.6} T ${w} ${h * 0.56} V ${h} H 0 Z' fill='hsl(${(hue + 180) % 360},30%,38%)'/>` +
-      `<path d='M0 ${h * 0.76} Q ${w * 0.3} ${h * 0.68} ${w * 0.6} ${h * 0.78} T ${w} ${h * 0.74} V ${h} H 0 Z' fill='hsl(${(hue + 190) % 360},35%,26%)'/>` +
+      `<circle cx='${w * 0.68}' cy='${h * 0.42}' r='${h * 0.14}' fill='hsl(36,60%,94%)'/>` +
+      `<path d='M0 ${h * 0.62} Q ${w * 0.25} ${h * 0.5} ${w * 0.5} ${h * 0.6} T ${w} ${h * 0.56} V ${h} H 0 Z' fill='hsl(${(hue + 160) % 360},16%,40%)'/>` +
+      `<path d='M0 ${h * 0.76} Q ${w * 0.3} ${h * 0.68} ${w * 0.6} ${h * 0.78} T ${w} ${h * 0.74} V ${h} H 0 Z' fill='hsl(${(hue + 170) % 360},18%,27%)'/>` +
       `</svg>`,
   )}`;
 }
