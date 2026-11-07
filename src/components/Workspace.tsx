@@ -198,6 +198,12 @@ export function Workspace(props: {
   const home = scope.kind === "home" && !query.trim();
   const shown: Scope = scope.kind === "home" && !home ? { kind: "list", key: "all" } : scope;
   const isDupes = shown.kind === "list" && shown.key === "duplicates";
+  // A new section, filter, sort or view gives a fresh board whose cards rise in again. Typing a
+  // search keeps the set, so cards already on screen don't replay the entrance on every letter.
+  const boardKey = `${JSON.stringify(shown)}|${sub}|${type}|${tag}|${sort}|${view}`;
+  const seenRef = useRef({ key: boardKey, ids: new Set<number>() });
+  if (seenRef.current.key !== boardKey) seenRef.current = { key: boardKey, ids: new Set<number>() };
+  const seen = seenRef.current.ids;
 
   // Every topic and tag in use (search aside), for tidying up.
   const names = useMemo(() => {
@@ -539,7 +545,8 @@ export function Workspace(props: {
         </div>
 
         <Grid
-          key={`${JSON.stringify(shown)}|${sub}|${type}|${tag}|${query}|${sort}|${view}`}
+          key={`${boardKey}|${query}`}
+          seen={seen}
           lib={lib}
           cards={visible}
           view={view}

@@ -42,7 +42,7 @@ export type CardHandlers = {
  * Virtualized board for all four views. Masonry uses the virtualizer's lanes; the uniform
  * grid virtualizes rows so cards line up; list and headlines are a single column.
  */
-export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?: CardLook; /** Instead of the usual "nothing here". */ empty?: { title: string; hint: string } }) {
+export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?: CardLook; /** Cards that already started their entrance; kept by the parent across searches. */ seen: Set<number>; /** Instead of the usual "nothing here". */ empty?: { title: string; hint: string } }) {
   const { cards, view } = props;
   const parentRef = useRef<HTMLDivElement>(null);
   const [outer, setWidth] = useState(1000);
@@ -53,6 +53,8 @@ export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?
   useLayoutEffect(() => {
     const el = parentRef.current;
     if (!el) return;
+    // Measure before paint, so the first re-flow happens before any card starts its entrance.
+    setWidth(el.clientWidth);
     const ro = new ResizeObserver(() => setWidth(el.clientWidth));
     ro.observe(el);
     return () => ro.disconnect();
@@ -78,6 +80,20 @@ export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?
     paddingEnd: GAP * 2,
   });
 
+  // Cards rise in only the first time this board shows them (MOTION.md «Masonry»). Opening the
+  // side panel narrows the board, the column count changes and every item remounts; without this
+  // the whole screen would animate again on each open and close. A card counts as shown once its
+  // entrance starts (the first width measurement happens before paint, so that re-flow is over by
+  // then). Workspace hands over a fresh set on a section, filter or view change and keeps it while
+  // a search is typed, so found cards don't replay on every letter.
+  const seen = props.seen;
+  // The first screenful rises in one after another (MOTION.md: 50 ms apart); cards scrolled into
+  // view later come in without waiting. Short rows get a shorter step so a full screen of
+  // headlines still finishes in about half a second.
+  const born = useRef(performance.now());
+  const step = view === "headlines" ? 20 : view === "list" ? 35 : 50;
+  const delayAt = (k: number) => (performance.now() - born.current < 400 ? Math.min(k * step, 600) : 0);
+
   // Keep the card open in the side panel in view while stepping through with the arrow keys.
   useEffect(() => {
     if (props.activeId == null) return;
@@ -85,9 +101,12 @@ export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?
     if (i >= 0) virtualizer.scrollToIndex(rowMode ? Math.floor(i / cols) : i, { align: "auto" });
   }, [props.activeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const card = (c: Card) => (
+  const card = (c: Card, delay: number) => (
     <CardView
       key={c.id}
+      enterDelay={delay}
+      enter={!seen.has(c.id)}
+      onEntered={() => seen.add(c.id)}
       lib={props.lib}
       card={c}
       view={view}
@@ -119,7 +138,7 @@ export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?
   return (
     <div className={`grid-scroll board-${view}`} ref={parentRef}>
       <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
-        {virtualizer.getVirtualItems().map((item) => (
+        {virtualizer.getVirtualItems().map((item, k) => (
           <div
             key={item.key}
             data-index={item.index}
@@ -134,7 +153,7 @@ export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?
               ...(rowMode ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: GAP } : null),
             }}
           >
-            {rowMode ? cards.slice(item.index * cols, item.index * cols + cols).map(card) : card(cards[item.index])}
+            {rowMode ? cards.slice(item.index * cols, item.index * cols + cols).map((c) => card(c, delayAt(k))) : card(cards[item.index], delayAt(k))}
           </div>
         ))}
       </div>
