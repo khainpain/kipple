@@ -5,11 +5,6 @@
 // not how it was built.
 export const changelog = [
   {
-    ver: "next",
-    en: ["A new installer window: bigger, livelier, with Kipple tidying up your kipple"],
-    ru: ["Новое окно установки: крупнее и живее, Киппл наводит порядок в хламе"],
-  },
-  {
     ver: "0.1.18",
     date: "2026-11-08",
     en: [
@@ -17,12 +12,14 @@ export const changelog = [
       "Three for today: a few small cleanup tasks on the overview each day",
       "A local backup of your Saved Messages that only grows (Settings → Data)",
       "Loading from Telegram and AI tagging start only when you press the button",
+      "A new installer window: bigger, livelier, with Kipple tidying up your kipple",
     ],
     ru: [
       "«Открыть в Telegram»: переход от карточки к её сообщению в Избранном",
       "«Три на сегодня»: каждый день несколько маленьких заданий по уборке на обзоре",
       "Локальная резервная копия «Избранного», которая только пополняется (Настройки → Данные)",
       "Загрузка из Telegram и AI-теги запускаются только по твоей кнопке",
+      "Новое окно установки: крупнее и живее, Киппл наводит порядок в хламе",
     ],
   },
   {
