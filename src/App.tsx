@@ -67,8 +67,6 @@ export default function App() {
   const [demoToday, setDemoToday] = useState<{ today?: TodayState; skips: Skips }>({ skips: {} });
   const demoRef = useRef(demo);
   demoRef.current = demo;
-  /** Loading from Telegram already started by itself after sign-in in this launch. */
-  const tgAutoRef = useRef(false);
   /** Settings as of now, for AI runs that start right after a save (state updates later). */
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
@@ -150,14 +148,8 @@ export default function App() {
             setRev((r) => r + 1);
           });
         };
-        // Signed in to Telegram: bring in what was saved since last time (and finish an interrupted
-        // load). That ends with previews and AI anyway; otherwise just catch up on previews.
-        const tg = platform.telegram;
-        if (!tg) return catchUp();
-        void tg.status().then(
-          (st) => (st.authorized ? void syncTelegram(l, false, catchUp) : catchUp()),
-          catchUp,
-        );
+        // Nothing is loaded from Telegram and nothing goes to AI on start: both wait for the user's button.
+        catchUp();
       } catch (e) {
         notify(T.app.loadFailed(String(e)));
       } finally {
@@ -340,14 +332,28 @@ export default function App() {
     return true;
   }
 
+  /** Link previews for new cards, after an import or a load from Telegram. No AI here. */
+  async function fetchPreviews(l: Library) {
+    abortRef.current?.abort();
+    const ctl = new AbortController();
+    abortRef.current = ctl;
+    try {
+      if (settingsRef.current.fetchLinks && platform.canFetchLinks) await enrichLinks(l, ctl.signal);
+    } finally {
+      setJob(null);
+      setRev((r) => r + 1);
+    }
+  }
+
+  /** The "Tag N" button (and re-tagging from Settings): previews, then AI. Only ever started by the user. */
   async function processAll(l: Library) {
     abortRef.current?.abort();
     const ctl = new AbortController();
     abortRef.current = ctl;
     try {
       if (settingsRef.current.fetchLinks && platform.canFetchLinks) await enrichLinks(l, ctl.signal);
-      if (!ctl.signal.aborted && !demoRef.current && !aiAllowed(settingsRef.current) && !settingsRef.current.aiAsked && pendingForAi(l.cards).length) {
-        // The first time there is something to tag, ask once; "No AI" is remembered and not asked again.
+      if (!ctl.signal.aborted && !demoRef.current && !aiAllowed(settingsRef.current) && pendingForAi(l.cards).length) {
+        // Pressing the button without consent asks for it; "No AI" is remembered and hides the button.
         setJob(null);
         const ok = await askConsent();
         if (!ok) track("ai_consent_answered", "no"); // "yes" is counted in applySettings
@@ -367,7 +373,7 @@ export default function App() {
     try {
       const { lib: next, added, warning } = await importFolder(src, demoRef.current ? null : lib);
       await saveLibrary(next);
-      demoRef.current = false; // before processAll below, which saves as it goes
+      demoRef.current = false; // before fetchPreviews below, which saves as it goes
       setTelemetrySuspended(false);
       setDemo(false);
       setLib(next);
@@ -375,18 +381,13 @@ export default function App() {
       notify(warning ?? T.app.imported(next.cards.length, added));
       track("import_completed", "export_json");
       markImported();
-      void processAll(next);
+      void fetchPreviews(next);
     } catch (e) {
       track("import_failed", "export_json");
       notify(e instanceof Error ? e.message : String(e));
     }
   }
 
-  /**
-   * Loads Saved Messages straight from Telegram into `l` (a fresh library after sign-in, or the
-   * current one to fetch what's new), then downloads photos and runs previews and AI as after an import.
-   * Stopping it keeps what was loaded; the next launch carries on.
-   */
   /** Brings the local backup of Saved Messages up to date, quietly, after each load from Telegram. */
   const backupRun = useRef<AbortController | null>(null);
   async function runBackup() {
@@ -404,7 +405,12 @@ export default function App() {
   }
   useEffect(() => () => backupRun.current?.abort(), []);
 
-  async function syncTelegram(l: Library, fresh: boolean, nothingNew?: () => void) {
+  /**
+   * Loads Saved Messages straight from Telegram into `l` (a fresh library after sign-in, or the
+   * current one to fetch what's new), then downloads photos and link previews. Started only by the
+   * user's button; AI waits for its own button. Stopping it keeps what was loaded; the next load carries on.
+   */
+  async function syncTelegram(l: Library, fresh: boolean) {
     const tg = platform.telegram;
     if (!tg || demoRef.current) return;
     abortRef.current?.abort();
@@ -440,9 +446,8 @@ export default function App() {
     }
     void runBackup();
     if (ctl.signal.aborted || abortRef.current !== ctl) return;
-    // AI only runs on its own after something new arrived, as after an import.
-    if (fresh || added) await processAll(l);
-    else nothingNew?.();
+    if (fresh || added) await fetchPreviews(l);
+    else notify(T.app.tgNothingNew);
   }
 
   async function openDemo() {
@@ -572,7 +577,6 @@ export default function App() {
     await deleteApiKey().catch(() => undefined);
     await platform.telegram?.forgetMedia().catch(() => undefined);
     await platform.telegram?.logout().catch(() => undefined);
-    tgAutoRef.current = false;
     setHasKey(false);
     if (demoOnly) openDemo();
     else {
@@ -766,12 +770,7 @@ export default function App() {
         tg={platform.telegram}
         showDemo
         onImport={doImport}
-        onSignedIn={(auto) => {
-          // On its own only once per launch, so a failed load doesn't loop back here and retry forever.
-          if (auto && tgAutoRef.current) return;
-          tgAutoRef.current = true;
-          void syncTelegram(emptyTelegramLibrary(), true);
-        }}
+        onLoadSaved={() => void syncTelegram(emptyTelegramLibrary(), true)}
         onDemo={openDemo}
         telemetry={telemetrySupported() ? settings.telemetry : undefined}
         onTelemetry={(on) => void applySettings({ ...settingsRef.current, telemetry: on })}
@@ -796,11 +795,12 @@ export default function App() {
         tgAccount={tgAccount}
         job={job}
         needAi={demo ? 0 : needAi}
-        aiEnabled={aiAllowed(settings)}
+        offerAi={aiAllowed(settings) || !settings.aiAsked}
         onImport={demo ? undefined : doImport}
         onExport={doExport}
         onSettings={() => setShowSettings(true)}
         onTelegram={platform.telegram && !demo ? () => setShowTelegram(true) : undefined}
+        onLoadTelegram={tgAccount && !demo ? () => void syncTelegram(lib, false) : undefined}
         onRunAi={() => processAll(lib)}
         onNameImage={aiAllowed(settings) && !demo ? nameOne : undefined}
         onOpenInTelegram={tgAccount && !demo ? openInTelegram : undefined}
