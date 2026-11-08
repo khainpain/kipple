@@ -14,9 +14,10 @@ html,body{margin:0;height:100%;overflow:hidden;user-select:none;cursor:default}
 .bar{height:36px;display:flex;align-items:center;justify-content:flex-end;padding:0 6px;flex:none}
 .bar button{width:34px;height:26px;border:0;background:none;color:var(--muted);border-radius:6px;font-size:13px}
 .bar button:hover{background:rgba(127,127,127,.15)}.bar button.x:hover{background:#c42b1c;color:#fff}
-.stage{flex:1;display:grid;grid-template-columns:230px 1fr;align-items:center;padding:0 36px 34px 18px;pointer-events:none}
+.stage{flex:1;display:grid;grid-template-columns:300px 1fr;align-items:center;padding:0 48px 40px 20px;pointer-events:none}
 .stage button,.stage label,.stage .opts{pointer-events:auto}
-.art{position:relative;height:230px}
+/* The art is laid out at 230px and drawn 1.22x larger, so all positions in the script stay in one 230px space. */
+.art{position:relative;width:230px;height:230px;justify-self:center;transform:scale(1.22)}
 .mascot{position:absolute;left:50%;top:50%;width:132px;height:132px;transform:translate(-50%,-50%);animation:bob 4.5s ease-in-out infinite}
 @keyframes bob{50%{transform:translate(-50%,-54%) rotate(-1.5deg)}}
 /* The kipple: messages, links and photos. Positions and the intro are driven from JS. */
@@ -50,14 +51,14 @@ html,body{margin:0;height:100%;overflow:hidden;user-select:none;cursor:default}
 .done .mascot{animation:settle .5s cubic-bezier(.22,1,.36,1) 1}
 @keyframes settle{0%{transform:translate(-50%,-50%) scale(.96)}100%{transform:translate(-50%,-50%) scale(1)}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-.wm{width:104px;height:42px;color:var(--ink);display:block;margin-bottom:6px}
-h1{font-size:22px;line-height:1.25;margin:0 0 6px;font-weight:650;letter-spacing:-.01em}
-p{margin:0;color:var(--muted);line-height:1.45}
-.btn{margin-top:24px;display:inline-flex;align-items:center;height:44px;padding:0 26px;border-radius:12px;border:0;background:var(--accent);color:#fff;font:inherit;font-size:15px;font-weight:600;box-shadow:0 6px 16px color-mix(in srgb,var(--accent) 35%,transparent);transition:transform .12s,filter .12s;outline:none}
+.wm{width:124px;height:50px;color:var(--ink);display:block;margin-bottom:6px}
+h1{font-size:26px;line-height:1.25;margin:0 0 6px;font-weight:650;letter-spacing:-.01em}
+p{margin:0;color:var(--muted);line-height:1.5;font-size:15px}
+.btn{margin-top:28px;display:inline-flex;align-items:center;height:48px;padding:0 30px;border-radius:12px;border:0;background:var(--accent);color:#fff;font:inherit;font-size:15px;font-weight:600;box-shadow:0 6px 16px color-mix(in srgb,var(--accent) 35%,transparent);transition:transform .12s,filter .12s;outline:none}
 .btn:hover{filter:brightness(1.06);transform:translateY(-1px)}.btn:active{transform:translateY(1px)}
 .btn:focus-visible{box-shadow:0 0 0 3px var(--accent-soft),0 6px 16px color-mix(in srgb,var(--accent) 35%,transparent)}
 .row{display:flex;align-items:center;gap:16px}
-.link{background:none;border:0;color:var(--muted);font:inherit;font-size:13px;margin-top:24px;padding:0;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line);outline:none}
+.link{background:none;border:0;color:var(--muted);font:inherit;font-size:14px;margin-top:28px;padding:0;text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line);outline:none}
 .link:hover{color:var(--ink)}
 .opts{margin-top:14px;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;font-size:13px;color:var(--muted);display:grid;gap:8px}
 .dir{display:flex;gap:8px;align-items:center}.dir code{flex:1;color:var(--ink);font-family:inherit;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -194,8 +195,9 @@ const place = () => items.forEach((el, i) => { el.style.transform = tf(tidy[i].x
 // Starting spots are spread over the whole window on a shuffled grid (one card per cell, jittered),
 // so the kipple fills the window instead of bunching up. Returns a path (seconds → centre x, y, rotation, scale).
 function spots(n) {
-  const art = document.querySelector(".art").getBoundingClientRect();
-  const x0 = 60 - art.left, x1 = innerWidth - 60 - art.left, y0 = 70 - art.top, y1 = innerHeight - 60 - art.top;
+  // Window edges in the art's own (unscaled) coordinates.
+  const art = document.querySelector(".art").getBoundingClientRect(), k = art.width / ART;
+  const x0 = (60 - art.left) / k, x1 = (innerWidth - 60 - art.left) / k, y0 = (70 - art.top) / k, y1 = (innerHeight - 60 - art.top) / k;
   const cols = 5, rows = Math.ceil(n / cols), cw = (x1 - x0) / cols, ch = (y1 - y0) / rows;
   const cells = [...Array(cols * rows).keys()].sort(() => Math.random() - .5).slice(0, n);
   return cells.map(c => [x0 + (c % cols + rnd(.2, .8)) * cw, y0 + (Math.floor(c / cols) + rnd(.2, .8)) * ch]);
