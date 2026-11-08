@@ -2,7 +2,7 @@
 name = "saved-board"
 version = "0.1.0"
 description = "Kipple: a visual library for Telegram Saved Messages"
-authors = ["khainpain"]
+authors = ["The Kipple authors"]
 license = "MIT"
 edition = "2024"
 

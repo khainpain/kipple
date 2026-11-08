@@ -36,7 +36,7 @@ const telegram: TelegramApi = {
   sendNote: (b, topicId, replyTo, text, boldLen) => invoke("tg_send_note", { channelId: b.channelId, accessHash: b.accessHash, topicId, replyTo, text, boldLen }),
 };
 
-// App data lives in the app's own folder (on Windows: %APPDATA%\com.khainpain.savedboard).
+// App data lives in the app's own folder (on Windows: %APPDATA%\io.getkipple.app).
 const base = { baseDir: BaseDirectory.AppData };
 
 async function ensureDir() {
