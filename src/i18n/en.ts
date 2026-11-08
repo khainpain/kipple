@@ -52,6 +52,7 @@ export const en: Dict = {
     tgStopped: (done, total) => `Stopped: sent ${num(done)} of ${num(total)}. Press "Send" again to continue.`,
     tgDone: (n, board) => `Done: ${cards(n)} in the "${board}" group.`,
     wiped: "All data has been deleted from this computer.",
+    busy: "Wait for the current task to finish, or stop it first.",
     statsNotice: "Kipple now sends anonymous usage stats: no id, no message text. You can turn them off in Settings.",
     webBanner: (version) =>
       `Web build for trying out the interface${version ? ` (${version})` : ""}. Data stays in this browser only, link previews aren't loaded, and photos show until the page is reloaded.`,
@@ -473,6 +474,7 @@ export const en: Dict = {
     next: "Next (↓)",
     openModes: "How cards open",
     openFile: "Open the file in its app",
+    fileOutside: "This file is outside the export folder, so Kipple won't open it.",
     closeEsc: "Close (Esc)",
     titlePlaceholder: "Title",
     titleEditable: "You can edit the title",
@@ -562,6 +564,8 @@ export const en: Dict = {
     errQrExpired: "The code expired; showing a new one.",
     errSession: "The Telegram session has ended. Sign in again.",
     errTooMany: "This account has too many groups and channels; Telegram won't allow another one.",
+    errLogoutLocal: "Signed out on this computer, but Telegram couldn't be reached, so the session may still be listed under Active sessions. End it there to be sure.",
+    errOtherAccount: "This board was loaded from another Telegram account. Sign in to that account, or delete all data (Settings → Data) to start over.",
     errOther: (msg) => `Telegram error: ${msg}`,
   },
 

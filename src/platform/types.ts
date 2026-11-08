@@ -16,7 +16,7 @@ export interface AvailableUpdate {
 }
 
 /** fetch() plus Tauri's connectTimeout option, ignored in the browser. */
-export type HttpFetch = (url: string, init?: RequestInit & { connectTimeout?: number }) => Promise<Response>;
+export type HttpFetch = (url: string, init?: RequestInit & { connectTimeout?: number; maxRedirections?: number }) => Promise<Response>;
 
 export interface TelegramStatus {
   hasApi: boolean;
@@ -77,6 +77,8 @@ export interface SavedPage {
   /** Offset for the next (older) page; null when there is nothing more. */
   nextOffset: number | null;
   total: number | null;
+  /** The signed-in account's user id (message ids are per account); null when it couldn't be read. */
+  owner?: number | null;
 }
 
 /**
@@ -102,6 +104,8 @@ export interface TelegramApi {
   qrPoll(): Promise<QrResult>;
   /** Stops QR sign-in (switched to the phone number or left the screen). */
   qrCancel(): Promise<void>;
+  /** Signs out. The session is always forgotten here; rejects with "LOGOUT_LOCAL_ONLY" when
+   *  Telegram couldn't be told, so it may still be listed under Active sessions. */
   logout(): Promise<void>;
   /** Up to 100 Saved Messages older than offsetId (0: from the newest) and newer than minId. */
   savedPage(offsetId: number, minId: number): Promise<SavedPage>;
@@ -162,6 +166,12 @@ export interface Platform {
   /** Asks where to save (desktop) or downloads (web). Returns where it went, or null if cancelled. */
   saveTextFile(defaultName: string, filter: { name: string; ext: string }, content: string): Promise<string | null>;
   httpFetch: HttpFetch;
+  /**
+   * Desktop only: whether a host name is, or resolves to, a loopback/private/link-local address.
+   * Link previews check it for every address and redirect before fetching. Rejects when the name
+   * doesn't resolve. The browser build has no need: its /api/fetch refuses such addresses itself.
+   */
+  hostIsPrivate?(host: string): Promise<boolean>;
   appVersion(): Promise<string>;
   checkUpdate(): Promise<AvailableUpdate | null>;
   /** Matches the native title bar to the app theme; null follows the OS. Desktop only. */
@@ -176,4 +186,45 @@ export function joinPath(dir: string, rel: string): string {
   const sep = dir.includes("\\") ? "\\" : "/";
   const trimmed = dir.replace(/[\\/]+$/, "");
   return `${trimmed}${sep}${rel.replace(/[\\/]+/g, sep)}`;
+}
+
+/**
+ * An absolute path with `.` and `..` resolved and one kind of separator (the one it starts with:
+ * `\` for drive letters and UNC paths, `/` otherwise). Null for a relative path or one that
+ * climbs above its root.
+ */
+export function normalizePath(p: string): string | null {
+  const m = /^([a-zA-Z]:)[\\/]|^(\\\\|\/\/)|^\//.exec(p);
+  if (!m) return null;
+  const win = !!m[1] || !!m[2];
+  const sep = win ? "\\" : "/";
+  const root = m[1] ? `${m[1]}\\` : m[2] ? "\\\\" : "/";
+  const out: string[] = [];
+  for (const part of p.slice(m[0].length).split(/[\\/]+/)) {
+    if (!part || part === ".") continue;
+    if (part === "..") {
+      if (!out.length) return null;
+      out.pop();
+    } else out.push(part);
+  }
+  return root + out.join(sep);
+}
+
+/**
+ * `rel` joined to `dir` (absolute `rel` stays as it is, like joinPath) when the result lies inside
+ * one of `roots`, else null. Windows paths compare case-insensitively. Used before opening or
+ * reading a file a card points at: result.json comes from outside and could name any file.
+ */
+export function resolveInside(roots: string[], dir: string, rel: string): string | null {
+  if (!rel) return null;
+  const full = normalizePath(joinPath(dir, rel));
+  if (!full) return null;
+  const fold = (s: string) => (s.startsWith("/") ? s : s.toLowerCase());
+  for (const r of roots) {
+    const root = r ? normalizePath(r) : null;
+    if (!root) continue;
+    const prefix = root.endsWith("\\") || root.endsWith("/") ? root : root + (root.startsWith("/") ? "/" : "\\");
+    if (fold(full).startsWith(fold(prefix)) && full.length > prefix.length) return full;
+  }
+  return null;
 }

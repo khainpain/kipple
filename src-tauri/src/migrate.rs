@@ -21,6 +21,23 @@ const SECRETS: &[&str] = &["anthropic_api_key", "kipple_install_id", "telegram_s
 #[cfg_attr(not(windows), allow(dead_code))]
 const MARKER: &str = "migrated-from-savedboard";
 
+/// Written into the new data folder once the credentials were moved with `overwrite`. Without it,
+/// a data copy that keeps failing (MARKER never written) would copy the old credentials over newer
+/// ones (a new sign-in, a new key) on every launch.
+#[cfg_attr(not(windows), allow(dead_code))]
+const SECRETS_MARKER: &str = "secrets-moved-from-savedboard";
+
+/// Old credentials win over new ones only on the first migration attempt.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn secrets_overwrite(new: &Path) -> bool {
+    !new.join(MARKER).exists() && !new.join(SECRETS_MARKER).exists()
+}
+
+#[cfg_attr(not(windows), allow(dead_code))]
+fn mark_secrets_moved(new: &Path) {
+    let _ = std::fs::create_dir_all(new).and_then(|_| std::fs::write(new.join(SECRETS_MARKER), OLD_APP_ID));
+}
+
 pub fn run() {
     #[cfg(not(windows))]
     move_secrets(false);
@@ -28,11 +45,16 @@ pub fn run() {
     {
         if let Some(roaming) = std::env::var_os("APPDATA") {
             let roaming = Path::new(&roaming);
-            // Until the data has been copied, the old install is the one in use: its credentials
-            // win over any left in the new place (e.g. after going back to an older version and
-            // deleting the new folder to migrate again).
-            move_secrets(!roaming.join(APP_ID).join(MARKER).exists());
-            let _ = copy_data(&roaming.join(OLD_APP_ID), &roaming.join(APP_ID));
+            // On the first attempt the old install is the one in use: its credentials win over any
+            // left in the new place (e.g. after going back to an older version and deleting the new
+            // folder to migrate again). Later attempts (a data copy that failed) only fill gaps.
+            let new = roaming.join(APP_ID);
+            let overwrite = secrets_overwrite(&new);
+            move_secrets(overwrite);
+            if overwrite {
+                mark_secrets_moved(&new);
+            }
+            let _ = copy_data(&roaming.join(OLD_APP_ID), &new);
         }
         if let Some(local) = std::env::var_os("LOCALAPPDATA") {
             // The web view's localStorage: language, theme, panel sizes, view settings.
@@ -110,6 +132,18 @@ fn copy_missing(from: &Path, to: &Path) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn old_secrets_overwrite_only_on_the_first_attempt() {
+        let new = std::env::temp_dir().join(format!("kipple-migrate-secrets-{}", std::process::id())).join(APP_ID);
+        let _ = std::fs::remove_dir_all(&new);
+        assert!(secrets_overwrite(&new), "first attempt: the old install's credentials win");
+        mark_secrets_moved(&new);
+        // The data copy failed (no MARKER), but the next launch must not overwrite again.
+        assert!(!new.join(MARKER).exists());
+        assert!(!secrets_overwrite(&new));
+        std::fs::remove_dir_all(new.parent().unwrap()).unwrap();
+    }
 
     #[test]
     fn copies_old_data_once_and_repoints_photos() {

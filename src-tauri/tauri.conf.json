@@ -23,13 +23,49 @@
       "csp": "default-src 'self'; img-src 'self' asset: http://asset.localhost https: http: data: blob:; media-src 'self' asset: http://asset.localhost blob:; frame-src 'self' blob: asset: http://asset.localhost https://www.youtube-nocookie.com https://www.instagram.com https://player.vimeo.com https://www.tiktok.com; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost",
       "assetProtocol": {
         "enable": true,
-        "scope": [
-          "$HOME/**",
-          "$DOWNLOAD/**",
-          "$DOCUMENT/**",
-          "$DESKTOP/**",
-          "$APPDATA/telegram-media/**"
-        ]
+        "scope": {
+          "allow": [
+            "$HOME/**",
+            "$DOWNLOAD/**",
+            "$DOCUMENT/**",
+            "$DESKTOP/**",
+            "$APPDATA/telegram-media/**"
+          ],
+          "deny": [
+            "$HOME/.ssh",
+            "$HOME/.ssh/**",
+            "$HOME/.gnupg/**",
+            "$DATA/Telegram Desktop/**",
+            "$DATA/TelegramDesktop/**",
+            "$APPDATA/Telegram Desktop/**",
+            "$LOCALDATA/Telegram Desktop/**",
+            "$HOME/.local/share/TelegramDesktop/**",
+            "$LOCALDATA/Google/Chrome/**",
+            "$LOCALDATA/Chromium/**",
+            "$LOCALDATA/Microsoft/Edge/**",
+            "$LOCALDATA/Yandex/**",
+            "$LOCALDATA/BraveSoftware/**",
+            "$LOCALDATA/Vivaldi/**",
+            "$LOCALDATA/Mozilla/**",
+            "$DATA/Mozilla/**",
+            "$DATA/Opera Software/**",
+            "$APPDATA/Mozilla/**",
+            "$DATA/Google/Chrome/**",
+            "$DATA/Chromium/**",
+            "$DATA/Microsoft Edge/**",
+            "$DATA/Firefox/**",
+            "$DATA/Yandex/**",
+            "$DATA/BraveSoftware/**",
+            "$DATA/Arc/**",
+            "$CONFIG/google-chrome/**",
+            "$CONFIG/chromium/**",
+            "$CONFIG/microsoft-edge/**",
+            "$CONFIG/BraveSoftware/**",
+            "$CONFIG/yandex-browser/**",
+            "$CONFIG/opera/**",
+            "$HOME/.mozilla/**"
+          ]
+        }
       }
     }
   },

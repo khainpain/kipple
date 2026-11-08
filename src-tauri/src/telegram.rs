@@ -42,6 +42,12 @@ struct Conn {
     api_hash: String,
     login: Option<LoginToken>,
     password: Option<PasswordToken>,
+    /// Telegram asked for the cloud password and sign-in hasn't finished: a lost `password`
+    /// token is fetched again (account.getPassword) instead of making the user start over.
+    password_needed: bool,
+    /// The signed-in account's user id, once read. A connection belongs to one authorization;
+    /// it is reset whenever a sign-in completes on it.
+    owner: Option<i64>,
     /// The QR login token being shown and when it expires (unix seconds).
     qr: Option<(Vec<u8>, i64)>,
     /// Set when Telegram sends updateLoginToken: the QR was scanned and accepted on the phone.
@@ -215,7 +221,7 @@ fn connect() -> Result<Conn, String> {
             }
         }
     });
-    Ok(Conn { client, session, api_id, api_hash, login: None, password: None, qr: None, qr_scanned })
+    Ok(Conn { client, session, api_id, api_hash, login: None, password: None, password_needed: false, owner: None, qr: None, qr_scanned })
 }
 
 /// Locks the connection, opening it on first use.
@@ -371,12 +377,21 @@ pub async fn tg_request_code(state: tauri::State<'_, TgState>, phone: String) ->
     let token = c.client.request_login_code(phone.trim(), &hash).await.map_err(err)?;
     c.login = Some(token);
     c.password = None;
+    c.password_needed = false;
     Ok(())
 }
 
-fn finish_login(c: &Conn, name: String) -> Result<SignInResult, String> {
+fn finish_login(c: &mut Conn, name: String) -> Result<SignInResult, String> {
+    c.owner = None;
+    c.password_needed = false;
     save_session(&c.session)?;
     Ok(SignInResult::Ok { name })
+}
+
+/// A fresh password token (the SRP parameters in the old one are single-use).
+async fn fresh_password_token(c: &Conn) -> Result<PasswordToken, String> {
+    let p: tl::types::account::Password = c.client.invoke(&tl::functions::account::GetPassword {}).await.map_err(err)?.into();
+    Ok(PasswordToken::new(p))
 }
 
 #[tauri::command]
@@ -384,10 +399,11 @@ pub async fn tg_sign_in(state: tauri::State<'_, TgState>, code: String) -> Resul
     let mut c = conn(&state).await?;
     let token = c.login.take().ok_or("NO_CODE_REQUESTED")?;
     match c.client.sign_in(&token, code.trim()).await {
-        Ok(user) => finish_login(&c, user.full_name()),
+        Ok(user) => finish_login(&mut c, user.full_name()),
         Err(SignInError::PasswordRequired(p)) => {
             let hint = p.hint().map(str::to_string);
             c.password = Some(p);
+            c.password_needed = true;
             Ok(SignInResult::Password { hint })
         }
         Err(SignInError::InvalidCode) => {
@@ -396,21 +412,36 @@ pub async fn tg_sign_in(state: tauri::State<'_, TgState>, code: String) -> Resul
         }
         Err(SignInError::SignUpRequired) => Err("SIGN_UP_REQUIRED".into()),
         Err(SignInError::InvalidPassword(_)) => Err("PASSWORD_HASH_INVALID".into()),
-        Err(SignInError::Other(e)) => Err(err(e)),
+        // A network error or a rate limit: the code may still be good, so keep the token and let
+        // the user try the same code again. (An expired code just fails again and asks for a new one.)
+        Err(SignInError::Other(e)) => {
+            c.login = Some(token);
+            Err(err(e))
+        }
     }
 }
 
 #[tauri::command]
 pub async fn tg_check_password(state: tauri::State<'_, TgState>, password: String) -> Result<SignInResult, String> {
     let mut c = conn(&state).await?;
-    let token = c.password.take().ok_or("NO_PASSWORD_REQUESTED")?;
+    let token = match c.password.take() {
+        Some(t) => t,
+        // The last try failed on the way (network, rate limit) and took the token with it.
+        None if c.password_needed => fresh_password_token(&c).await?,
+        None => return Err("NO_PASSWORD_REQUESTED".into()),
+    };
     match c.client.check_password(token, password.as_bytes()).await {
-        Ok(user) => finish_login(&c, user.full_name()),
+        Ok(user) => finish_login(&mut c, user.full_name()),
         Err(SignInError::InvalidPassword(p)) => {
             c.password = Some(p);
             Err("PASSWORD_HASH_INVALID".into())
         }
-        Err(SignInError::Other(e)) => Err(err(e)),
+        Err(SignInError::Other(e)) => {
+            // The token was used up; get a fresh one now so a retry works. If that fails too,
+            // the next try fetches it (password_needed stays set).
+            c.password = fresh_password_token(&c).await.ok();
+            Err(err(e))
+        }
         Err(_) => Err("SIGN_IN_FAILED".into()),
     }
 }
@@ -453,6 +484,7 @@ async fn password_step(c: &mut Conn) -> Result<QrResult, String> {
     let token = PasswordToken::new(p);
     let hint = token.hint().map(str::to_string);
     c.password = Some(token);
+    c.password_needed = true;
     c.qr = None;
     Ok(QrResult::Password { hint })
 }
@@ -462,6 +494,8 @@ fn qr_authorized(c: &mut Conn, auth: tl::enums::auth::Authorization) -> Result<Q
     c.qr = None;
     match auth {
         tl::enums::auth::Authorization::Authorization(a) => {
+            c.owner = None;
+            c.password_needed = false;
             let name = user_name(&a.user);
             save_session(&c.session)?;
             Ok(QrResult::Ok { name })
@@ -517,15 +551,33 @@ pub async fn tg_qr_cancel(state: tauri::State<'_, TgState>) -> Result<(), String
 }
 
 /// Ends the session on Telegram's side (it disappears from «Активные сеансы») and forgets it here.
+/// The session is forgotten on this device either way; "LOGOUT_LOCAL_ONLY" means Telegram
+/// couldn't be told (e.g. offline), so the session may still be listed as active there.
 #[tauri::command]
 pub async fn tg_logout(state: tauri::State<'_, TgState>) -> Result<(), String> {
     let mut guard = state.0.lock().await;
-    if let Some(c) = guard.take() {
-        let _ = c.client.sign_out().await;
+    let conn = match guard.take() {
+        Some(c) => Some(c),
+        // Not connected yet in this run, but a session is saved: connect to end it properly.
+        None if read_secret(SESSION_KEY).is_some() => connect().ok(),
+        None => None,
+    };
+    let had_session = read_secret(SESSION_KEY).is_some();
+    let mut remote_ok = true;
+    if let Some(c) = conn {
+        remote_ok = match c.client.sign_out().await {
+            Ok(_) => true,
+            // Not signed in on this connection (e.g. a sign-in that never finished): nothing to end.
+            Err(InvocationError::Rpc(e)) if e.code == 401 => true,
+            Err(_) => false,
+        };
         c.client.disconnect();
+    } else if had_session {
+        // A saved session we couldn't even connect with (no api key any more).
+        remote_ok = false;
     }
     forget_session();
-    Ok(())
+    if remote_ok { Ok(()) } else { Err("LOGOUT_LOCAL_ONLY".into()) }
 }
 
 fn parse_hash(access_hash: &str) -> Result<i64, String> {
@@ -781,6 +833,14 @@ async fn self_user(c: &Conn) -> Option<tl::types::User> {
     }
 }
 
+/// The signed-in account's user id, read once per connection.
+async fn owner_id(c: &mut Conn) -> Option<i64> {
+    if c.owner.is_none() {
+        c.owner = self_user(c).await.map(|u| u.id);
+    }
+    c.owner
+}
+
 /// Replies to message `id` in Saved Messages with `text` and returns the reply's id and a link
 /// to the chat. "NO_ORIGINAL" when the original is gone.
 #[tauri::command]
@@ -863,14 +923,13 @@ pub async fn tg_delete_saved(app: tauri::AppHandle, state: tauri::State<'_, TgSt
         None => return Err("NO_ACCOUNT".into()),
     }
     // Copy them into the local backup first; if that fails, nothing is deleted.
-    let req = tl::functions::messages::GetMessages { id: ids.iter().map(|&id| tl::types::InputMessageId { id }.into()).collect() };
-    use tl::enums::messages::Messages as R;
-    let (messages, users, chats) = match c.client.invoke(&req).await.map_err(err)? {
-        R::Messages(m) => (m.messages, m.users, m.chats),
-        R::Slice(m) => (m.messages, m.users, m.chats),
-        R::ChannelMessages(m) => (m.messages, m.users, m.chats),
-        R::NotModified(_) => (vec![], vec![], vec![]),
-    };
+    let (mut messages, mut users, mut chats) = (vec![], vec![], vec![]);
+    for chunk in ids.chunks(IDS_PER_CALL) {
+        let (m, u, ch) = get_messages(&c, chunk).await?;
+        messages.extend(m);
+        users.extend(u);
+        chats.extend(ch);
+    }
     // Message ids in private chats are shared by all of the account's chats, and DeleteMessages
     // takes no chat. Only delete what really is our own message in Saved Messages, so a stale id
     // can never remove a message in someone else's chat (for both sides).
@@ -884,9 +943,28 @@ pub async fn tg_delete_saved(app: tauri::AppHandle, state: tauri::State<'_, TgSt
     let found = to_saved(&mine, &users, &chats);
     append_backup(&backup_dir(&app)?, owner, &found, "before_delete")?;
     let ids: Vec<i32> = mine.iter().map(|m| m.id()).collect();
-    let req = tl::functions::messages::DeleteMessages { revoke: true, id: ids };
-    c.client.invoke(&req).await.map_err(err)?;
+    for chunk in ids.chunks(IDS_PER_CALL) {
+        let req = tl::functions::messages::DeleteMessages { revoke: true, id: chunk.to_vec() };
+        c.client.invoke(&req).await.map_err(err)?;
+    }
     Ok(())
+}
+
+/// Telegram takes at most 100 message ids per messages.getMessages / messages.deleteMessages.
+const IDS_PER_CALL: usize = 100;
+
+type MessagesParts = (Vec<tl::enums::Message>, Vec<tl::enums::User>, Vec<tl::enums::Chat>);
+
+/// messages.getMessages for up to IDS_PER_CALL ids of the account's private chats.
+async fn get_messages(c: &Conn, ids: &[i32]) -> Result<MessagesParts, String> {
+    let req = tl::functions::messages::GetMessages { id: ids.iter().map(|&id| tl::types::InputMessageId { id }.into()).collect() };
+    use tl::enums::messages::Messages as R;
+    Ok(match c.client.invoke(&req).await.map_err(err)? {
+        R::Messages(m) => (m.messages, m.users, m.chats),
+        R::Slice(m) => (m.messages, m.users, m.chats),
+        R::ChannelMessages(m) => (m.messages, m.users, m.chats),
+        R::NotModified(_) => (vec![], vec![], vec![]),
+    })
 }
 
 // ---- Loading Saved Messages straight from Telegram -------------------------------------
@@ -955,6 +1033,9 @@ pub struct SavedPage {
     next_offset: Option<i32>,
     /// Roughly how many messages there are in total (above min_id), for the progress bar.
     total: Option<i32>,
+    /// The signed-in account's user id: message ids are per account, so the caller restarts its
+    /// sync when this changes. None when it couldn't be read.
+    owner: Option<i64>,
 }
 
 fn entity(e: &tl::enums::MessageEntity) -> Option<SavedEntity> {
@@ -1126,8 +1207,9 @@ fn photo_of(media: &tl::enums::MessageMedia) -> Option<(&tl::types::Photo, bool)
 /// newest) and newer than `min_id` (0 = all the way back).
 #[tauri::command]
 pub async fn tg_saved_page(state: tauri::State<'_, TgState>, offset_id: i32, min_id: i32) -> Result<SavedPage, String> {
-    let c = conn(&state).await?;
-    history_page(&c, offset_id, min_id).await
+    let mut c = conn(&state).await?;
+    let owner = owner_id(&mut c).await;
+    Ok(SavedPage { owner, ..history_page(&c, offset_id, min_id).await? })
 }
 
 /// Up to 100 Saved Messages older than `offset_id` (0: from the newest) and newer than `min_id`.
@@ -1153,7 +1235,7 @@ async fn history_page(c: &Conn, offset_id: i32, min_id: i32) -> Result<SavedPage
         R::NotModified(_) => (vec![], vec![], vec![], None),
     };
     let next_offset = messages.iter().map(|m| m.id()).min();
-    Ok(SavedPage { messages: to_saved(&messages, &users, &chats), next_offset, total })
+    Ok(SavedPage { messages: to_saved(&messages, &users, &chats), next_offset, total, owner: None })
 }
 
 /// Plain messages as SavedMessage, with the names of forwarded-from senders filled in.
@@ -1350,13 +1432,46 @@ pub struct SavedPhoto {
     path: String,
 }
 
-/// Downloads the photos (or link preview pictures) of these Saved Messages into the app's folder (telegram-media/<id>.jpg)
-/// and returns where each one went. Photos already on disk are not downloaded again, so an
-/// interrupted run picks up where it stopped. Messages without a photo, or that no longer
-/// exist, are left out of the result.
+/// One photo may take at most this long; a stuck download counts as failed (tried again later),
+/// so it can't hold the Telegram connection, and «Удалить все данные» waiting on it, forever.
+const PHOTO_TIMEOUT: Duration = Duration::from_secs(60);
+/// A batch stops starting new downloads after this long; the rest are tried again later.
+const PHOTO_BATCH_BUDGET: Duration = Duration::from_secs(120);
+
+/// Downloads one photo. Err only for a flood wait (the caller waits and retries the whole
+/// batch); a failed or timed-out download is Ok(None).
+async fn download_photo(client: &Client, file: &PhotoFile) -> Result<Option<Vec<u8>>, String> {
+    let run = async {
+        let mut bytes = Vec::new();
+        let mut download = client.iter_download(file);
+        loop {
+            match download.next().await {
+                Ok(Some(chunk)) => bytes.extend(chunk),
+                Ok(None) => return Ok(Some(bytes)),
+                Err(e) => {
+                    let e = err(e);
+                    if e.starts_with("FLOOD_WAIT") {
+                        return Err(e);
+                    }
+                    return Ok(None);
+                }
+            }
+        }
+    };
+    tokio::time::timeout(PHOTO_TIMEOUT, run).await.unwrap_or(Ok(None))
+}
+
+/// Downloads the photos (or link preview pictures) of these Saved Messages into the app's folder
+/// (telegram-media/<user id>/<message id>.jpg: message ids are per account) and returns where
+/// each one went. Photos already on disk are not downloaded again, so an interrupted run picks
+/// up where it stopped. Messages without a photo, or that no longer exist, are left out of the
+/// result; an empty path means the download failed this time.
 #[tauri::command]
 pub async fn tg_saved_photos(app: tauri::AppHandle, state: tauri::State<'_, TgState>, ids: Vec<i32>) -> Result<Vec<SavedPhoto>, String> {
-    let dir = media_dir(&app)?;
+    let mut c = conn(&state).await?;
+    let owner = owner_id(&mut c).await.ok_or("NO_ACCOUNT")?;
+    let dir = media_dir(&app)?.join(owner.to_string());
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let mut out = Vec::new();
     let mut todo = Vec::new();
     for id in ids {
@@ -1367,24 +1482,22 @@ pub async fn tg_saved_photos(app: tauri::AppHandle, state: tauri::State<'_, TgSt
             todo.push(id);
         }
     }
-    if todo.is_empty() {
-        return Ok(out);
-    }
-    let c = conn(&state).await?;
+    let started = std::time::Instant::now();
     // Fresh copies of the messages: a photo's file_reference expires, so the one from the
     // history page may be stale by now.
-    let req = tl::functions::messages::GetMessages { id: todo.iter().map(|&id| tl::types::InputMessageId { id }.into()).collect() };
-    use tl::enums::messages::Messages as R;
-    let messages = match c.client.invoke(&req).await.map_err(err)? {
-        R::Messages(m) => m.messages,
-        R::Slice(m) => m.messages,
-        R::ChannelMessages(m) => m.messages,
-        R::NotModified(_) => vec![],
-    };
+    let mut messages = Vec::new();
+    for chunk in todo.chunks(IDS_PER_CALL) {
+        let got = tokio::time::timeout(PHOTO_TIMEOUT, get_messages(&c, chunk)).await.map_err(|_| "TIMEOUT".to_string())??;
+        messages.extend(got.0);
+    }
     for m in messages {
         let tl::enums::Message::Message(m) = m else { continue };
         let Some((photo, _)) = m.media.as_ref().and_then(photo_of) else { continue };
         let Some(thumb_size) = pick_photo_size(&photo.sizes) else { continue };
+        if started.elapsed() > PHOTO_BATCH_BUDGET {
+            out.push(SavedPhoto { id: m.id, path: String::new() });
+            continue;
+        }
         let file = PhotoFile {
             location: tl::types::InputPhotoFileLocation {
                 id: photo.id,
@@ -1395,30 +1508,16 @@ pub async fn tg_saved_photos(app: tauri::AppHandle, state: tauri::State<'_, TgSt
             .into(),
             dc_id: photo.dc_id,
         };
-        let mut bytes = Vec::new();
-        let mut download = c.client.iter_download(&file);
-        let mut failed = false;
-        loop {
-            match download.next().await {
-                Ok(Some(chunk)) => bytes.extend(chunk),
-                Ok(None) => break,
-                Err(e) => {
-                    let e = err(e);
-                    // A flood wait is for the whole batch: the caller waits and retries it.
-                    if e.starts_with("FLOOD_WAIT") {
-                        return Err(e);
-                    }
-                    failed = true;
-                    break;
-                }
-            }
-        }
+        let bytes = download_photo(&c.client, &file).await?;
         let path = dir.join(format!("{}.jpg", m.id));
         let tmp = dir.join(format!("{}.jpg.part", m.id));
-        let saved = !failed && !bytes.is_empty() && std::fs::write(&tmp, &bytes).and_then(|_| std::fs::rename(&tmp, &path)).is_ok();
+        let saved = match &bytes {
+            Some(b) if !b.is_empty() => std::fs::write(&tmp, b).and_then(|_| std::fs::rename(&tmp, &path)).is_ok(),
+            _ => false,
+        };
         if saved {
             out.push(SavedPhoto { id: m.id, path: path.to_string_lossy().into_owned() });
-        } else if failed || !bytes.is_empty() {
+        } else if bytes.as_ref().is_none_or(|b| !b.is_empty()) {
             // One photo that keeps failing must not stop all the others: an empty path means
             // "try again on the next load", unlike leaving it out ("no photo").
             out.push(SavedPhoto { id: m.id, path: String::new() });
@@ -1427,7 +1526,7 @@ pub async fn tg_saved_photos(app: tauri::AppHandle, state: tauri::State<'_, TgSt
     Ok(out)
 }
 
-/// Deletes the downloaded photos (Settings → «Удалить все данные»).
+/// Deletes the downloaded photos of every account (Settings → «Удалить все данные»).
 #[tauri::command]
 pub async fn tg_forget_media(app: tauri::AppHandle, state: tauri::State<'_, TgState>) -> Result<(), String> {
     // Wait for a photo batch that is still writing files, so none land after the folder is gone.

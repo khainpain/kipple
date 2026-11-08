@@ -31,6 +31,20 @@ export function mergeImport(prev: Library | null, next: Omit<Library, "version">
   return { version: 1, telegram: prev?.telegram, subgroups: prev?.subgroups, ...next, cards };
 }
 
+/** After a re-tag ends (or on the next launch if the app closed mid-run): cards it didn't redo get their old AI fields back. Returns whether any did. */
+export function restorePrevAi(cards: Card[]): boolean {
+  let restored = false;
+  for (const c of cards) {
+    if (!c.aiPrev) continue;
+    if (!c.ai) {
+      c.ai = c.aiPrev;
+      restored = true;
+    }
+    delete c.aiPrev;
+  }
+  return restored;
+}
+
 export function applyEdits(cards: Card[], events: EditEvent[]): Card[] {
   const byId = new Map(cards.map((c) => [c.id, c]));
   for (const ev of events) {

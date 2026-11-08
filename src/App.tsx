@@ -5,7 +5,7 @@ import { useTelegramAccount } from "./useTelegramAccount";
 import "./App.css";
 import type { Card, Library, UserFields } from "./lib/types";
 import type { Skips, TodayState } from "./lib/today";
-import { effectiveTags, effectiveTopic, findTopic, getOwnTopics, makeEdit, matchesFilter, mergeAlias, NO_ALIASES, setAliases, setOwnTopics, topicName, type Aliases } from "./lib/library";
+import { effectiveTags, effectiveTopic, findTopic, getOwnTopics, makeEdit, matchesFilter, restorePrevAi, mergeAlias, NO_ALIASES, setAliases, setOwnTopics, topicName, type Aliases } from "./lib/library";
 import { aiAllowed, appendEdit, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadPendingReplies, loadSettings, saveBoardState, saveLibrary, savePendingReplies, saveSettings, wipeAll, type Settings } from "./lib/store";
 import { dueReplies, nextDue, replyText, scheduleReply, withoutReplies, type PendingReply } from "./lib/tgReplies";
 import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type SendOptions } from "./lib/telegram";
@@ -18,6 +18,7 @@ import { toCsv, toMarkdown } from "./lib/exporters";
 import { deleteApiKey, getAiAuth, getApiKey, setApiKey } from "./lib/secrets";
 import { Workspace, type Job } from "./components/Workspace";
 import { SettingsDialog } from "./components/Settings";
+import { NOTICE_EVENT } from "./components/openFile";
 import { AiConsentDialog } from "./components/AiConsent";
 import { Welcome } from "./components/Welcome";
 import { demoLibrary } from "./lib/demo";
@@ -79,6 +80,13 @@ export default function App() {
     setToast(msg);
     setTimeout(() => setToast((t) => (t === msg ? null : t)), 6000);
   }, []);
+
+  // Components deep in the board (opening a card's file) report problems through this event.
+  useEffect(() => {
+    const on = (e: Event) => notify(String((e as CustomEvent).detail));
+    window.addEventListener(NOTICE_EVENT, on);
+    return () => window.removeEventListener(NOTICE_EVENT, on);
+  }, [notify]);
 
   // Deletes "Open in Telegram" helper replies from Saved Messages when they're due, while signed in.
   // Every change to the pending list goes through one queue, so a reply added while a cleanup
@@ -286,19 +294,43 @@ export default function App() {
     }
   }
 
-  async function nameOne(card: Card) {
-    if (!lib || !aiAllowed(settingsRef.current)) return;
-    const auth = await getAiAuth();
+  // One job at a time. Link previews give way to anything the user starts; a job the user started
+  // isn't stopped by another button: that one says the app is busy instead.
+  const runningJob = useRef<{ kind: "previews" | "work"; ctl: AbortController } | null>(null);
+  function jobRunning(): boolean {
+    const cur = runningJob.current;
+    return !!cur && cur.kind === "work" && !cur.ctl.signal.aborted;
+  }
+  function startJob(kind: "previews" | "work"): AbortController | null {
+    if (jobRunning()) {
+      if (kind === "work") notify(T.app.busy);
+      return null;
+    }
     abortRef.current?.abort();
     const ctl = new AbortController();
     abortRef.current = ctl;
+    runningJob.current = { kind, ctl };
+    return ctl;
+  }
+  /** Clears the progress bar, unless a newer job already owns it. */
+  function endJob(ctl: AbortController) {
+    if (runningJob.current && runningJob.current.ctl !== ctl) return;
+    runningJob.current = null;
+    setJob(null);
+  }
+
+  async function nameOne(card: Card) {
+    if (!lib || !aiAllowed(settingsRef.current)) return;
+    const auth = await getAiAuth();
+    const ctl = startJob("work");
+    if (!ctl) return;
     const saved = card.ai;
     card.ai = undefined;
     try {
       await runImageAi(auth, lib, [card], ctl.signal);
     } finally {
       if (!card.ai) card.ai = saved;
-      setJob(null);
+      endJob(ctl);
       setRev((r) => r + 1);
     }
   }
@@ -337,22 +369,20 @@ export default function App() {
 
   /** Link previews for new cards, after an import or a load from Telegram. No AI here. */
   async function fetchPreviews(l: Library) {
-    abortRef.current?.abort();
-    const ctl = new AbortController();
-    abortRef.current = ctl;
+    const ctl = startJob("previews");
+    if (!ctl) return;
     try {
       if (settingsRef.current.fetchLinks && platform.canFetchLinks) await enrichLinks(l, ctl.signal);
     } finally {
-      setJob(null);
+      endJob(ctl);
       setRev((r) => r + 1);
     }
   }
 
   /** The "Tag N" button (and re-tagging from Settings): previews, then AI. Only ever started by the user. */
   async function processAll(l: Library) {
-    abortRef.current?.abort();
-    const ctl = new AbortController();
-    abortRef.current = ctl;
+    const ctl = startJob("work");
+    if (!ctl) return;
     try {
       if (settingsRef.current.fetchLinks && platform.canFetchLinks) await enrichLinks(l, ctl.signal);
       if (!ctl.signal.aborted && !demoRef.current && !aiAllowed(settingsRef.current) && pendingForAi(l.cards).length) {
@@ -365,7 +395,7 @@ export default function App() {
       }
       if (aiAllowed(settingsRef.current) && !ctl.signal.aborted) await runAi(l, ctl.signal);
     } finally {
-      setJob(null);
+      endJob(ctl);
       setRev((r) => r + 1);
     }
   }
@@ -417,9 +447,8 @@ export default function App() {
   async function syncTelegram(l: Library, fresh: boolean) {
     const tg = platform.telegram;
     if (!tg || demoRef.current) return;
-    abortRef.current?.abort();
-    const ctl = new AbortController();
-    abortRef.current = ctl;
+    const ctl = startJob("work");
+    if (!ctl) return;
     if (fresh) {
       setLib(l);
       setRev((r) => r + 1);
@@ -445,7 +474,7 @@ export default function App() {
       // Nothing came in on the first load: back to the start, where the export file still works.
       if (fresh && !l.cards.length) setLib(null);
     } finally {
-      setJob(null);
+      endJob(ctl);
       setRev((r) => r + 1);
     }
     void runBackup();
@@ -499,9 +528,8 @@ export default function App() {
     const tg = platform.telegram;
     if (!lib || !tg) return;
     setShowTelegram(false);
-    abortRef.current?.abort();
-    const ctl = new AbortController();
-    abortRef.current = ctl;
+    const ctl = startJob("work");
+    if (!ctl) return;
     setSendingTg(true);
     try {
       const state = await loadBoardState();
@@ -518,7 +546,7 @@ export default function App() {
       if (e instanceof TelegramAuthError) setShowTelegram(true);
     } finally {
       setSendingTg(false);
-      setJob(null);
+      endJob(ctl);
     }
   }
 
@@ -554,41 +582,36 @@ export default function App() {
     return true;
   }
 
-  // The AI fields a running re-tag took off cards, kept until it ends; a second re-tag adds to them.
-  const retagOld = useRef<Map<Card, NonNullable<Card["ai"]>> | null>(null);
   const retagRun = useRef(0);
 
   /** Saves the settings, then tags every already tagged card again with the chosen model. */
   async function onRetag(s: Settings, key: string | null) {
     if (!(await onSaveSettings(s, key))) return; // don't spend the allowance with settings that didn't save
     if (!lib || demoRef.current) return;
-    const old = retagOld.current ?? new Map<Card, NonNullable<Card["ai"]>>();
-    retagOld.current = old;
+    if (jobRunning()) return void notify(T.app.busy);
     const run = ++retagRun.current;
+    // The old fields stay on the card (aiPrev, saved with the library) until new ones arrive.
     for (const c of lib.cards) {
       if (!c.ai) continue;
-      old.set(c, c.ai);
+      c.aiPrev = c.ai;
       c.ai = undefined;
     }
     // Put back what this run won't redo (hidden cards, photos when picture naming is off), so nothing loses its title.
     const redo = new Set([...pendingForAi(lib.cards), ...(s.aiImages ? pendingImages(lib.cards) : [])]);
-    for (const [c, ai] of old) if (!redo.has(c)) c.ai = ai;
+    for (const c of lib.cards) {
+      if (c.aiPrev && !redo.has(c)) {
+        c.ai = c.aiPrev;
+        delete c.aiPrev;
+      }
+    }
     setRev((r) => r + 1);
     const l = lib;
-    // A stopped run (quota used up, key rejected, another job) must not leave cards without the title they had.
+    // A stopped run (quota used up, key rejected, Stop) must not leave cards without the title they had.
     void processAll(l).finally(() => {
       if (retagRun.current !== run) return; // a newer re-tag took over these cards
-      retagOld.current = null;
-      let restored = false;
-      for (const [c, ai] of old) {
-        if (c.ai) continue;
-        c.ai = ai;
-        restored = true;
-      }
-      if (restored) {
-        void persist(l);
-        setRev((r) => r + 1);
-      }
+      restorePrevAi(l.cards);
+      void persist(l);
+      setRev((r) => r + 1);
     });
   }
 

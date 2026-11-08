@@ -1,6 +1,6 @@
 import { platform } from "@platform";
 import type { EditEvent, Library } from "./types";
-import { annotateContext, applyEdits, type Aliases } from "./library";
+import { annotateContext, applyEdits, restorePrevAi, type Aliases } from "./library";
 import { emptyBoardState, type BoardState } from "./telegram";
 import type { LangPref } from "../i18n";
 import { DEFAULT_AI_MODEL, type AiModel } from "./ai";
@@ -67,6 +67,7 @@ export async function loadLibrary(): Promise<Library | null> {
   if (!(await exists(LIBRARY))) return null;
   const lib = JSON.parse(await read(LIBRARY)) as Library | null;
   if (!lib?.cards) return null;
+  restorePrevAi(lib.cards); // a re-tag that the app closed in the middle of
   applyEdits(lib.cards, await loadEdits());
   annotateContext(lib.cards);
   return lib;

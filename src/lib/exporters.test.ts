@@ -41,3 +41,17 @@ describe("mergeImport", () => {
     expect(byId.get(50)?.removed).toBeUndefined();
   });
 });
+
+describe("restorePrevAi", () => {
+  it("gives a re-tag's untouched cards their old AI fields back and drops the copies", async () => {
+    const { restorePrevAi } = await import("./library");
+    const ai = (title: string) => ({ title, summary: "", topic: "T", tags: [], action: "idea" as const, priority: 2 as const, model: "m", at: "t" });
+    const done = card(1, { ai: ai("new"), aiPrev: ai("old") });
+    const stopped = card(2, { aiPrev: ai("old") });
+    expect(restorePrevAi([done, stopped])).toBe(true);
+    expect(done.ai?.title).toBe("new");
+    expect(stopped.ai?.title).toBe("old");
+    expect(done.aiPrev).toBeUndefined();
+    expect(stopped.aiPrev).toBeUndefined();
+  });
+});

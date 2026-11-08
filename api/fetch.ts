@@ -1,15 +1,30 @@
 // Vercel function for the browser build: fetches a page or picture for a link preview,
 // because browsers don't let a site read other sites. It gets only the link itself,
 // keeps nothing, and answers only pages of this same site. The desktop app doesn't use it.
+// Each request has 10 seconds in all (redirects and reading the body included), and one address
+// gets at most 120 requests a minute (api/_lib/limit.ts keeps a short hash, not the address).
 import { lookup, type LookupAddress } from "node:dns";
 import { request as httpRequest, type IncomingMessage } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { isIP } from "node:net";
+import { clientIp, env } from "./_lib/quota.js";
+import { withinLimit } from "./_lib/limit.js";
 
 const MAX_BYTES = 2_000_000;
 // No SVG: it can carry script.
 const ALLOWED_TYPE = /^(text\/html|application\/xhtml\+xml|application\/json|image\/(png|jpe?g|gif|webp|avif|bmp|x-icon|vnd\.microsoft\.icon))\b/i;
 const UA = "Mozilla/5.0 (compatible; Kipple/0.1; link preview)";
+
+type Lookup = (host: string, opts: object, cb: (err: Error | null, address: string | LookupAddress[], family?: number) => void) => void;
+
+export interface FetchOptions {
+  /** Time for the whole request: connecting, redirects and reading the body. */
+  deadlineMs: number;
+  /** Requests one client may make per minute. */
+  perMinute: number;
+  /** DNS lookup for outgoing connections; tests swap it to reach a local server. */
+  lookup: Lookup;
+}
 
 function privateV4(ip: string): boolean {
   const [a, b, c] = ip.split(".").map(Number);
@@ -60,7 +75,7 @@ export function privateIp(ip: string): boolean {
  * time (not with a separate lookup first) means a name can't resolve to a public address for
  * the check and to a private one for the request.
  */
-function publicLookup(host: string, opts: object, cb: (err: Error | null, address: string | LookupAddress[], family?: number) => void) {
+function publicLookup(...[host, opts, cb]: Parameters<Lookup>) {
   lookup(host, { ...opts, all: true }, (err, addrs) => {
     if (err) return cb(err, []);
     if (!addrs.length || addrs.some((a) => privateIp(a.address))) return cb(new Error("private address"), []);
@@ -84,13 +99,14 @@ function publicUrl(raw: string): URL | null {
 }
 
 /** One GET without following redirects, connecting only to public addresses. */
-function get(url: URL): Promise<IncomingMessage> {
+function get(url: URL, lookup: Lookup, signal: AbortSignal): Promise<IncomingMessage> {
   return new Promise((resolve, reject) => {
     const req = (url.protocol === "https:" ? httpsRequest : httpRequest)(
       url,
       {
         method: "GET",
-        lookup: publicLookup as never,
+        lookup: lookup as never,
+        signal,
         timeout: 8000,
         headers: { "user-agent": UA, accept: "text/html,application/json,image/*;q=0.9,*/*;q=0.5", "accept-language": "en,ru;q=0.8", "accept-encoding": "identity" },
       },
@@ -104,19 +120,38 @@ function get(url: URL): Promise<IncomingMessage> {
 
 const text = (status: number, body: string) => new Response(body, { status, headers: { "content-type": "text/plain; charset=utf-8" } });
 
+const perMinute = () => {
+  const v = Number(env("KIPPLE_FETCH_PER_MINUTE"));
+  return Number.isFinite(v) && v > 0 ? v : 120;
+};
+
 export async function GET(request: Request): Promise<Response> {
+  return fetchLink(request, { deadlineMs: 10_000, perMinute: perMinute(), lookup: publicLookup });
+}
+
+export async function fetchLink(request: Request, opts: Partial<FetchOptions> & Pick<FetchOptions, "lookup">): Promise<Response> {
+  const { deadlineMs = 10_000, lookup: dns } = opts;
   // Only the web app's own fetch() calls, which browsers mark same-origin. A request without the mark
   // (a script, curl) is refused too: otherwise it could put any page into the shared cache, to be
   // opened later from this site's address.
   if (request.headers.get("sec-fetch-site") !== "same-origin") return text(403, "forbidden");
 
+  // An outage of the counter store doesn't take link previews down with it.
+  const allowed = await withinLimit("fetch", clientIp(request), opts.perMinute ?? perMinute(), 60).catch((e) => {
+    console.error("fetch limit unavailable", e);
+    return true;
+  });
+  if (!allowed) return new Response("slow down", { status: 429, headers: { "content-type": "text/plain; charset=utf-8", "retry-after": "60", "cache-control": "no-store" } });
+
   let target = publicUrl(new URL(request.url).searchParams.get("url") ?? "");
   if (!target) return text(400, "bad url");
 
+  const deadline = AbortSignal.timeout(deadlineMs);
+  const timedOut = () => text(504, "timeout");
   let res: IncomingMessage | undefined;
   for (let hop = 0; hop < 5; hop++) {
-    res = await get(target).catch(() => undefined);
-    if (!res) return text(502, "fetch failed");
+    res = await get(target, dns, deadline).catch(() => undefined);
+    if (!res) return deadline.aborted ? timedOut() : text(502, "fetch failed");
     const status = res.statusCode ?? 502;
     const loc = res.headers.location;
     if (status < 300 || status >= 400 || !loc) break;
@@ -155,6 +190,8 @@ export async function GET(request: Request): Promise<Response> {
   // Read at most MAX_BYTES: enough for a page's <head> or a preview picture.
   const chunks: Uint8Array[] = [];
   let size = 0;
+  const stop = () => res.destroy(new Error("timeout"));
+  deadline.addEventListener("abort", stop, { once: true });
   try {
     for await (const chunk of res as AsyncIterable<Buffer>) {
       chunks.push(chunk);
@@ -166,7 +203,11 @@ export async function GET(request: Request): Promise<Response> {
       }
     }
   } catch {
+    // A cut-off answer is not cached as if it were whole.
+    if (deadline.aborted) return timedOut();
     if (!size) return text(502, "fetch failed");
+  } finally {
+    deadline.removeEventListener("abort", stop);
   }
   const body = new Uint8Array(size);
   let off = 0;

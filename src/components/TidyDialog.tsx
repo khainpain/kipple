@@ -3,6 +3,7 @@ import { mergeAlias, type Aliases } from "../lib/library";
 import { suggestMerges, type MergeSuggestion } from "../lib/tidy";
 import { T, formatNumber } from "../i18n";
 import { Icon } from "./Icon";
+import { useEscape } from "./useEscape";
 
 export type TidyKind = "topics" | "tags";
 
@@ -22,6 +23,7 @@ export function TidyDialog(props: {
   onChange: (a: Aliases) => void;
   onClose: () => void;
 }) {
+  useEscape(props.onClose);
   const L = T.tidy;
   const [kind, setKind] = useState<TidyKind>(props.initial ?? "tags");
   const [aiGroups, setAiGroups] = useState<Record<TidyKind, Array<{ into: string; from: string[] }>>>({ topics: [], tags: [] });

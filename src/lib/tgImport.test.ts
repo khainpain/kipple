@@ -213,6 +213,56 @@ describe("syncSaved", () => {
   });
 });
 
+describe("albums across pages", () => {
+  it("merges an album split over two history pages into one card", async () => {
+    const date = 1_700_000_000;
+    const g = { groupedId: "777", date };
+    const pages: SavedPage[] = [
+      { messages: [msg(103, { ...g, media: { kind: "photo" } }), msg(102, { ...g, media: { kind: "photo" } })], nextOffset: 102, total: 4 },
+      { messages: [msg(101, { ...g, media: { kind: "photo" } }), msg(100, { ...g, text: "caption", media: { kind: "photo" } })], nextOffset: 100, total: 4 },
+      { messages: [], nextOffset: null, total: 4 },
+    ];
+    const tg: SyncDeps["tg"] = {
+      savedPage: async () => pages.shift()!,
+      savedPhotos: async (batch) => batch.map((id) => ({ id, path: `/m/${id}.jpg` })),
+    };
+    const lib = emptyTelegramLibrary();
+    const r = await syncSaved(lib, deps(tg));
+    expect(lib.cards).toHaveLength(1);
+    expect(r.added).toBe(1);
+    const c = lib.cards[0];
+    expect(c.text).toBe("caption");
+    expect([c.id, ...(c.albumIds ?? [])].sort((a, b) => a - b)).toEqual([100, 101, 102, 103]);
+    expect(c.album).toHaveLength(3);
+    expect(r.photos).toBe(4);
+  });
+
+  it("merges album parts by groupedId even when the caption is not on the first message", () => {
+    const g = { groupedId: "5" };
+    const cards = messagesToCards([msg(11, { ...g, text: "late caption", media: { kind: "photo" } }), msg(10, { ...g, media: { kind: "photo" } })]);
+    expect(cards).toHaveLength(1);
+    expect(cards[0]).toMatchObject({ id: 10, text: "late caption", albumIds: [11] });
+  });
+});
+
+describe("account switch", () => {
+  it("refuses to mix another account's messages into the board, and changes nothing", async () => {
+    const chat = fakeChat(4);
+    const owner = { id: 1 };
+    const tg: SyncDeps["tg"] = {
+      ...chat.tg,
+      savedPage: async (o, m) => ({ ...(await chat.tg.savedPage(o, m)), owner: owner.id }),
+    };
+    const lib = emptyTelegramLibrary();
+    await syncSaved(lib, deps(tg));
+    expect(lib.telegram).toMatchObject({ top: 4, owner: 1, noPhoto: [3] });
+    const before = structuredClone(lib);
+    owner.id = 2;
+    await expect(syncSaved(lib, deps(tg))).rejects.toThrow("OTHER_ACCOUNT_LIBRARY");
+    expect(lib).toEqual(before);
+  });
+});
+
 describe("backupSaved", () => {
   it("steps until done and waits out FLOOD_WAIT", async () => {
     const steps = [{ done: false, saved: 100 }, "FLOOD_WAIT:2", { done: false, saved: 100 }, { done: true, saved: 7 }];

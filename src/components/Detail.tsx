@@ -14,6 +14,7 @@ import { isImportant } from "../lib/smart";
 import { OPEN_MODES, PANEL_WIDTH, clampPanelWidth, hueOf, loadPanelWidth, savePref, type OpenMode } from "./nav";
 import { TopicMenu } from "./TopicMenu";
 import { NoteField, PropRow, StatusChip, TagsEditor } from "./CardProps";
+import { openCardFile } from "./openFile";
 
 /** Messages up to this long (and without media or links) are shown as the card's heading. */
 const SHORT_TEXT = 140;
@@ -203,7 +204,7 @@ export function Detail(props: {
           <Icon name="star" />
         </button>
         {card.media?.path && card.kind !== "photo" && (
-          <button className="icon-btn" onClick={() => platform.openFile(lib.sourceDir, card.media!.path!)} title={T.detail.openFile}>
+          <button className="icon-btn" onClick={() => openCardFile(lib.sourceDir, card.media!.path!)} title={T.detail.openFile}>
             <Icon name="file" />
           </button>
         )}

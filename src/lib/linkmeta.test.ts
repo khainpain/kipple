@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { needsPreview, PARSE_VERSION } from "./linkmeta";
+import { guardedFetch, needsPreview, PARSE_VERSION, PrivateHostError } from "./linkmeta";
 import type { Card, LinkMeta } from "./types";
 
 const card = (link?: Partial<LinkMeta>, url = "https://example.com/a"): Card => ({
@@ -26,5 +26,46 @@ describe("needsPreview", () => {
   it("leaves links with a picture and skipped ones alone", () => {
     expect(needsPreview(card({ image: "https://example.com/og.png" }))).toBe(false);
     expect(needsPreview(card({ error: "skipped" }))).toBe(false);
+  });
+});
+
+describe("guardedFetch (desktop link previews)", () => {
+  const ok = (_url: string) => new Response("<html></html>", { status: 200, headers: { "content-type": "text/html" } });
+  const redirect = (to: string) => new Response(null, { status: 302, headers: { location: to } });
+
+  it("checks the host before fetching and follows redirects by hand, checking each hop", async () => {
+    const asked: string[] = [];
+    const fetched: Array<[string, unknown]> = [];
+    const res = await guardedFetch("https://a.example/x", {}, {
+      isPrivate: async (h) => (asked.push(h), false),
+      fetch: async (u, init) => (fetched.push([u, (init as { maxRedirections?: number }).maxRedirections]), u.endsWith("/x") ? redirect("/y") : ok(u)),
+    });
+    expect(res.res).toBeInstanceOf(Response);
+    expect(res.url).toBe("https://a.example/y");
+    expect(asked).toEqual(["a.example", "a.example"]);
+    expect(fetched).toEqual([["https://a.example/x", 0], ["https://a.example/y", 0]]);
+  });
+
+  it("refuses a redirect into the local network", async () => {
+    const fetched: string[] = [];
+    await expect(
+      guardedFetch("https://a.example/", {}, {
+        isPrivate: async (h) => h === "router.lan",
+        fetch: async (u) => (fetched.push(u), redirect("http://router.lan/admin")),
+      }),
+    ).rejects.toBeInstanceOf(PrivateHostError);
+    expect(fetched).toEqual(["https://a.example/"]);
+  });
+
+  it("refuses literal private hosts without asking, and gives up after 5 redirects", async () => {
+    await expect(guardedFetch("http://192.168.0.1/", {}, { isPrivate: async () => false, fetch: async (u) => ok(u) })).rejects.toBeInstanceOf(PrivateHostError);
+    let n = 0;
+    await expect(guardedFetch("https://a.example/0", {}, { isPrivate: async () => false, fetch: async () => redirect(`/${++n}`) })).rejects.toThrow(/redirect/i);
+    expect(n).toBe(6);
+  });
+
+  it("reports the final address", async () => {
+    const r = await guardedFetch("https://a.example/x", {}, { isPrivate: async () => false, fetch: async (u) => (u.endsWith("/x") ? redirect("https://b.example/z") : ok(u)) });
+    expect(r.url).toBe("https://b.example/z");
   });
 });

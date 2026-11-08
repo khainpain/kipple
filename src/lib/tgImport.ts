@@ -71,16 +71,123 @@ export function toRawMessage(m: SavedMessage): RawMessage {
   }
 }
 
-/** Cards for these messages (any order), albums merged, media marked as kept in Telegram. */
-export function messagesToCards(messages: SavedMessage[]): Card[] {
+/**
+ * The sync state as tgImport keeps it. `owner` and `albums` are extra fields on Library.telegram
+ * (saved with the library like the rest of it).
+ */
+export type TgSyncState = TelegramSync & {
+  /** The Telegram user id whose Saved Messages `top`, `cursor` and `noPhoto` refer to (ids are per account). */
+  owner?: number;
+  /**
+   * Albums (groupedId → card id) seen at the edges of the pages read so far: an album can be cut
+   * by a page boundary, and its other part, on the next page, joins this card.
+   */
+  albums?: Record<string, number>;
+};
+
+/** Kept small: only albums at page edges can continue on another page. */
+const MAX_EDGE_ALBUMS = 20;
+
+const visual = (c: Card) => c.kind === "photo" || c.kind === "video";
+
+/** Card media (main + album) with the message id each piece belongs to. */
+function parts(c: Card): Array<{ id: number; ref: MediaRef }> {
+  const out: Array<{ id: number; ref: MediaRef }> = [];
+  if (c.media) out.push({ id: c.id, ref: c.media });
+  c.album?.forEach((ref, i) => {
+    const id = c.albumIds?.[i];
+    if (id !== undefined) out.push({ id, ref });
+  });
+  return out;
+}
+
+/**
+ * Moves the album part `part` into `into`: its photos join the album (ordered by message id) and
+ * its caption is taken when `into` has none. `into` keeps its id, so nothing tied to it is lost.
+ */
+function mergeAlbumPart(into: Card, part: Card) {
+  const extra = [...(into.album ?? []).map((ref, i) => ({ id: into.albumIds?.[i], ref })), ...parts(part)]
+    .filter((p): p is { id: number; ref: MediaRef } => p.id !== undefined && p.id !== into.id)
+    .sort((a, b) => a.id - b.id);
+  into.album = extra.map((p) => p.ref);
+  into.albumIds = extra.map((p) => p.id);
+  if (!into.text.trim() && part.text.trim()) {
+    into.text = part.text;
+    into.urls = part.urls;
+    into.hashtags = part.hashtags;
+    into.autoJunk = part.autoJunk;
+  }
+  if (part.sensitive) into.sensitive = true;
+  into.forwardedFrom ??= part.forwardedFrom;
+}
+
+/** Cards for a page of messages plus the album (groupedId) each card belongs to. */
+function pageCards(messages: SavedMessage[]): { cards: Card[]; groupOf: Map<number, string> } {
   const sorted = [...messages].sort((a, b) => a.id - b.id);
-  const { cards } = parseExport({ name: T.importer.savedMessages, type: "saved_messages", messages: sorted.map(toRawMessage) });
+  const { cards: parsed } = parseExport({ name: T.importer.savedMessages, type: "saved_messages", messages: sorted.map(toRawMessage) });
   const webPhoto = new Set(sorted.filter((m) => m.webPhoto).map((m) => m.id));
+  const groupOfMsg = new Map(sorted.filter((m) => m.groupedId).map((m) => [m.id, m.groupedId!]));
+  // Telegram marks album members with a groupedId: merge by it (the parser only knows "same second").
+  const cards: Card[] = [];
+  const groupOf = new Map<number, string>();
+  const byGroup = new Map<string, Card>();
+  for (const c of parsed) {
+    const g = groupOfMsg.get(c.id);
+    const head = g !== undefined ? byGroup.get(g) : undefined;
+    if (head && visual(head) && visual(c)) {
+      mergeAlbumPart(head, c);
+      continue;
+    }
+    if (g !== undefined && !head) byGroup.set(g, c);
+    if (g !== undefined) groupOf.set(c.id, g);
+    cards.push(c);
+  }
   for (const c of cards) {
     if (c.kind === "link" && webPhoto.has(c.id)) c.preview = { inTelegram: true };
     for (const m of mediaOf(c)) m.ref.inTelegram = true;
   }
-  return cards;
+  return { cards, groupOf };
+}
+
+/** Cards for these messages (any order), albums merged, media marked as kept in Telegram. */
+export function messagesToCards(messages: SavedMessage[]): Card[] {
+  return pageCards(messages).cards;
+}
+
+/**
+ * Adds one page's cards; album parts whose album already has a card (from a page read before)
+ * join that card instead of making a second one. Remembers the albums at this page's edges.
+ */
+function addPage(lib: Library, sync: TgSyncState, messages: SavedMessage[]): number {
+  const { cards, groupOf } = pageCards(messages);
+  const albums = sync.albums ?? {};
+  const fresh: Card[] = [];
+  let merged = false;
+  for (const c of cards) {
+    const g = groupOf.get(c.id);
+    const known = g !== undefined && albums[g] !== undefined ? lib.cards.find((x) => x.id === albums[g]) : undefined;
+    const ids = [c.id, ...(c.albumIds ?? [])];
+    if (known && known.id !== c.id && visual(known) && visual(c) && !ids.some((id) => id === known.id || known.albumIds?.includes(id))) {
+      mergeAlbumPart(known, c);
+      merged = true;
+    } else fresh.push(c);
+  }
+  const added = addCards(lib, fresh);
+  if (merged && !added) annotateContext(lib.cards);
+  // An album cut by a page boundary has a message at this page's lowest or highest id.
+  const ids = messages.map((m) => m.id);
+  for (const edge of ids.length ? [Math.min(...ids), Math.max(...ids)] : []) {
+    const g = messages.find((m) => m.id === edge)?.groupedId;
+    if (!g) continue;
+    const card = lib.cards.find((x) => x.id === edge || x.albumIds?.includes(edge));
+    if (!card) continue;
+    delete albums[g];
+    albums[g] = card.id;
+  }
+  const keys = Object.keys(albums);
+  for (const k of keys.slice(0, Math.max(0, keys.length - MAX_EDGE_ALBUMS))) delete albums[k];
+  if (Object.keys(albums).length) sync.albums = albums;
+  return added;
 }
 
 /** A card's media with the message id each piece came from (an album holds several). */
@@ -177,15 +284,18 @@ export async function backupSaved(deps: { tg: Pick<TelegramApi, "backupStep">; s
 /**
  * Reads new Saved Messages into the library (in place), then downloads their photos.
  * Returns how many cards were added. Stopping (signal) keeps what's done so far.
+ * Throws OTHER_ACCOUNT_LIBRARY when another Telegram account than the one this library was
+ * loaded from is signed in (nothing is changed then).
  */
 export async function syncSaved(lib: Library, deps: SyncDeps): Promise<{ added: number; photos: number }> {
-  const sync: TelegramSync = lib.telegram ?? { top: newestId(lib) };
+  let sync: TgSyncState = lib.telegram ?? { top: newestId(lib) };
   lib.telegram = sync;
   let added = 0;
   let pages = 0;
   let done = 0;
   let total = 0;
   let cursor = sync.cursor ?? 0;
+  let ownerChecked = false;
   while (!deps.signal.aborted) {
     let page;
     try {
@@ -194,9 +304,18 @@ export async function syncSaved(lib: Library, deps: SyncDeps): Promise<{ added: 
       await deps.save(lib).catch(() => undefined); // keep what came in; the next run carries on from `cursor`
       throw e;
     }
+    if (!ownerChecked && page.owner != null) {
+      ownerChecked = true;
+      if (sync.owner != null && sync.owner !== page.owner) {
+        // This board was loaded from another account, and message ids are per account: mixing
+        // the two would skip or mislabel messages. Nothing is changed; the user decides.
+        throw new Error("OTHER_ACCOUNT_LIBRARY");
+      }
+      sync.owner = page.owner;
+    }
     if (page.nextOffset == null || page.nextOffset <= sync.top) {
       // Read everything down to `top`: the pass is complete.
-      added += addCards(lib, messagesToCards(page.messages));
+      added += addPage(lib, sync, page.messages);
       sync.top = Math.max(sync.top, sync.passTop ?? 0, ...page.messages.map((m) => m.id));
       sync.cursor = undefined;
       sync.passTop = undefined;
@@ -206,7 +325,7 @@ export async function syncSaved(lib: Library, deps: SyncDeps): Promise<{ added: 
     }
     if (cursor === 0 && page.total) total = page.total;
     sync.passTop = Math.max(sync.passTop ?? 0, ...page.messages.map((m) => m.id));
-    added += addCards(lib, messagesToCards(page.messages));
+    added += addPage(lib, sync, page.messages);
     done += page.messages.length;
     cursor = page.nextOffset;
     sync.cursor = cursor;

@@ -35,6 +35,104 @@
         {
           "path": "$APPDATA/telegram-backup"
         }
+      ],
+      "deny": [
+        {
+          "path": "$HOME/.ssh"
+        },
+        {
+          "path": "$HOME/.ssh/**"
+        },
+        {
+          "path": "$HOME/.gnupg/**"
+        },
+        {
+          "path": "$DATA/Telegram Desktop/**"
+        },
+        {
+          "path": "$DATA/TelegramDesktop/**"
+        },
+        {
+          "path": "$APPDATA/Telegram Desktop/**"
+        },
+        {
+          "path": "$LOCALDATA/Telegram Desktop/**"
+        },
+        {
+          "path": "$HOME/.local/share/TelegramDesktop/**"
+        },
+        {
+          "path": "$LOCALDATA/Google/Chrome/**"
+        },
+        {
+          "path": "$LOCALDATA/Chromium/**"
+        },
+        {
+          "path": "$LOCALDATA/Microsoft/Edge/**"
+        },
+        {
+          "path": "$LOCALDATA/Yandex/**"
+        },
+        {
+          "path": "$LOCALDATA/BraveSoftware/**"
+        },
+        {
+          "path": "$LOCALDATA/Vivaldi/**"
+        },
+        {
+          "path": "$LOCALDATA/Mozilla/**"
+        },
+        {
+          "path": "$DATA/Mozilla/**"
+        },
+        {
+          "path": "$DATA/Opera Software/**"
+        },
+        {
+          "path": "$APPDATA/Mozilla/**"
+        },
+        {
+          "path": "$DATA/Google/Chrome/**"
+        },
+        {
+          "path": "$DATA/Chromium/**"
+        },
+        {
+          "path": "$DATA/Microsoft Edge/**"
+        },
+        {
+          "path": "$DATA/Firefox/**"
+        },
+        {
+          "path": "$DATA/Yandex/**"
+        },
+        {
+          "path": "$DATA/BraveSoftware/**"
+        },
+        {
+          "path": "$DATA/Arc/**"
+        },
+        {
+          "path": "$CONFIG/google-chrome/**"
+        },
+        {
+          "path": "$CONFIG/chromium/**"
+        },
+        {
+          "path": "$CONFIG/microsoft-edge/**"
+        },
+        {
+          "path": "$CONFIG/BraveSoftware/**"
+        },
+        {
+          "path": "$CONFIG/yandex-browser/**"
+        },
+        {
+          "path": "$CONFIG/opera/**"
+        },
+        {
+          "path": "$HOME/.mozilla/**"
+        }
       ]
     },
     "dialog:default",
@@ -72,6 +170,107 @@
         },
         {
           "path": "$APPDATA/telegram-media/**"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:scope",
+      "deny": [
+        {
+          "path": "$HOME/.ssh"
+        },
+        {
+          "path": "$HOME/.ssh/**"
+        },
+        {
+          "path": "$HOME/.gnupg/**"
+        },
+        {
+          "path": "$DATA/Telegram Desktop/**"
+        },
+        {
+          "path": "$DATA/TelegramDesktop/**"
+        },
+        {
+          "path": "$APPDATA/Telegram Desktop/**"
+        },
+        {
+          "path": "$LOCALDATA/Telegram Desktop/**"
+        },
+        {
+          "path": "$HOME/.local/share/TelegramDesktop/**"
+        },
+        {
+          "path": "$LOCALDATA/Google/Chrome/**"
+        },
+        {
+          "path": "$LOCALDATA/Chromium/**"
+        },
+        {
+          "path": "$LOCALDATA/Microsoft/Edge/**"
+        },
+        {
+          "path": "$LOCALDATA/Yandex/**"
+        },
+        {
+          "path": "$LOCALDATA/BraveSoftware/**"
+        },
+        {
+          "path": "$LOCALDATA/Vivaldi/**"
+        },
+        {
+          "path": "$LOCALDATA/Mozilla/**"
+        },
+        {
+          "path": "$DATA/Mozilla/**"
+        },
+        {
+          "path": "$DATA/Opera Software/**"
+        },
+        {
+          "path": "$APPDATA/Mozilla/**"
+        },
+        {
+          "path": "$DATA/Google/Chrome/**"
+        },
+        {
+          "path": "$DATA/Chromium/**"
+        },
+        {
+          "path": "$DATA/Microsoft Edge/**"
+        },
+        {
+          "path": "$DATA/Firefox/**"
+        },
+        {
+          "path": "$DATA/Yandex/**"
+        },
+        {
+          "path": "$DATA/BraveSoftware/**"
+        },
+        {
+          "path": "$DATA/Arc/**"
+        },
+        {
+          "path": "$CONFIG/google-chrome/**"
+        },
+        {
+          "path": "$CONFIG/chromium/**"
+        },
+        {
+          "path": "$CONFIG/microsoft-edge/**"
+        },
+        {
+          "path": "$CONFIG/BraveSoftware/**"
+        },
+        {
+          "path": "$CONFIG/yandex-browser/**"
+        },
+        {
+          "path": "$CONFIG/opera/**"
+        },
+        {
+          "path": "$HOME/.mozilla/**"
         }
       ]
     },

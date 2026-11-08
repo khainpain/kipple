@@ -685,7 +685,7 @@ export function Workspace(props: {
           topics={topics.map(([t]) => t)}
           mode={narrow ? "full" : openMode}
           narrow={narrow}
-          onNameImage={props.onNameImage && openCard.kind === "photo" && !props.job ? () => props.onNameImage!(openCard) : undefined}
+          onNameImage={props.onNameImage && openCard.kind === "photo" && !openCard.sensitive && !props.job ? () => props.onNameImage!(openCard) : undefined}
           onMode={setOpenMode}
           onClose={() => setOpenId(null)}
           onEdit={(p) => onEdit([openCard.id], p)}

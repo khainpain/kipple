@@ -1,6 +1,7 @@
 import { T } from "../i18n";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
+import { appDataDir } from "@tauri-apps/api/path";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { BaseDirectory, exists, mkdir, readFile, readTextFile, rename, writeTextFile } from "@tauri-apps/plugin-fs";
@@ -8,7 +9,7 @@ import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check } from "@tauri-apps/plugin-updater";
-import { joinPath, type HttpFetch, type Platform, type TelegramApi } from "./types";
+import { joinPath, resolveInside, type HttpFetch, type Platform, type TelegramApi } from "./types";
 
 // Telegram over MTProto lives in src-tauri/src/telegram.rs; these are thin wrappers around its commands.
 const telegram: TelegramApi = {
@@ -43,6 +44,19 @@ async function ensureDir() {
   if (!(await exists("", base))) await mkdir("", { ...base, recursive: true });
 }
 
+/**
+ * A card's file as an absolute path, only when it lies inside the export folder or among the
+ * photos loaded from Telegram (telegram-media in the app's folder). Paths come from result.json,
+ * which could name any file on the computer (`..`, absolute paths); those are refused.
+ */
+async function cardFile(sourceDir: string, rel: string): Promise<string> {
+  const data = (await appDataDir()).replace(/[\\/]+$/, "");
+  const media = `${data}${data.includes("\\") ? "\\" : "/"}telegram-media`;
+  const path = resolveInside([sourceDir, media], sourceDir, rel);
+  if (!path) throw new Error("PATH_OUTSIDE_EXPORT");
+  return path;
+}
+
 export const platform: Platform = {
   kind: "desktop",
   canFetchLinks: true,
@@ -73,9 +87,9 @@ export const platform: Platform = {
     return { dir, readText: (rel) => readTextFile(joinPath(dir, rel)) };
   },
   mediaUrl: (sourceDir, rel) => convertFileSrc(joinPath(sourceDir, rel)),
-  readMedia: async (sourceDir, rel) => new Blob([await readFile(joinPath(sourceDir, rel))]),
+  readMedia: async (sourceDir, rel) => new Blob([await readFile(await cardFile(sourceDir, rel))]),
   openUrl: (url) => openUrl(url),
-  openFile: (sourceDir, rel) => openPath(joinPath(sourceDir, rel)),
+  openFile: async (sourceDir, rel) => openPath(await cardFile(sourceDir, rel)),
   async saveTextFile(defaultName, filter, content) {
     const path = await save({ title: T.importer.saveTitle, defaultPath: defaultName, filters: [{ name: filter.name, extensions: [filter.ext] }] });
     if (!path) return null;
@@ -83,6 +97,7 @@ export const platform: Platform = {
     return path;
   },
   httpFetch: tauriFetch as HttpFetch,
+  hostIsPrivate: (host) => invoke<boolean>("host_is_private", { host }),
   telegram,
   appVersion: () => getVersion(),
   setWindowTheme: (theme) => getCurrentWindow().setTheme(theme),
