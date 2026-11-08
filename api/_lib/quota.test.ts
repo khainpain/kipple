@@ -44,6 +44,7 @@ describe("allowedRequest", () => {
     expect(ipBucket("203.0.113.5")).toBe("203.0.113.5");
     expect(ipBucket("2001:db8:1:2:aaaa::1")).toBe(ipBucket("2001:0db8:0001:0002:ffff:1:2:3"));
     expect(ipBucket("2001:db8::1")).toBe("2001:db8:0:0::/64");
+    expect(ipBucket("::ffff:203.0.113.5")).toBe("203.0.113.5");
   });
   it("refuses a prompt sent with another prompt's answer format", () => {
     expect(allowedRequest({ ...ok, system: groupsSystemPrompt("ru") })).toMatch(/own/);

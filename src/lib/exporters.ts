@@ -5,7 +5,8 @@ import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic } from "
 
 function csvCell(v: string): string {
   // A cell starting with = + - @ is run as a formula by Excel; a leading ' keeps it text.
-  if (/^[=+\-@\t\r]/.test(v)) v = "'" + v;
+  // A "- " list item can't be a formula, so it stays as it is.
+  if (/^([=+@\t\r]|-(?!\s))/.test(v)) v = "'" + v;
   return /[",\n\r;]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
 }
 

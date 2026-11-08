@@ -197,8 +197,11 @@ export default function App() {
     }
   }
 
+  // Libraries replaced by "Delete all data" or a new import. A job still unwinding on one of them
+  // must not write it back over what replaced it.
+  const retired = useRef(new WeakSet<Library>());
   const persist = useCallback(async (l: Library) => {
-    if (demoRef.current) return;
+    if (demoRef.current || retired.current.has(l)) return;
     try {
       await saveLibrary(l);
     } catch (e) {
@@ -372,6 +375,7 @@ export default function App() {
     if (!src) return;
     try {
       const { lib: next, added, warning } = await importFolder(src, demoRef.current ? null : lib);
+      if (lib) retired.current.add(lib);
       await saveLibrary(next);
       demoRef.current = false; // before fetchPreviews below, which saves as it goes
       setTelemetrySuspended(false);
@@ -531,12 +535,12 @@ export default function App() {
     setSettings(s);
   }
 
-  async function onSaveSettings(s: Settings, key: string | null) {
+  async function onSaveSettings(s: Settings, key: string | null): Promise<boolean> {
     try {
       await applySettings(s);
     } catch (e) {
       notify(T.app.saveFailed(String(e)));
-      return;
+      return false;
     }
     if (key) {
       try {
@@ -547,13 +551,20 @@ export default function App() {
       }
     }
     setShowSettings(false);
+    return true;
   }
+
+  // The AI fields a running re-tag took off cards, kept until it ends; a second re-tag adds to them.
+  const retagOld = useRef<Map<Card, NonNullable<Card["ai"]>> | null>(null);
+  const retagRun = useRef(0);
 
   /** Saves the settings, then tags every already tagged card again with the chosen model. */
   async function onRetag(s: Settings, key: string | null) {
-    await onSaveSettings(s, key);
+    if (!(await onSaveSettings(s, key))) return; // don't spend the allowance with settings that didn't save
     if (!lib || demoRef.current) return;
-    const old = new Map<Card, NonNullable<Card["ai"]>>();
+    const old = retagOld.current ?? new Map<Card, NonNullable<Card["ai"]>>();
+    retagOld.current = old;
+    const run = ++retagRun.current;
     for (const c of lib.cards) {
       if (!c.ai) continue;
       old.set(c, c.ai);
@@ -566,6 +577,8 @@ export default function App() {
     const l = lib;
     // A stopped run (quota used up, key rejected, another job) must not leave cards without the title they had.
     void processAll(l).finally(() => {
+      if (retagRun.current !== run) return; // a newer re-tag took over these cards
+      retagOld.current = null;
       let restored = false;
       for (const [c, ai] of old) {
         if (c.ai) continue;
@@ -591,6 +604,7 @@ export default function App() {
 
   async function onWipe() {
     abortRef.current?.abort();
+    if (lib) retired.current.add(lib);
     try {
       await wipeAll();
       // Settings stay, but what came from the cards goes too: own topic names, merges, today's plan.

@@ -152,6 +152,22 @@ describe("syncSaved", () => {
     expect(lib.cards).toHaveLength(10);
   });
 
+  it("retries a photo whose download failed, instead of marking it as having none", async () => {
+    const chat = fakeChat(6);
+    let fail = true;
+    const inner = chat.tg.savedPhotos;
+    chat.tg.savedPhotos = async (batch) => (await inner(batch)).map((p) => (p.id === 5 && fail ? { id: 5, path: "" } : p));
+    const lib = emptyTelegramLibrary();
+    const r1 = await syncSaved(lib, deps(chat.tg));
+    expect(lib.telegram!.noPhoto).toEqual([3]);
+    expect(pendingPhotos(lib)).toEqual([5]);
+    expect(r1.photos).toBe(1);
+    fail = false;
+    await syncSaved(lib, deps(chat.tg));
+    expect(lib.cards.find((c) => c.id === 5)!.media!.path).toBe("/data/telegram-media/5.jpg");
+    expect(pendingPhotos(lib)).toEqual([]);
+  });
+
   it("carries on after an interruption without losing the gap", async () => {
     const chat = fakeChat(10, { failAt: 3 });
     const lib = emptyTelegramLibrary();

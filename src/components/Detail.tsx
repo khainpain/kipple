@@ -353,7 +353,10 @@ export function Detail(props: {
                 current={topic || undefined}
                 onPick={(t) => {
                   setTopic(t);
-                  if (t !== (effectiveTopic(card) ?? "")) props.onEdit({ topic: t });
+                  if (t !== (effectiveTopic(card) ?? "")) {
+                    saved.current.topic = t; // so closing the panel doesn't write it again over a later move
+                    props.onEdit({ topic: t });
+                  }
                 }}
                 onClose={() => {
                   setTopicAt(null);

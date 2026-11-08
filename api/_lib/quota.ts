@@ -141,6 +141,8 @@ export const day = () => new Date().toISOString().slice(0, 10);
 
 /** IPv6 clients get a whole /64 (often more), so they're counted by that prefix, not by address. */
 export function ipBucket(ip: string): string {
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip);
+  if (mapped) return mapped[1];
   if (!ip.includes(":")) return ip;
   const [head, tail = ""] = ip.toLowerCase().split("%")[0].split("::");
   const left = head ? head.split(":") : [];

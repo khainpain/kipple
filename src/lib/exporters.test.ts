@@ -12,6 +12,11 @@ describe("exports", () => {
     expect(rows[1].endsWith(`"'=HYPERLINK(""http://x"",""y"")"`)).toBe(true);
     expect(rows[2].endsWith('"a\rb"')).toBe(true);
   });
+  it("leaves a list item that starts with a dash alone, but not a negative formula", () => {
+    const rows = toCsv([card(1, { text: "- buy milk" }), card(2, { text: "-2+3+cmd" })]).split("\r\n");
+    expect(rows[1].endsWith(",- buy milk")).toBe(true);
+    expect(rows[2].endsWith(",'-2+3+cmd")).toBe(true);
+  });
   it("does not fail Markdown on a link that isn't a valid URL", () => {
     expect(() => toMarkdown([card(1, { text: "see http://[oops", urls: ["http://[oops"] })])).not.toThrow();
   });
