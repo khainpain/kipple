@@ -22,10 +22,13 @@ export function mergeImport(prev: Library | null, next: Omit<Library, "version">
       user: o.user,
     };
   });
-  for (const o of prev?.cards ?? []) if (!seen.has(o.id)) cards.push({ ...o, removed: true });
+  // Messages newer than the export (loaded from Telegram after it was made) aren't missing from it, just later.
+  const newest = next.cards.reduce((m, c) => Math.max(m, c.id), 0);
+  for (const o of prev?.cards ?? []) if (!seen.has(o.id)) cards.push(o.id > newest ? o : { ...o, removed: true });
   cards.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.id - a.id));
   annotateContext(cards);
-  return { version: 1, ...next, cards };
+  // Keep what the export doesn't carry: where Telegram loading stopped, and AI subgroups.
+  return { version: 1, telegram: prev?.telegram, subgroups: prev?.subgroups, ...next, cards };
 }
 
 export function applyEdits(cards: Card[], events: EditEvent[]): Card[] {

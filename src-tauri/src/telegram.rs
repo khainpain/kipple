@@ -574,11 +574,18 @@ pub async fn tg_ensure_board(
     if let (Some(id), Some(hash_str)) = (channel_id, access_hash) {
         let hash = parse_hash(&hash_str)?;
         let req = tl::functions::channels::GetChannels { id: vec![input_channel(id, hash)] };
-        if let Ok(tl::enums::messages::Chats::Chats(chats)) = c.client.invoke(&req).await {
-            let alive = chats.chats.iter().any(|ch| matches!(ch, tl::enums::Chat::Channel(ch) if ch.id == id && !ch.left));
-            if alive {
-                return Ok(Board { channel_id: id, access_hash: hash_str, created: false });
+        match c.client.invoke(&req).await {
+            Ok(tl::enums::messages::Chats::Chats(chats)) => {
+                let alive = chats.chats.iter().any(|ch| matches!(ch, tl::enums::Chat::Channel(ch) if ch.id == id && !ch.left));
+                if alive {
+                    return Ok(Board { channel_id: id, access_hash: hash_str, created: false });
+                }
             }
+            Ok(_) => {}
+            // The group is gone or closed to us: make a new one below.
+            Err(e) if e.is("CHANNEL_INVALID") || e.is("CHANNEL_PRIVATE") => {}
+            // A timeout or a dropped connection says nothing about the group: creating another would duplicate the board.
+            Err(e) => return Err(err(e)),
         }
     }
     let req = tl::functions::channels::CreateChannel {
@@ -858,13 +865,25 @@ pub async fn tg_delete_saved(app: tauri::AppHandle, state: tauri::State<'_, TgSt
     // Copy them into the local backup first; if that fails, nothing is deleted.
     let req = tl::functions::messages::GetMessages { id: ids.iter().map(|&id| tl::types::InputMessageId { id }.into()).collect() };
     use tl::enums::messages::Messages as R;
-    let found = match c.client.invoke(&req).await.map_err(err)? {
-        R::Messages(m) => to_saved(&m.messages, &m.users, &m.chats),
-        R::Slice(m) => to_saved(&m.messages, &m.users, &m.chats),
-        R::ChannelMessages(m) => to_saved(&m.messages, &m.users, &m.chats),
-        R::NotModified(_) => vec![],
+    let (messages, users, chats) = match c.client.invoke(&req).await.map_err(err)? {
+        R::Messages(m) => (m.messages, m.users, m.chats),
+        R::Slice(m) => (m.messages, m.users, m.chats),
+        R::ChannelMessages(m) => (m.messages, m.users, m.chats),
+        R::NotModified(_) => (vec![], vec![], vec![]),
     };
+    // Message ids in private chats are shared by all of the account's chats, and DeleteMessages
+    // takes no chat. Only delete what really is our own message in Saved Messages, so a stale id
+    // can never remove a message in someone else's chat (for both sides).
+    let mine: Vec<tl::enums::Message> = messages
+        .into_iter()
+        .filter(|m| matches!(m, tl::enums::Message::Message(m) if m.out && matches!(&m.peer_id, tl::enums::Peer::User(p) if p.user_id == owner)))
+        .collect();
+    if mine.is_empty() {
+        return Ok(());
+    }
+    let found = to_saved(&mine, &users, &chats);
     append_backup(&backup_dir(&app)?, owner, &found, "before_delete")?;
+    let ids: Vec<i32> = mine.iter().map(|m| m.id()).collect();
     let req = tl::functions::messages::DeleteMessages { revoke: true, id: ids };
     c.client.invoke(&req).await.map_err(err)?;
     Ok(())
@@ -1378,24 +1397,41 @@ pub async fn tg_saved_photos(app: tauri::AppHandle, state: tauri::State<'_, TgSt
         };
         let mut bytes = Vec::new();
         let mut download = c.client.iter_download(&file);
-        while let Some(chunk) = download.next().await.map_err(err)? {
-            bytes.extend(chunk);
-        }
-        if bytes.is_empty() {
-            continue;
+        let mut failed = false;
+        loop {
+            match download.next().await {
+                Ok(Some(chunk)) => bytes.extend(chunk),
+                Ok(None) => break,
+                Err(e) => {
+                    let e = err(e);
+                    // A flood wait is for the whole batch: the caller waits and retries it.
+                    if e.starts_with("FLOOD_WAIT") {
+                        return Err(e);
+                    }
+                    failed = true;
+                    break;
+                }
+            }
         }
         let path = dir.join(format!("{}.jpg", m.id));
         let tmp = dir.join(format!("{}.jpg.part", m.id));
-        std::fs::write(&tmp, &bytes).map_err(|e| e.to_string())?;
-        std::fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
-        out.push(SavedPhoto { id: m.id, path: path.to_string_lossy().into_owned() });
+        let saved = !failed && !bytes.is_empty() && std::fs::write(&tmp, &bytes).and_then(|_| std::fs::rename(&tmp, &path)).is_ok();
+        if saved {
+            out.push(SavedPhoto { id: m.id, path: path.to_string_lossy().into_owned() });
+        } else if failed || !bytes.is_empty() {
+            // One photo that keeps failing must not stop all the others: an empty path means
+            // "try again on the next load", unlike leaving it out ("no photo").
+            out.push(SavedPhoto { id: m.id, path: String::new() });
+        }
     }
     Ok(out)
 }
 
 /// Deletes the downloaded photos (Settings → «Удалить все данные»).
 #[tauri::command]
-pub async fn tg_forget_media(app: tauri::AppHandle) -> Result<(), String> {
+pub async fn tg_forget_media(app: tauri::AppHandle, state: tauri::State<'_, TgState>) -> Result<(), String> {
+    // Wait for a photo batch that is still writing files, so none land after the folder is gone.
+    let _guard = state.0.lock().await;
     let dir = media_dir(&app)?;
     std::fs::remove_dir_all(&dir).map_err(|e| e.to_string())
 }

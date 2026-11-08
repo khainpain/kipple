@@ -230,13 +230,14 @@ export async function syncSaved(lib: Library, deps: SyncDeps): Promise<{ added: 
       const got = await withFloodWait(() => deps.tg.savedPhotos(batch), deps);
       const ok = new Set<number>();
       for (const { id, path } of got) {
+        ok.add(id);
+        if (!path) continue; // failed this time: not "no photo", tried again on the next load
         const ref = refs.get(id);
         if (ref) ref.path = path;
-        ok.add(id);
+        photos++;
       }
       const gone = batch.filter((id) => !ok.has(id));
       if (gone.length) sync.noPhoto = [...(sync.noPhoto ?? []), ...gone];
-      photos += got.length;
       deps.onProgress({ phase: "photos", done: Math.min(i + PHOTO_BATCH, todo.length), total: todo.length });
       deps.onChange();
       if ((i / PHOTO_BATCH) % 3 === 2) await deps.save(lib);

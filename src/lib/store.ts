@@ -7,7 +7,21 @@ import { DEFAULT_AI_MODEL, type AiModel } from "./ai";
 import type { Skips, TodayState } from "./today";
 import { DEFAULT_REPLY_CLEANUP, validReplies, type PendingReply, type ReplyCleanup } from "./tgReplies";
 
-const { exists, read, write: atomicWrite, append } = platform.data;
+const { exists, read } = platform.data;
+
+/**
+ * Writes run one at a time. Several AI workers save the library at once, and a bulk edit appends one
+ * line per card: in parallel, desktop saves share one temp file and the browser's read-then-write
+ * append keeps only the last line.
+ */
+let queue: Promise<unknown> = Promise.resolve();
+function serial<T>(fn: () => Promise<T>): Promise<T> {
+  const run = queue.then(fn, fn);
+  queue = run.catch(() => undefined);
+  return run;
+}
+const atomicWrite = (name: string, data: string) => serial(() => platform.data.write(name, data));
+const append = (name: string, data: string) => serial(() => platform.data.append(name, data));
 const LIBRARY = "library.json";
 const EDITS = "edits.jsonl";
 const SETTINGS = "settings.json";

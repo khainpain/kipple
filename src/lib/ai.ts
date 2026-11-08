@@ -312,6 +312,8 @@ export async function nameImages(
   signal?: AbortSignal,
 ): Promise<AiProgress> {
   const client = makeClient(auth);
+  // Sensitive photos never leave the device, whichever button asked for them.
+  todo = todo.filter((c) => !c.sensitive);
   const progress: AiProgress = { done: 0, total: todo.length, failed: 0 };
   for (let i = 0; i < todo.length && !signal?.aborted; i += IMAGE_BATCH) {
     const slice = todo.slice(i, i + IMAGE_BATCH);
@@ -390,6 +392,8 @@ export const GROUP_LIMIT = 400;
  * not the messages themselves. Each card ends up in at most one group.
  */
 export async function groupCards(auth: AiAuth, model: AiModel, lang: AiLang, topic: string, cards: Card[], title: (c: Card) => string, tags: (c: Card) => string[]): Promise<Array<{ name: string; ids: number[] }>> {
+  // Sensitive cards never leave the device, even as a title.
+  cards = cards.filter((c) => !c.sensitive);
   const items = cards.slice(0, GROUP_LIMIT).map((c) => JSON.stringify({ id: c.id, title: title(c).slice(0, 100), summary: c.ai?.summary?.slice(0, 200), tags: tags(c).slice(0, 6) }));
   if (items.length < 4) return [];
   const client = makeClient(auth);

@@ -18,6 +18,8 @@ export function buildIndex(cards: Card[]) {
   const topicSyn = reverse(aliases.topics);
   const ms = new MiniSearch<{ id: number; title: string; text: string; tags: string; topic: string; status: string; site: string; source: string }>({
     fields: ["title", "text", "tags", "topic", "status", "site", "source"],
+    // Russian writes ё and е interchangeably: "елка" should find "ёлку".
+    processTerm: (term) => term.toLowerCase().replace(/ё/g, "е"),
     searchOptions: { prefix: true, fuzzy: 0.2, boost: { title: 3, tags: 2, topic: 2 }, combineWith: "AND" },
   });
   ms.addAll(

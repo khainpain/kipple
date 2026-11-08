@@ -65,11 +65,16 @@ export function Detail(props: {
 
   // What this panel last saved, so the save on unmount doesn't repeat one a blur just made.
   const saved = useRef<UserFields>({});
+  // What the fields held when the panel opened. Only a field the user changed here is saved:
+  // the card itself may change meanwhile (moved from the board, a topic deleted, new AI results),
+  // and the panel's stale copy must not write that back.
+  const opened = useRef({ title, topic, note });
   function saveText() {
     const patch: UserFields = {};
-    if (title !== effectiveTitle(card) && title.trim() !== saved.current.title) patch.title = title.trim();
-    if (topic !== (effectiveTopic(card) ?? "") && topic.trim() !== saved.current.topic) patch.topic = topic.trim();
-    if (note !== (card.user?.note ?? "") && note !== saved.current.note) patch.note = note;
+    const at = opened.current;
+    if ((title !== at.title || "title" in saved.current) && title !== effectiveTitle(card) && title.trim() !== saved.current.title) patch.title = title.trim();
+    if ((topic !== at.topic || "topic" in saved.current) && topic !== (effectiveTopic(card) ?? "") && topic.trim() !== saved.current.topic) patch.topic = topic.trim();
+    if ((note !== at.note || "note" in saved.current) && note !== (card.user?.note ?? "") && note !== saved.current.note) patch.note = note;
     if (Object.keys(patch).length) {
       Object.assign(saved.current, patch);
       props.onEdit(patch);

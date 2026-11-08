@@ -390,9 +390,21 @@ export function Workspace(props: {
     onEdit([c.id], { action: isJunk ? (c.ai?.action && c.ai.action !== "junk" ? c.ai.action : "reference") : "junk" });
   }
 
+  // A selection the current filter hides would still be hit by the bulk buttons: keep only what's on screen.
+  useEffect(() => {
+    setSelected((prev) => {
+      if (!prev.size) return prev;
+      const shownIds = new Set(visible.map((c) => c.id));
+      const next = new Set([...prev].filter((id) => shownIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [visible]);
+
   // Keyboard: "/" focuses search, Esc closes the panel or clears the selection, ↑/↓ (or j/k) step through cards.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      // A dialog (Settings, Telegram, Tidy…) is on top: the board behind it doesn't react.
+      if (e.defaultPrevented || document.querySelector(".modal-backdrop")) return;
       const el = e.target as HTMLElement;
       const typing = el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT";
       if (e.key === "Escape") {

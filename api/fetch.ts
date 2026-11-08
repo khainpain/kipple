@@ -7,7 +7,8 @@ import { request as httpsRequest } from "node:https";
 import { isIP } from "node:net";
 
 const MAX_BYTES = 2_000_000;
-const ALLOWED_TYPE = /^(text\/html|application\/xhtml\+xml|application\/json|image\/)/i;
+// No SVG: it can carry script.
+const ALLOWED_TYPE = /^(text\/html|application\/xhtml\+xml|application\/json|image\/(png|jpe?g|gif|webp|avif|bmp|x-icon|vnd\.microsoft\.icon))\b/i;
 const UA = "Mozilla/5.0 (compatible; Kipple/0.1; link preview)";
 
 function privateV4(ip: string): boolean {
@@ -104,9 +105,10 @@ function get(url: URL): Promise<IncomingMessage> {
 const text = (status: number, body: string) => new Response(body, { status, headers: { "content-type": "text/plain; charset=utf-8" } });
 
 export async function GET(request: Request): Promise<Response> {
-  // Browsers mark requests from other sites; refuse those so this isn't an open proxy for them.
-  const site = request.headers.get("sec-fetch-site");
-  if (site && site !== "same-origin") return text(403, "forbidden");
+  // Only the web app's own fetch() calls, which browsers mark same-origin. A request without the mark
+  // (a script, curl) is refused too: otherwise it could put any page into the shared cache, to be
+  // opened later from this site's address.
+  if (request.headers.get("sec-fetch-site") !== "same-origin") return text(403, "forbidden");
 
   let target = publicUrl(new URL(request.url).searchParams.get("url") ?? "");
   if (!target) return text(400, "bad url");
@@ -136,6 +138,10 @@ export async function GET(request: Request): Promise<Response> {
     // Same link from any visitor → served from Vercel's cache for a week.
     "cache-control": ok ? "public, max-age=86400, s-maxage=604800" : "public, s-maxage=3600",
     "x-content-type-options": "nosniff",
+    // The app only reads these as data. Opened directly, a fetched page must not run as this site.
+    "content-security-policy": "sandbox; default-src 'none'",
+    "content-disposition": "attachment",
+    vary: "Sec-Fetch-Site",
   });
   if (status < 200 || status > 599) {
     res.destroy();

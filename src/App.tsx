@@ -532,7 +532,12 @@ export default function App() {
   }
 
   async function onSaveSettings(s: Settings, key: string | null) {
-    await applySettings(s);
+    try {
+      await applySettings(s);
+    } catch (e) {
+      notify(T.app.saveFailed(String(e)));
+      return;
+    }
     if (key) {
       try {
         await setApiKey(key);
@@ -558,7 +563,20 @@ export default function App() {
     const redo = new Set([...pendingForAi(lib.cards), ...(s.aiImages ? pendingImages(lib.cards) : [])]);
     for (const [c, ai] of old) if (!redo.has(c)) c.ai = ai;
     setRev((r) => r + 1);
-    void processAll(lib);
+    const l = lib;
+    // A stopped run (quota used up, key rejected, another job) must not leave cards without the title they had.
+    void processAll(l).finally(() => {
+      let restored = false;
+      for (const [c, ai] of old) {
+        if (c.ai) continue;
+        c.ai = ai;
+        restored = true;
+      }
+      if (restored) {
+        void persist(l);
+        setRev((r) => r + 1);
+      }
+    });
   }
 
   /** Back to the built-in key. */
@@ -573,7 +591,14 @@ export default function App() {
 
   async function onWipe() {
     abortRef.current?.abort();
-    await wipeAll();
+    try {
+      await wipeAll();
+      // Settings stay, but what came from the cards goes too: own topic names, merges, today's plan.
+      await applySettings({ ...settingsRef.current, aliases: undefined, topics: undefined, today: undefined, taskSkips: undefined });
+    } catch (e) {
+      notify(T.app.saveFailed(String(e)));
+      return;
+    }
     await deleteApiKey().catch(() => undefined);
     await platform.telegram?.forgetMedia().catch(() => undefined);
     await platform.telegram?.logout().catch(() => undefined);

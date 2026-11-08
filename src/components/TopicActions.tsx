@@ -31,7 +31,11 @@ export function TopicActions(props: { anchor: HTMLElement; name: string; count: 
         className={`menu topic-menu topic-actions${pos.up ? " up" : ""}`}
         style={{ left: pos.left, top: pos.top, width: WIDTH }}
         onMouseDown={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === "Escape" && props.onClose()}
+        onKeyDown={(e) => {
+          if (e.key !== "Escape") return;
+          e.stopPropagation();
+          props.onClose();
+        }}
       >
         {confirm ? (
           <>

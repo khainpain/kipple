@@ -124,7 +124,7 @@ export interface TelegramApi {
   backupInfo(): Promise<{ dir: string; messages: number }>;
   /** Opens the backup folder in the file manager. */
   openBackup(dir: string): Promise<void>;
-  /** Downloads these messages' photos into the app's folder; returns absolute paths. Skips ones already there. */
+  /** Downloads these messages' photos into the app's folder; returns absolute paths. Skips ones already there. An empty path means the download failed this time (try again later); a missing id has no photo. */
   /** Photos of these messages, or the pictures of their link previews. */
   savedPhotos(ids: number[]): Promise<Array<{ id: number; path: string }>>;
   /** Deletes the downloaded photos. */
