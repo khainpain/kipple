@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SavedMessage, SavedPage } from "../platform/types";
-import { addCards, emptyTelegramLibrary, messagesToCards, pendingPhotos, syncSaved, textEntities, toRawMessage, type SyncDeps } from "./tgImport";
+import { addCards, backupSaved, emptyTelegramLibrary, messagesToCards, pendingPhotos, syncSaved, textEntities, toRawMessage, type SyncDeps } from "./tgImport";
 import type { Library } from "./types";
 
 const msg = (id: number, over: Partial<SavedMessage> = {}): SavedMessage => ({ id, date: 1_700_000_000 + id * 100, text: "", entities: [], ...over });
@@ -194,5 +194,31 @@ describe("syncSaved", () => {
     const r = await syncSaved(emptyTelegramLibrary(), { ...deps(tg), sleep: async (ms) => void slept.push(ms) });
     expect(slept).toEqual([3500]);
     expect(r.added).toBe(2);
+  });
+});
+
+describe("backupSaved", () => {
+  it("steps until done and waits out FLOOD_WAIT", async () => {
+    const steps = [{ done: false, saved: 100 }, "FLOOD_WAIT:2", { done: false, saved: 100 }, { done: true, saved: 7 }];
+    const slept: number[] = [];
+    const tg = {
+      backupStep: async () => {
+        const s = steps.shift();
+        if (typeof s === "string") throw s;
+        return s!;
+      },
+    };
+    const n = await backupSaved({ tg, signal: new AbortController().signal, sleep: async (ms) => void slept.push(ms) });
+    expect(n).toBe(207);
+    expect(slept).toEqual([2500]);
+    expect(steps).toEqual([]);
+  });
+
+  it("stops when asked", async () => {
+    const ctl = new AbortController();
+    let calls = 0;
+    const tg = { backupStep: async () => (calls++, ctl.abort(), { done: false, saved: 1 }) };
+    expect(await backupSaved({ tg, signal: ctl.signal })).toBe(1);
+    expect(calls).toBe(1);
   });
 });

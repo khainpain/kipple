@@ -206,6 +206,10 @@ export const en: Dict = {
     dataWhereWeb: "Stored in this browser",
     dataMedia: "Photos and files",
     dataMediaDesc: "Photos from an export are read from its folder, not copied; ones loaded from Telegram live in the app's folder.",
+    backupTitle: "Saved Messages backup",
+    backupDesc: (n: number) =>
+      `${num(n)} message${s(n)}. The text of every message from Telegram, without photos or files. Kipple only adds to it and never deletes anything from it, not even when you delete all data.`,
+    backupOpen: "Show folder",
     wipeDesc: "The library, your edits and your key are deleted from this computer. The Telegram export itself is not touched.",
     wipeHold: "Hold to delete",
     wipeDone: "Deleted",

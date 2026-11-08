@@ -32,6 +32,7 @@ The paper-plane button in the toolbar lays the library out inside Telegram: the 
 | What was sent to the Telegram group | `%APPDATA%\com.khainpain.savedboard\telegram.json` |
 | Photos and files from an export | Read in place from the Telegram export folder, never copied |
 | Photos loaded from Telegram | `%APPDATA%\com.khainpain.savedboard\telegram-media\<message id>.jpg` |
+| Backup of Saved Messages (only grows, never deleted by the app) | `%APPDATA%\com.khainpain.savedboard\telegram-backup\<user id>.jsonl` |
 
 The folder and credential-store entries are named after the app identifier `com.khainpain.savedboard`, from before the app was called Kipple. It stays as is on purpose: changing it would make the app lose the library, the keys and the Telegram session on update.
 

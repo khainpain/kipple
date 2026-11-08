@@ -7,7 +7,7 @@ import { T } from "../i18n";
 
 type Step = "loading" | "noApi" | "phone" | "code" | "password" | "ready";
 
-/** Logs in to the user's Telegram account and starts sending the library to the "Saved Board" group. */
+/** Logs in to the user's Telegram account and starts sending the library to the "Kipple" group. */
 export function TelegramDialog(props: {
   tg: TelegramApi;
   cards: Card[];

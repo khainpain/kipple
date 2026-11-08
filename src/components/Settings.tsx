@@ -256,6 +256,7 @@ export function SettingsDialog(props: {
                 <small>{L.dataMediaDesc}</small>
               </div>
             </div>
+            {platform.telegram && <BackupRow tg={platform.telegram} />}
             <div className="s2-row s2-icon-row danger">
               <Icon name="trash" size={16} />
               <div className="s2-text">
@@ -406,5 +407,27 @@ function TelegramKey(props: { tg: TelegramApi }) {
       {note && <p className="hint">{note}</p>}
       {error && <p className="error">{error}</p>}
     </form>
+  );
+}
+
+/** The local backup of Saved Messages: how big it is and where (src-tauri telegram.rs, "Local backup"). */
+function BackupRow({ tg }: { tg: NonNullable<typeof platform.telegram> }) {
+  const L = T.settings;
+  const [info, setInfo] = useState<{ dir: string; messages: number } | null>(null);
+  useEffect(() => {
+    tg.backupInfo().then(setInfo, () => setInfo(null));
+  }, [tg]);
+  if (!info) return null;
+  return (
+    <div className="s2-row s2-icon-row">
+      <Icon name="lock" size={16} />
+      <div className="s2-text">
+        <b>{L.backupTitle}</b>
+        <small>{L.backupDesc(info.messages)}</small>
+      </div>
+      <button className="link-btn" onClick={() => void tg.openBackup(info.dir).catch(() => undefined)}>
+        {L.backupOpen}
+      </button>
+    </div>
   );
 }

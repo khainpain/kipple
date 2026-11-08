@@ -107,12 +107,23 @@ export interface TelegramApi {
   savedPage(offsetId: number, minId: number): Promise<SavedPage>;
   /**
    * Posts `text` in Saved Messages as a reply to message `id`. Returns the reply's id and a tg://
-   * link that opens Saved Messages (null when the account has neither username nor phone).
-   * Rejects with "NO_ORIGINAL" when the original is gone.
+   * link that opens Saved Messages (null when the account has neither username nor phone), and
+   * the account's user id (null when it couldn't be read). Rejects with "NO_ORIGINAL" when the
+   * original is gone.
    */
-  quoteSaved(id: number, text: string): Promise<{ id: number; open: string | null }>;
-  /** Deletes these messages from Saved Messages, on all devices. */
-  deleteSaved(ids: number[]): Promise<void>;
+  quoteSaved(id: number, text: string): Promise<{ id: number; open: string | null; owner: number | null }>;
+  /** Deletes these messages from Saved Messages, on all devices. Rejects with "OTHER_ACCOUNT"
+   *  (and deletes nothing) when the signed-in account isn't `owner`. */
+  deleteSaved(ids: number[], owner: number): Promise<void>;
+  /**
+   * Copies one page of Saved Messages that aren't in the local backup yet into it (the whole
+   * history on the first run, then only newer messages). Call until `done`. The backup only grows.
+   */
+  backupStep(): Promise<{ done: boolean; saved: number }>;
+  /** The backup folder and how many messages it holds. */
+  backupInfo(): Promise<{ dir: string; messages: number }>;
+  /** Opens the backup folder in the file manager. */
+  openBackup(dir: string): Promise<void>;
   /** Downloads these messages' photos into the app's folder; returns absolute paths. Skips ones already there. */
   /** Photos of these messages, or the pictures of their link previews. */
   savedPhotos(ids: number[]): Promise<Array<{ id: number; path: string }>>;

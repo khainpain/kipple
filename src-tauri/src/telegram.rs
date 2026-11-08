@@ -22,7 +22,7 @@ use grammers_client::session::updates::UpdatesLike;
 use grammers_client::session::{Session, SessionData};
 use grammers_client::tl;
 use grammers_client::{Client, InvocationError, SignInError};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tokio::sync::{Mutex, MutexGuard};
 
 const SERVICE: &str = "com.khainpain.savedboard";
@@ -746,7 +746,8 @@ pub async fn tg_send_note(
 // Telegram has no link to a message inside Saved Messages that desktop apps follow (a link with
 // a message id only scrolls to the post in channels). So Kipple posts a short reply to the
 // original in Saved Messages and opens the chat: the reply is the newest message, and a tap on
-// its quote jumps to the original. The reply is deleted later (src/lib/tgService.ts).
+// its quote jumps to the original. The reply is deleted later (src/lib/tgReplies.ts), after a
+// copy goes into the local backup.
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -756,6 +757,21 @@ pub struct QuoteSent {
     /// A tg:// link that opens Saved Messages (the account's own chat), when the account has a
     /// username or the phone number is known.
     open: Option<String>,
+    /// The signed-in account's user id: the reply is deleted later only while this account is
+    /// signed in (message ids are per account). None when it couldn't be read; then the reply stays.
+    owner: Option<i64>,
+}
+
+/// The signed-in account's user, or None when it can't be read right now.
+async fn self_user(c: &Conn) -> Option<tl::types::User> {
+    let me = tl::functions::users::GetUsers { id: vec![tl::enums::InputUser::UserSelf] };
+    match c.client.invoke(&me).await {
+        Ok(users) => match users.into_iter().next() {
+            Some(tl::enums::User::User(u)) => Some(u),
+            _ => None,
+        },
+        Err(_) => None,
+    }
 }
 
 /// Replies to message `id` in Saved Messages with `text` and returns the reply's id and a link
@@ -808,16 +824,10 @@ pub async fn tg_quote_saved(state: tauri::State<'_, TgState>, id: i32, text: Str
         Err(e) if e.is("REPLY_MESSAGE_ID_INVALID") || e.is("MESSAGE_ID_INVALID") => return Err("NO_ORIGINAL".into()),
         Err(e) => return Err(err(e)),
     };
-    let me = tl::functions::users::GetUsers { id: vec![tl::enums::InputUser::UserSelf] };
-    let open = match c.client.invoke(&me).await {
-        Ok(users) => match users.into_iter().next() {
-            Some(tl::enums::User::User(u)) => saved_chat_link(u.username.as_deref(), u.phone.as_deref()),
-            _ => None,
-        },
-        // The reply is out already; without a link the app says where to find it.
-        Err(_) => None,
-    };
-    Ok(QuoteSent { id: sent, open })
+    // The reply is out already; without a link the app says where to find it.
+    let me = self_user(&c).await;
+    let open = me.as_ref().and_then(|u| saved_chat_link(u.username.as_deref(), u.phone.as_deref()));
+    Ok(QuoteSent { id: sent, open, owner: me.map(|u| u.id) })
 }
 
 /// tg:// link to the account's own chat (Saved Messages): by username, else by phone number.
@@ -832,13 +842,29 @@ fn saved_chat_link(username: Option<&str>, phone: Option<&str>) -> Option<String
 }
 
 /// Deletes Kipple's own replies from Saved Messages (for everyone, i.e. on all devices).
-/// Ids that are already gone are fine.
+/// Ids that are already gone are fine. `owner` is the account that posted them: message ids are
+/// per account, so with another account signed in nothing is deleted ("OTHER_ACCOUNT").
 #[tauri::command]
-pub async fn tg_delete_saved(state: tauri::State<'_, TgState>, ids: Vec<i32>) -> Result<(), String> {
+pub async fn tg_delete_saved(app: tauri::AppHandle, state: tauri::State<'_, TgState>, ids: Vec<i32>, owner: i64) -> Result<(), String> {
     if ids.is_empty() {
         return Ok(());
     }
     let c = conn(&state).await?;
+    match self_user(&c).await {
+        Some(u) if u.id == owner => {}
+        Some(_) => return Err("OTHER_ACCOUNT".into()),
+        None => return Err("NO_ACCOUNT".into()),
+    }
+    // Copy them into the local backup first; if that fails, nothing is deleted.
+    let req = tl::functions::messages::GetMessages { id: ids.iter().map(|&id| tl::types::InputMessageId { id }.into()).collect() };
+    use tl::enums::messages::Messages as R;
+    let found = match c.client.invoke(&req).await.map_err(err)? {
+        R::Messages(m) => to_saved(&m.messages, &m.users, &m.chats),
+        R::Slice(m) => to_saved(&m.messages, &m.users, &m.chats),
+        R::ChannelMessages(m) => to_saved(&m.messages, &m.users, &m.chats),
+        R::NotModified(_) => vec![],
+    };
+    append_backup(&backup_dir(&app)?, owner, &found, "before_delete")?;
     let req = tl::functions::messages::DeleteMessages { revoke: true, id: ids };
     c.client.invoke(&req).await.map_err(err)?;
     Ok(())
@@ -1082,6 +1108,11 @@ fn photo_of(media: &tl::enums::MessageMedia) -> Option<(&tl::types::Photo, bool)
 #[tauri::command]
 pub async fn tg_saved_page(state: tauri::State<'_, TgState>, offset_id: i32, min_id: i32) -> Result<SavedPage, String> {
     let c = conn(&state).await?;
+    history_page(&c, offset_id, min_id).await
+}
+
+/// Up to 100 Saved Messages older than `offset_id` (0: from the newest) and newer than `min_id`.
+async fn history_page(c: &Conn, offset_id: i32, min_id: i32) -> Result<SavedPage, String> {
     let req = tl::functions::messages::GetHistory {
         peer: tl::enums::InputPeer::PeerSelf,
         offset_id,
@@ -1102,22 +1133,149 @@ pub async fn tg_saved_page(state: tauri::State<'_, TgState>, offset_id: i32, min
         R::ChannelMessages(m) => (m.messages, m.users, m.chats, Some(m.count)),
         R::NotModified(_) => (vec![], vec![], vec![], None),
     };
+    let next_offset = messages.iter().map(|m| m.id()).min();
+    Ok(SavedPage { messages: to_saved(&messages, &users, &chats), next_offset, total })
+}
+
+/// Plain messages as SavedMessage, with the names of forwarded-from senders filled in.
+fn to_saved(messages: &[tl::enums::Message], users: &[tl::enums::User], chats: &[tl::enums::Chat]) -> Vec<SavedMessage> {
     let mut names: HashMap<i64, String> = HashMap::new();
-    for u in &users {
+    for u in users {
         if let tl::enums::User::User(user) = u {
             names.insert(user.id, user_name(u));
         }
     }
     names.extend(chats.iter().filter_map(chat_title));
-    let next_offset = messages.iter().map(|m| m.id()).min();
-    let messages = messages
+    messages
         .iter()
         .filter_map(|m| match m {
             tl::enums::Message::Message(m) => Some(saved_message(m, &names)),
             _ => None,
         })
-        .collect();
-    Ok(SavedPage { messages, next_offset, total })
+        .collect()
+}
+
+// ---- Local backup of Saved Messages ------------------------------------------------------
+//
+// A safety net: every Saved Message Kipple has seen is kept on the device in
+// telegram-backup/<user id>.jsonl (one JSON message per line), and anything Kipple deletes in
+// Telegram is copied there first. The backup only grows: nothing in the app removes or rewrites
+// it, not even Settings → «Удалить все данные».
+
+fn backup_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    use tauri::Manager;
+    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?.join("telegram-backup");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+/// Where a backup pass stands, per account (<user id>.state.json).
+#[derive(Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct BackupState {
+    /// Everything up to this id is in the backup.
+    top: i32,
+    /// A pass in progress: the next page starts below this id.
+    cursor: Option<i32>,
+    /// The newest id seen in the pass in progress; becomes `top` when it completes.
+    pass_top: i32,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BackupLine<'a> {
+    /// Unix seconds when the line was written.
+    backed_up_at: i64,
+    /// Why: "history" (read from Saved Messages) or "before_delete" (Kipple was about to delete it).
+    reason: &'static str,
+    #[serde(flatten)]
+    message: &'a SavedMessage,
+}
+
+/// Appends messages to the account's backup file. Never truncates or rewrites it.
+fn append_backup(dir: &std::path::Path, owner: i64, messages: &[SavedMessage], reason: &'static str) -> Result<(), String> {
+    use std::io::Write;
+    if messages.is_empty() {
+        return Ok(());
+    }
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
+    let mut out = String::new();
+    for m in messages {
+        out.push_str(&serde_json::to_string(&BackupLine { backed_up_at: now, reason, message: m }).map_err(|e| e.to_string())?);
+        out.push('\n');
+    }
+    let mut f = std::fs::OpenOptions::new().create(true).append(true).open(dir.join(format!("{owner}.jsonl"))).map_err(|e| e.to_string())?;
+    f.write_all(out.as_bytes()).map_err(|e| e.to_string())?;
+    f.sync_all().map_err(|e| e.to_string())
+}
+
+fn read_backup_state(dir: &std::path::Path, owner: i64) -> BackupState {
+    std::fs::read_to_string(dir.join(format!("{owner}.state.json"))).ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
+}
+
+fn write_backup_state(dir: &std::path::Path, owner: i64, st: &BackupState) -> Result<(), String> {
+    let tmp = dir.join(format!("{owner}.state.json.tmp"));
+    std::fs::write(&tmp, serde_json::to_string(st).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    std::fs::rename(&tmp, dir.join(format!("{owner}.state.json"))).map_err(|e| e.to_string())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupStep {
+    /// The backup has everything up to now; call again later for newer messages.
+    done: bool,
+    /// Messages written by this step.
+    saved: usize,
+}
+
+/// Backs up one page (up to 100) of Saved Messages not in the backup yet: the whole history on
+/// the first run, then only newer messages. Call until `done`.
+#[tauri::command]
+pub async fn tg_backup_step(app: tauri::AppHandle, state: tauri::State<'_, TgState>) -> Result<BackupStep, String> {
+    let c = conn(&state).await?;
+    let owner = self_user(&c).await.ok_or("NO_ACCOUNT")?.id;
+    let dir = backup_dir(&app)?;
+    let mut st = read_backup_state(&dir, owner);
+    let page = history_page(&c, st.cursor.unwrap_or(0), st.top).await?;
+    match page.next_offset {
+        Some(next) if next > st.top => {
+            append_backup(&dir, owner, &page.messages, "history")?;
+            st.pass_top = st.pass_top.max(page.messages.iter().map(|m| m.id).max().unwrap_or(0));
+            st.cursor = Some(next);
+            write_backup_state(&dir, owner, &st)?;
+            Ok(BackupStep { done: false, saved: page.messages.len() })
+        }
+        _ => {
+            append_backup(&dir, owner, &page.messages, "history")?;
+            st.top = st.top.max(st.pass_top).max(page.messages.iter().map(|m| m.id).max().unwrap_or(0));
+            st.cursor = None;
+            st.pass_top = 0;
+            write_backup_state(&dir, owner, &st)?;
+            Ok(BackupStep { done: true, saved: page.messages.len() })
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupInfo {
+    /// The backup folder.
+    dir: String,
+    /// Lines in all backup files (a message can appear more than once).
+    messages: usize,
+}
+
+/// Where the backup is and how big it is. Works without a connection.
+#[tauri::command]
+pub async fn tg_backup_info(app: tauri::AppHandle) -> Result<BackupInfo, String> {
+    let dir = backup_dir(&app)?;
+    let mut messages = 0;
+    for e in std::fs::read_dir(&dir).map_err(|e| e.to_string())?.flatten() {
+        if e.path().extension().is_some_and(|x| x == "jsonl") {
+            messages += std::fs::read_to_string(e.path()).map(|s| s.lines().filter(|l| !l.is_empty()).count()).unwrap_or(0);
+        }
+    }
+    Ok(BackupInfo { dir: dir.to_string_lossy().into_owned(), messages })
 }
 
 /// A photo size to download: a custom location so we can ask for the ~800px version
@@ -1245,6 +1403,26 @@ pub async fn tg_forget_media(app: tauri::AppHandle) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn backup_only_appends() {
+        let dir = std::env::temp_dir().join(format!("kipple-backup-test-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let msg = |id| SavedMessage { id, date: 1, text: format!("m{id}"), entities: vec![], forwarded_from: None, grouped_id: None, media: None, web_photo: false };
+        append_backup(&dir, 7, &[msg(1), msg(2)], "history").unwrap();
+        append_backup(&dir, 7, &[msg(2)], "before_delete").unwrap();
+        append_backup(&dir, 7, &[], "history").unwrap();
+        let text = std::fs::read_to_string(dir.join("7.jsonl")).unwrap();
+        let lines: Vec<serde_json::Value> = text.lines().map(|l| serde_json::from_str(l).unwrap()).collect();
+        assert_eq!(lines.len(), 3);
+        assert_eq!(lines[0]["text"], "m1");
+        assert_eq!(lines[2]["reason"], "before_delete");
+        assert_eq!(read_backup_state(&dir, 7).top, 0);
+        write_backup_state(&dir, 7, &BackupState { top: 5, cursor: Some(3), pass_top: 9 }).unwrap();
+        let st = read_backup_state(&dir, 7);
+        assert_eq!((st.top, st.cursor, st.pass_top), (5, Some(3), 9));
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn saved_chat_link_prefers_username() {
