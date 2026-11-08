@@ -37,11 +37,8 @@ export function Welcome(props: {
   tg?: TelegramApi;
   showDemo?: boolean;
   onImport: () => void;
-  /**
-   * Signed in: load Saved Messages straight from Telegram. `auto` is true when the card calls it
-   * by itself on reaching the signed-in state; false from the button.
-   */
-  onSignedIn?: (auto: boolean) => void;
+  /** Signed in: load Saved Messages straight from Telegram. Only from the user's button. */
+  onLoadSaved?: () => void;
   onDemo: () => void;
   onSettings: () => void;
   onLanguage: (l: Lang) => void;
@@ -102,7 +99,7 @@ export function Welcome(props: {
                       </button>
                     </p>
                   )}
-                  {props.tg && <SignInCard tg={props.tg} active={screen === 0} onSettings={props.onSettings} onExport={() => setScreen(1)} onSignedIn={props.onSignedIn} />}
+                  {props.tg && <SignInCard tg={props.tg} active={screen === 0} onSettings={props.onSettings} onExport={() => setScreen(1)} onLoadSaved={props.onLoadSaved} />}
                   {props.tg && <div className="w-or">{L.orWithout}</div>}
                   <div className="w-tiles">
                   <button className="w-tile grow" onClick={() => setScreen(1)}>
@@ -174,7 +171,7 @@ export function Welcome(props: {
 
 type Step = "loading" | "noApi" | "qr" | "phone" | "code" | "password" | "done";
 
-function SignInCard(props: { tg: TelegramApi; active: boolean; onSettings: () => void; onExport: () => void; onSignedIn?: (auto: boolean) => void }) {
+function SignInCard(props: { tg: TelegramApi; active: boolean; onSettings: () => void; onExport: () => void; onLoadSaved?: () => void }) {
   const { tg } = props;
   const L = T.welcome;
   const TL = T.telegram;
@@ -206,12 +203,6 @@ function SignInCard(props: { tg: TelegramApi; active: boolean; onSettings: () =>
   useEffect(() => {
     void refresh();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Signed in: the messages start loading by themselves, no export needed.
-  const onSignedIn = props.onSignedIn;
-  useEffect(() => {
-    if (step === "done") onSignedIn?.(true);
-  }, [step, onSignedIn]);
 
   // Anonymous statistics: sign-in offered, finished, or failed (each at most once per visit).
   const counted = useRef({ started: false, failed: false });
@@ -422,11 +413,11 @@ function SignInCard(props: { tg: TelegramApi; active: boolean; onSettings: () =>
             <p>
               <Done label={L.signedIn(name)} />
             </p>
-            <p className="hint">{props.onSignedIn ? L.signedInLoad : L.signedInNext}</p>
+            <p className="hint">{props.onLoadSaved ? L.signedInLoad : L.signedInNext}</p>
             <div className="w-inline">
-              {props.onSignedIn ? (
+              {props.onLoadSaved ? (
                 <>
-                  <button onClick={() => props.onSignedIn?.(false)}>{L.loadSaved}</button>
+                  <button onClick={props.onLoadSaved}>{L.loadSaved}</button>
                   <button className="link-btn w-small-link" onClick={props.onExport}>
                     {L.orExport}
                   </button>

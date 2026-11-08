@@ -66,13 +66,16 @@ export function Workspace(props: {
   rev: number;
   job: Job;
   needAi: number;
-  aiEnabled: boolean;
+  /** Show the "Tag N" button: AI is on, or the user hasn't been asked yet (pressing it asks). */
+  offerAi: boolean;
   /** Undefined in the demo, which can't take a real import. */
   onImport?: () => void;
   onExport: (kind: "csv" | "md", cards: Card[]) => void;
   onSettings: () => void;
   /** Desktop only: opens "Send to Telegram". */
   onTelegram?: () => void;
+  /** Load what was saved in Telegram since last time; set when signed in. */
+  onLoadTelegram?: () => void;
   /** The signed-in Telegram account, shown at the top of the sidebar. */
   tgAccount?: TelegramAccount | null;
   onRunAi: () => void;
@@ -486,11 +489,16 @@ export function Workspace(props: {
               </span>
             ) : (
               props.needAi > 0 &&
-              props.aiEnabled && (
+              props.offerAi && (
                 <button className="secondary small-btn" onClick={props.onRunAi} title={T.toolbar.runAiHint}>
                   <Icon name="sparkle" size={14} /> {T.toolbar.runAi(props.needAi)}
                 </button>
               )
+            )}
+            {props.onLoadTelegram && (
+              <button className="icon-btn" onClick={props.onLoadTelegram} disabled={!!props.job} title={T.toolbar.loadTelegram}>
+                <Icon name="refresh" />
+              </button>
             )}
             {props.onImport && (
               <button className="icon-btn" onClick={props.onImport} title={T.toolbar.import}>
