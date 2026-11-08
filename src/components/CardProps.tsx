@@ -174,7 +174,10 @@ export function NoteField(props: { value: string; onChange: (v: string) => void;
       placeholder={T.detail.notePlaceholder}
       aria-labelledby={props.labelledBy}
       onChange={(e) => props.onChange(e.target.value)}
-      onKeyDown={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        e.stopPropagation(); // the board's keys (j/k, /) are text here
+        if (e.key === "Escape") e.currentTarget.blur(); // saves; a second Esc closes the card, as in the title
+      }}
       onBlur={() => {
         setEditing(false);
         props.onSave();

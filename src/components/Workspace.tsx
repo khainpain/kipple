@@ -390,15 +390,19 @@ export function Workspace(props: {
     onEdit([c.id], { action: isJunk ? (c.ai?.action && c.ai.action !== "junk" ? c.ai.action : "reference") : "junk" });
   }
 
-  // A selection the current filter hides would still be hit by the bulk buttons: keep only what's on screen.
+  // A selection the current section or filter hides would still be hit by the bulk buttons: keep
+  // only what's on screen. A search is the exception: picking cards across several searches is a
+  // way to gather them, so those stay selected (and counted) until the search is cleared.
+  const searchActive = query.trim() !== "";
   useEffect(() => {
+    if (searchActive) return;
     setSelected((prev) => {
       if (!prev.size) return prev;
       const shownIds = new Set(visible.map((c) => c.id));
       const next = new Set([...prev].filter((id) => shownIds.has(id)));
       return next.size === prev.size ? prev : next;
     });
-  }, [visible]);
+  }, [visible, searchActive]);
 
   // Keyboard: "/" focuses search, Esc closes the panel or clears the selection, ↑/↓ (or j/k) step through cards.
   useEffect(() => {
