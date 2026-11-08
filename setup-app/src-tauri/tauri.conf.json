@@ -3,7 +3,7 @@
   "productName": "Kipple Setup",
   "mainBinaryName": "Kipple-Setup",
   "version": "0.1.0",
-  "identifier": "io.getkipple.setup",
+  "identifier": "com.khainpain.kipple-setup",
   "build": {
     "frontendDist": "../ui"
   },

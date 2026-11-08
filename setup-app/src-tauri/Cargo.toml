@@ -2,7 +2,7 @@
 name = "kipple-setup"
 version = "0.1.0"
 description = "Kipple Setup: the branded first-install window around the NSIS setup.exe"
-authors = ["The Kipple authors"]
+authors = ["khainpain"]
 edition = "2024"
 
 [build-dependencies]

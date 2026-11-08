@@ -1,7 +1,6 @@
-mod migrate;
 mod telegram;
 
-const SERVICE: &str = migrate::APP_ID;
+const SERVICE: &str = "com.khainpain.savedboard";
 
 /// The only secrets the web view may touch. The Telegram session and api keys live in the same
 /// store but are read only by Rust (telegram.rs): if a page ever ran someone else's script,
@@ -40,8 +39,6 @@ fn delete_secret(name: String) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Before any window opens: carry data and credentials over from the old identifier.
-    migrate::run();
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_fs::init())

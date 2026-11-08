@@ -246,7 +246,7 @@ export function SettingsDialog(props: {
               <Icon name="folder" size={16} />
               <div className="s2-text">
                 <b>{L.dataLibrary}</b>
-                {platform.kind === "web" ? <small>{L.dataWhereWeb}</small> : <code>%APPDATA%\io.getkipple.app</code>}
+                {platform.kind === "web" ? <small>{L.dataWhereWeb}</small> : <code>%APPDATA%\com.khainpain.savedboard</code>}
               </div>
             </div>
             <div className="s2-row s2-icon-row">
