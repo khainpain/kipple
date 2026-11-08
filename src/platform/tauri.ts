@@ -46,11 +46,19 @@ async function ensureDir() {
 
 /** Where Telegram photos are kept (data dir/telegram-media); known shortly after start. */
 let mediaRoot: string | undefined;
-const mediaRootReady = appDataDir().then((d) => {
-  const data = d.replace(/[\\/]+$/, "");
-  mediaRoot = `${data}${data.includes("\\") ? "\\" : "/"}telegram-media`;
-  return mediaRoot;
-});
+let mediaRootAsked: Promise<string> | undefined;
+/** Asked on first use, not on import: tests import this module without Tauri around. */
+function mediaRootReady(): Promise<string> {
+  mediaRootAsked ??= appDataDir().then((d) => {
+    const data = d.replace(/[\\/]+$/, "");
+    mediaRoot = `${data}${data.includes("\\") ? "\\" : "/"}telegram-media`;
+    return mediaRoot;
+  }).catch((e: unknown) => {
+    mediaRootAsked = undefined; // asked again next time
+    throw e;
+  });
+  return mediaRootAsked;
+}
 
 /**
  * A card's file as an absolute path, only when it lies inside the export folder or among the
@@ -58,7 +66,7 @@ const mediaRootReady = appDataDir().then((d) => {
  * which could name any file on the computer (`..`, absolute paths); those are refused.
  */
 async function cardFile(sourceDir: string, rel: string): Promise<string> {
-  const path = resolveInside([sourceDir, await mediaRootReady], sourceDir, rel);
+  const path = resolveInside([sourceDir, await mediaRootReady()], sourceDir, rel);
   if (!path) throw new Error("PATH_OUTSIDE_EXPORT");
   return path;
 }
@@ -66,7 +74,10 @@ async function cardFile(sourceDir: string, rel: string): Promise<string> {
 /** Same guard for pictures shown in the board. Before the media folder is known (the first moments
  *  after start) the asset protocol's own scope is the only limit. */
 function mediaPath(sourceDir: string, rel: string): string | undefined {
-  if (!mediaRoot) return joinPath(sourceDir, rel);
+  if (!mediaRoot) {
+    mediaRootReady().catch(() => undefined);
+    return joinPath(sourceDir, rel);
+  }
   return resolveInside([sourceDir, mediaRoot], sourceDir, rel) ?? undefined;
 }
 
