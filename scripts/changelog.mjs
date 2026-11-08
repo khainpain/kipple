@@ -13,6 +13,7 @@ export const changelog = [
       "A local backup of your Saved Messages that only grows (Settings → Data)",
       "Loading from Telegram and AI tagging start only when you press the button",
       "A new installer window: bigger, livelier, with Kipple tidying up your kipple",
+      "Many fixes: edits and AI titles no longer get lost, sensitive cards never go to the AI",
     ],
     ru: [
       "«Открыть в Telegram»: переход от карточки к её сообщению в Избранном",
@@ -20,6 +21,7 @@ export const changelog = [
       "Локальная резервная копия «Избранного», которая только пополняется (Настройки → Данные)",
       "Загрузка из Telegram и AI-теги запускаются только по твоей кнопке",
       "Новое окно установки: крупнее и живее, Киппл наводит порядок в хламе",
+      "Много исправлений: правки и AI-названия больше не теряются, чувствительные карточки никогда не уходят в AI",
     ],
   },
   {
