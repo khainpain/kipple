@@ -89,17 +89,44 @@ async fn host_is_private(host: String) -> Result<bool, String> {
     }
 }
 
-/// Resolves names for preview_fetch and refuses any that point at a non-public address, at the
-/// moment of connecting.
-struct PublicOnly;
+/// The resolver's refusal; found again in reqwest's error chain to tell it from other failures.
+#[derive(Debug)]
+struct PrivateHost;
+
+impl std::fmt::Display for PrivateHost {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("PRIVATE_HOST")
+    }
+}
+
+impl std::error::Error for PrivateHost {}
+
+fn is_private_host_error(e: &(dyn std::error::Error + 'static)) -> bool {
+    let mut cur = Some(e);
+    while let Some(err) = cur {
+        if err.is::<PrivateHost>() {
+            return true;
+        }
+        cur = err.source();
+    }
+    false
+}
+
+/// Resolves names for preview_fetch and refuses the link's host when it points at a non-public
+/// address, at the moment of connecting. Other names (a system proxy given by name, which may well
+/// sit in the local network) resolve as usual.
+struct PublicOnly {
+    target: String,
+}
 
 impl reqwest::dns::Resolve for PublicOnly {
     fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
         let host = name.as_str().to_string();
+        let guard = host.eq_ignore_ascii_case(&self.target);
         Box::pin(async move {
             let addrs: Vec<std::net::SocketAddr> = tokio::net::lookup_host((host.as_str(), 0)).await?.collect();
-            if addrs.is_empty() || addrs.iter().any(|a| private_ip(a.ip())) {
-                return Err(Box::<dyn std::error::Error + Send + Sync>::from("PRIVATE_HOST"));
+            if guard && (addrs.is_empty() || addrs.iter().any(|a| private_ip(a.ip()))) {
+                return Err(Box::new(PrivateHost) as Box<dyn std::error::Error + Send + Sync>);
             }
             Ok(Box::new(addrs.into_iter()) as reqwest::dns::Addrs)
         })
@@ -120,9 +147,10 @@ pub struct PreviewResponse {
     body: String,
 }
 
-fn preview_client() -> Result<reqwest::Client, String> {
+/// A client for one hop: its resolver guards that hop's host.
+fn preview_client(host: &str) -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
-        .dns_resolver(std::sync::Arc::new(PublicOnly))
+        .dns_resolver(std::sync::Arc::new(PublicOnly { target: host.trim_start_matches('[').trim_end_matches(']').to_string() }))
         .redirect(reqwest::redirect::Policy::none())
         .connect_timeout(std::time::Duration::from_secs(8))
         .timeout(std::time::Duration::from_secs(15))
@@ -137,7 +165,6 @@ fn preview_client() -> Result<reqwest::Client, String> {
 #[tauri::command]
 pub async fn preview_fetch(url: String, accept: Option<String>) -> Result<PreviewResponse, String> {
     use base64::Engine;
-    let client = preview_client()?;
     let mut current = reqwest::Url::parse(&url).map_err(|e| e.to_string())?;
     for hop in 0..=PREVIEW_MAX_REDIRECTS {
         if !matches!(current.scheme(), "http" | "https") {
@@ -145,21 +172,18 @@ pub async fn preview_fetch(url: String, accept: Option<String>) -> Result<Previe
         }
         let host = current.host_str().unwrap_or("").to_string();
         // IP literals never reach the resolver, and with a proxy the proxy resolves: check here too.
-        if host_is_private(host).await? {
+        if host_is_private(host.clone()).await? {
             return Err("PRIVATE_HOST".into());
         }
-        let mut req = client.get(current.clone());
+        let mut req = preview_client(&host)?.get(current.clone());
         if let Some(a) = &accept {
             req = req.header(reqwest::header::ACCEPT, a);
         }
-        let mut res = req.send().await.map_err(|e| {
-            if format!("{e:?}").contains("PRIVATE_HOST") { "PRIVATE_HOST".to_string() } else { e.to_string() }
-        })?;
+        let mut res = req.send().await.map_err(|e| if is_private_host_error(&e) { "PRIVATE_HOST".to_string() } else { e.to_string() })?;
         let status = res.status();
-        if status.is_redirection() {
-            let Some(loc) = res.headers().get(reqwest::header::LOCATION).and_then(|v| v.to_str().ok()) else {
-                return Err("bad redirect".into());
-            };
+        // A 3xx without a usable Location (304, 300) is the answer itself, as in the browser build.
+        let location = res.headers().get(reqwest::header::LOCATION).and_then(|v| v.to_str().ok());
+        if let (true, Some(loc)) = (status.is_redirection(), location) {
             if hop == PREVIEW_MAX_REDIRECTS {
                 return Err("too many redirects".into());
             }
@@ -215,5 +239,27 @@ mod tests {
         assert_eq!(resolve_is_private("LOCALHOST."), Ok(true));
         assert_eq!(resolve_is_private("printer.local"), Ok(true));
         assert_eq!(resolve_is_private(""), Ok(true));
+    }
+
+    #[test]
+    fn resolver_guards_only_the_links_host() {
+        use reqwest::dns::Resolve;
+        use std::str::FromStr;
+        let name = || reqwest::dns::Name::from_str("localhost").unwrap();
+        tauri::async_runtime::block_on(async {
+            let refused = PublicOnly { target: "localhost".into() }.resolve(name()).await.err().expect("refused");
+            assert!(is_private_host_error(refused.as_ref()));
+            // A proxy given by name (here: not the link's host) may live in the local network.
+            assert!(PublicOnly { target: "example.com".into() }.resolve(name()).await.is_ok());
+        });
+    }
+
+    #[test]
+    fn preview_fetch_refuses_private_and_odd_links() {
+        tauri::async_runtime::block_on(async {
+            for url in ["http://127.0.0.1:9/", "http://[::1]:9/", "http://localhost:9/", "file:///etc/passwd"] {
+                assert_eq!(preview_fetch(url.into(), None).await.err().as_deref(), Some("PRIVATE_HOST"), "{url}");
+            }
+        });
     }
 }

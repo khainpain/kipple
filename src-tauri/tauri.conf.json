@@ -97,7 +97,8 @@
           "English",
           "Russian"
         ],
-        "displayLanguageSelector": false
+        "displayLanguageSelector": false,
+        "installerHooks": "installer/hooks.nsh"
       },
       "wix": {
         "bannerPath": "installer/wix-banner.bmp",
