@@ -5,16 +5,19 @@
 // not how it was built.
 export const changelog = [
   {
-    ver: "next",
+    ver: "0.1.18",
+    date: "2026-11-08",
     en: [
       "Open in Telegram: jump from a card to its message in Saved Messages",
       "Three for today: a few small cleanup tasks on the overview each day",
       "A local backup of your Saved Messages that only grows (Settings → Data)",
+      "Loading from Telegram and AI tagging start only when you press the button",
     ],
     ru: [
       "«Открыть в Telegram»: переход от карточки к её сообщению в Избранном",
       "«Три на сегодня»: каждый день несколько маленьких заданий по уборке на обзоре",
       "Локальная резервная копия «Избранного», которая только пополняется (Настройки → Данные)",
+      "Загрузка из Telegram и AI-теги запускаются только по твоей кнопке",
     ],
   },
   {
