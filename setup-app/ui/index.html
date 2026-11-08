@@ -183,9 +183,17 @@ const easeOut = v => 1 - Math.pow(1 - v, 3);
 const place = () => items.forEach((el, i) => { el.style.transform = tf(tidy[i].x, tidy[i].y, 0, tidy[i].gone ? 0.2 : 1); el.style.opacity = tidy[i].gone ? 0 : 1; });
 
 // Each card floats as if in water: two slow sine waves per axis, fresh on every launch.
-// Returns a path (seconds → centre x, y, rotation, scale).
-const drift = () => {
-  const cx = rnd(10, 400), cy = rnd(0, 220), ax = rnd(25, 60), ay = rnd(18, 40), bx = rnd(8, 20), by = rnd(8, 20);
+// Starting spots are spread over the whole window on a shuffled grid (one card per cell, jittered),
+// so the kipple fills the window instead of bunching up. Returns a path (seconds → centre x, y, rotation, scale).
+function spots(n) {
+  const art = document.querySelector(".art").getBoundingClientRect();
+  const x0 = 60 - art.left, x1 = innerWidth - 60 - art.left, y0 = 70 - art.top, y1 = innerHeight - 60 - art.top;
+  const cols = 5, rows = Math.ceil(n / cols), cw = (x1 - x0) / cols, ch = (y1 - y0) / rows;
+  const cells = [...Array(cols * rows).keys()].sort(() => Math.random() - .5).slice(0, n);
+  return cells.map(c => [x0 + (c % cols + rnd(.2, .8)) * cw, y0 + (Math.floor(c / cols) + rnd(.2, .8)) * ch]);
+}
+const drift = ([cx, cy]) => {
+  const ax = rnd(18, 40), ay = rnd(12, 26), bx = rnd(6, 14), by = rnd(6, 12);
   const w1 = rnd(.5, .9), w2 = rnd(1.1, 1.6), p = rnd(0, 6.3), q = rnd(0, 6.3), r0 = rnd(-25, 25), k = rnd(.9, 1.15);
   return t => [cx + ax * Math.sin(w1 * t + p) + bx * Math.sin(w2 * t + q), cy + ay * Math.cos(w1 * .8 * t + q) + by * Math.sin(w2 * t + p), r0 + 14 * Math.sin(w1 * t + q), k];
 };
@@ -196,7 +204,7 @@ let raf = 0;
 function intro() {
   const win = $("win");
   if (reduced) { place(); win.classList.remove("intro"); return; }
-  const paths = items.map(drift);
+  const paths = spots(items.length).map(drift);
   // Order of arrival: extras get eaten first, then the board fills in a random order.
   const keep = items.map((_, i) => i).filter(i => !tidy[i].gone).sort(() => Math.random() - .5);
   const eat = items.map((_, i) => i).filter(i => tidy[i].gone);
