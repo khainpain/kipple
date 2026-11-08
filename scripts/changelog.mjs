@@ -5,6 +5,11 @@
 // not how it was built.
 export const changelog = [
   {
+    ver: "next",
+    en: ["A new installer window: bigger, livelier, with Kipple tidying up your kipple"],
+    ru: ["Новое окно установки: крупнее и живее, Киппл наводит порядок в хламе"],
+  },
+  {
     ver: "0.1.18",
     date: "2026-11-08",
     en: [
