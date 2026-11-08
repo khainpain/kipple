@@ -71,19 +71,8 @@ export function toRawMessage(m: SavedMessage): RawMessage {
   }
 }
 
-/**
- * The sync state as tgImport keeps it. `owner` and `albums` are extra fields on Library.telegram
- * (saved with the library like the rest of it).
- */
-export type TgSyncState = TelegramSync & {
-  /** The Telegram user id whose Saved Messages `top`, `cursor` and `noPhoto` refer to (ids are per account). */
-  owner?: number;
-  /**
-   * Albums (groupedId → card id) seen at the edges of the pages read so far: an album can be cut
-   * by a page boundary, and its other part, on the next page, joins this card.
-   */
-  albums?: Record<string, number>;
-};
+/** The sync state (owner and edge albums live on TelegramSync too). */
+export type TgSyncState = TelegramSync;
 
 /** Kept small: only albums at page edges can continue on another page. */
 const MAX_EDGE_ALBUMS = 20;
@@ -288,7 +277,7 @@ export async function backupSaved(deps: { tg: Pick<TelegramApi, "backupStep">; s
  * loaded from is signed in (nothing is changed then).
  */
 export async function syncSaved(lib: Library, deps: SyncDeps): Promise<{ added: number; photos: number }> {
-  let sync: TgSyncState = lib.telegram ?? { top: newestId(lib) };
+  const sync: TgSyncState = lib.telegram ?? { top: newestId(lib) };
   lib.telegram = sync;
   let added = 0;
   let pages = 0;
@@ -304,6 +293,8 @@ export async function syncSaved(lib: Library, deps: SyncDeps): Promise<{ added: 
       await deps.save(lib).catch(() => undefined); // keep what came in; the next run carries on from `cursor`
       throw e;
     }
+    // Which account this is couldn't be read: don't add anything that might be another account's.
+    if (!ownerChecked && page.owner == null && sync.owner != null) throw new Error("NO_ACCOUNT");
     if (!ownerChecked && page.owner != null) {
       ownerChecked = true;
       if (sync.owner != null && sync.owner !== page.owner) {
@@ -325,9 +316,17 @@ export async function syncSaved(lib: Library, deps: SyncDeps): Promise<{ added: 
     }
     if (cursor === 0 && page.total) total = page.total;
     sync.passTop = Math.max(sync.passTop ?? 0, ...page.messages.map((m) => m.id));
-    added += addPage(lib, sync, page.messages);
-    done += page.messages.length;
-    cursor = page.nextOffset;
+    // The oldest album on the page may go on in the next page: read it again with that page, so
+    // the whole album becomes one card with its photos in order and the first one as the cover.
+    const oldest = page.messages.reduce<SavedMessage | undefined>((m, x) => (!m || x.id < m.id ? x : m), undefined);
+    const held = oldest?.groupedId ? page.messages.filter((m) => m.groupedId === oldest.groupedId) : [];
+    const again = held.length ? Math.max(...held.map((m) => m.id)) + 1 : 0;
+    // Only when that moves on (a page that is all one album, or the same album again, is taken as it is).
+    const hold = held.length > 0 && held.length < page.messages.length && (cursor === 0 || again < cursor);
+    const keep = hold ? page.messages.filter((m) => !held.includes(m)) : page.messages;
+    added += addPage(lib, sync, keep);
+    done += keep.length;
+    cursor = hold ? again : page.nextOffset;
     sync.cursor = cursor;
     deps.onProgress({ phase: "messages", done, total: Math.max(total, done) });
     deps.onChange();

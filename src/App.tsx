@@ -149,10 +149,10 @@ export default function App() {
         // Libraries imported before previews worked here (or by an older version) catch up in the background.
         const catchUp = () => {
           if (!s.fetchLinks || !platform.canFetchLinks || !l.cards.some(needsPreview)) return;
-          const ctl = new AbortController();
-          abortRef.current = ctl;
+          const ctl = startJob("previews");
+          if (!ctl) return;
           void enrichLinks(l, ctl.signal).finally(() => {
-            setJob(null);
+            endJob(ctl);
             setRev((r) => r + 1);
           });
         };
@@ -527,9 +527,9 @@ export default function App() {
   async function sendTelegram(opts: SendOptions) {
     const tg = platform.telegram;
     if (!lib || !tg) return;
-    setShowTelegram(false);
-    const ctl = startJob("work");
+    const ctl = startJob("work"); // busy: the dialog stays open with the notice
     if (!ctl) return;
+    setShowTelegram(false);
     setSendingTg(true);
     try {
       const state = await loadBoardState();

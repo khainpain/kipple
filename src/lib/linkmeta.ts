@@ -194,7 +194,7 @@ async function fetchMeta(url: string): Promise<Omit<LinkMeta, "fetchedAt">> {
     const html = (await res.text()).slice(0, MAX_HTML);
     return parseHtml(html, at);
   } catch (e) {
-    if (e instanceof PrivateHostError) return { url, error: "skipped" };
+    if (e instanceof PrivateHostError) return { url, error: "private" }; // tried again later: networks change
     return { url, error: String(e).slice(0, 200) };
   }
 }
@@ -209,6 +209,8 @@ export function needsPreview(c: Card): boolean {
   if (c.kind !== "link" || !c.urls[0] || c.removed) return false;
   if (!c.link) return true;
   if (c.link.image || c.link.error === "skipped") return false;
+  // Passing problems (a home-network address, too many requests, a server error): again after a day.
+  if (c.link.error === "private" || /^HTTP (429|5\d\d)$/.test(c.link.error ?? "")) return Date.now() - Date.parse(c.link.fetchedAt || "0") > DAY;
   if ((c.link.v ?? 1) < PARSE_VERSION) return true;
   if (!wantsImage(c.urls[0])) return false;
   return Date.now() - Date.parse(c.link.fetchedAt || "0") > DAY;

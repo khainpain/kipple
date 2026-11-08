@@ -1,6 +1,8 @@
 //! Link previews must not reach the user's own network (router pages, NAS, local dev servers).
 //! The web view checks every address a link (and each redirect) goes to with `host_is_private`
 //! before fetching it (src/lib/linkmeta.ts). Same rules as the web build's api/fetch.ts.
+//! The fetch itself resolves the name again, so a hostile DNS server could still answer differently
+//! the second time (DNS rebinding): this is a guard for ordinary links, not a sandbox.
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 
@@ -15,7 +17,8 @@ fn private_v4(ip: Ipv4Addr) -> bool {
         || (a == 172 && (16..=31).contains(&b))
         || (a == 192 && b == 168)
         || (a == 192 && b == 0 && c == 0)
-        || (a == 198 && (b == 18 || b == 19))
+    // Not 198.18.0.0/15: proxy clients in "fake IP" mode (Clash, sing-box) answer every name with
+    // an address from it, and a link through such a proxy is the public internet, not the home network.
 }
 
 fn v4_from(hi: u16, lo: u16) -> Ipv4Addr {
@@ -79,7 +82,11 @@ fn resolve_is_private(host: &str) -> Result<bool, String> {
 /// See the module comment. Resolution blocks, so it runs off the async runtime's workers.
 #[tauri::command]
 pub async fn host_is_private(host: String) -> Result<bool, String> {
-    tauri::async_runtime::spawn_blocking(move || resolve_is_private(&host)).await.map_err(|e| e.to_string())?
+    let lookup = tauri::async_runtime::spawn_blocking(move || resolve_is_private(&host));
+    match tokio::time::timeout(std::time::Duration::from_secs(8), lookup).await {
+        Ok(r) => r.map_err(|e| e.to_string())?,
+        Err(_) => Err("RESOLVE_FAILED".into()),
+    }
 }
 
 #[cfg(test)]

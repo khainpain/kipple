@@ -390,7 +390,12 @@ fn finish_login(c: &mut Conn, name: String) -> Result<SignInResult, String> {
 
 /// A fresh password token (the SRP parameters in the old one are single-use).
 async fn fresh_password_token(c: &Conn) -> Result<PasswordToken, String> {
-    let p: tl::types::account::Password = c.client.invoke(&tl::functions::account::GetPassword {}).await.map_err(err)?.into();
+    let req = tl::functions::account::GetPassword {};
+    let p: tl::types::account::Password = tokio::time::timeout(Duration::from_secs(15), c.client.invoke(&req))
+        .await
+        .map_err(|_| "TIMEOUT".to_string())?
+        .map_err(err)?
+        .into();
     Ok(PasswordToken::new(p))
 }
 
@@ -480,7 +485,12 @@ fn now_secs() -> i64 {
 
 /// Asks the phone's account for the cloud password, keeping the token for `tg_check_password`.
 async fn password_step(c: &mut Conn) -> Result<QrResult, String> {
-    let p: tl::types::account::Password = c.client.invoke(&tl::functions::account::GetPassword {}).await.map_err(err)?.into();
+    let req = tl::functions::account::GetPassword {};
+    let p: tl::types::account::Password = tokio::time::timeout(Duration::from_secs(15), c.client.invoke(&req))
+        .await
+        .map_err(|_| "TIMEOUT".to_string())?
+        .map_err(err)?
+        .into();
     let token = PasswordToken::new(p);
     let hint = token.hint().map(str::to_string);
     c.password = Some(token);
@@ -565,11 +575,12 @@ pub async fn tg_logout(state: tauri::State<'_, TgState>) -> Result<(), String> {
     let had_session = read_secret(SESSION_KEY).is_some();
     let mut remote_ok = true;
     if let Some(c) = conn {
-        remote_ok = match c.client.sign_out().await {
-            Ok(_) => true,
+        // Offline is exactly when this matters, so don't wait on Telegram for long.
+        remote_ok = match tokio::time::timeout(Duration::from_secs(15), c.client.sign_out()).await {
+            Ok(Ok(_)) => true,
             // Not signed in on this connection (e.g. a sign-in that never finished): nothing to end.
-            Err(InvocationError::Rpc(e)) if e.code == 401 => true,
-            Err(_) => false,
+            Ok(Err(InvocationError::Rpc(e))) if e.code == 401 => true,
+            Ok(Err(_)) | Err(_) => false,
         };
         c.client.disconnect();
     } else if had_session {
@@ -1434,9 +1445,9 @@ pub struct SavedPhoto {
 
 /// One photo may take at most this long; a stuck download counts as failed (tried again later),
 /// so it can't hold the Telegram connection, and «Удалить все данные» waiting on it, forever.
-const PHOTO_TIMEOUT: Duration = Duration::from_secs(60);
+const PHOTO_TIMEOUT: Duration = Duration::from_secs(30);
 /// A batch stops starting new downloads after this long; the rest are tried again later.
-const PHOTO_BATCH_BUDGET: Duration = Duration::from_secs(120);
+const PHOTO_BATCH_BUDGET: Duration = Duration::from_secs(45);
 
 /// Downloads one photo. Err only for a flood wait (the caller waits and retries the whole
 /// batch); a failed or timed-out download is Ok(None).

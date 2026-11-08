@@ -27,6 +27,15 @@ describe("needsPreview", () => {
     expect(needsPreview(card({ image: "https://example.com/og.png" }))).toBe(false);
     expect(needsPreview(card({ error: "skipped" }))).toBe(false);
   });
+
+  it("tries a home-network or rate-limited link again after a day, not right away", () => {
+    const fresh = new Date().toISOString();
+    const old = new Date(Date.now() - 2 * 86_400_000).toISOString();
+    for (const error of ["private", "HTTP 429", "HTTP 503"]) {
+      expect(needsPreview(card({ error, fetchedAt: fresh, v: PARSE_VERSION }))).toBe(false);
+      expect(needsPreview(card({ error, fetchedAt: old, v: PARSE_VERSION }))).toBe(true);
+    }
+  });
 });
 
 describe("guardedFetch (desktop link previews)", () => {

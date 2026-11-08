@@ -237,6 +237,29 @@ describe("albums across pages", () => {
     expect(r.photos).toBe(4);
   });
 
+  it("reads an album cut by a page boundary again with the next page: one card, photos in order", async () => {
+    const date = 1_700_000_000;
+    const all = [
+      msg(98, { text: "older note" }),
+      ...[100, 101, 102, 103].map((id) => msg(id, { groupedId: "9", date, media: { kind: "photo" }, text: id === 100 ? "caption" : "" })),
+      msg(104, { text: "newer note" }),
+    ];
+    const tg: SyncDeps["tg"] = {
+      async savedPage(offsetId, minId) {
+        const page = all.filter((m) => m.id > minId && (offsetId === 0 || m.id < offsetId)).sort((a, b) => b.id - a.id).slice(0, 5); // pages larger than an album, as in the app (100 vs at most 10)
+        return { messages: page, nextOffset: page.length ? Math.min(...page.map((m) => m.id)) : null, total: all.length };
+      },
+      savedPhotos: async (batch) => batch.map((id) => ({ id, path: `/m/${id}.jpg` })),
+    };
+    const lib = emptyTelegramLibrary();
+    await syncSaved(lib, deps(tg));
+    const album = lib.cards.filter((c) => c.kind === "photo");
+    expect(album).toHaveLength(1);
+    expect(album[0]).toMatchObject({ id: 100, text: "caption", albumIds: [101, 102, 103] });
+    expect(album[0].media?.path).toBe("/m/100.jpg");
+    expect(lib.cards.map((c) => c.id).sort((a, b) => a - b)).toEqual([98, 100, 104]);
+  });
+
   it("merges album parts by groupedId even when the caption is not on the first message", () => {
     const g = { groupedId: "5" };
     const cards = messagesToCards([msg(11, { ...g, text: "late caption", media: { kind: "photo" } }), msg(10, { ...g, media: { kind: "photo" } })]);

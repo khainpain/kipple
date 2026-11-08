@@ -44,6 +44,9 @@
           "path": "$HOME/.ssh/**"
         },
         {
+          "path": "$HOME/.gnupg"
+        },
+        {
           "path": "$HOME/.gnupg/**"
         },
         {
@@ -51,9 +54,6 @@
         },
         {
           "path": "$DATA/TelegramDesktop/**"
-        },
-        {
-          "path": "$APPDATA/Telegram Desktop/**"
         },
         {
           "path": "$LOCALDATA/Telegram Desktop/**"
@@ -87,9 +87,6 @@
         },
         {
           "path": "$DATA/Opera Software/**"
-        },
-        {
-          "path": "$APPDATA/Mozilla/**"
         },
         {
           "path": "$DATA/Google/Chrome/**"
@@ -183,6 +180,9 @@
           "path": "$HOME/.ssh/**"
         },
         {
+          "path": "$HOME/.gnupg"
+        },
+        {
           "path": "$HOME/.gnupg/**"
         },
         {
@@ -190,9 +190,6 @@
         },
         {
           "path": "$DATA/TelegramDesktop/**"
-        },
-        {
-          "path": "$APPDATA/Telegram Desktop/**"
         },
         {
           "path": "$LOCALDATA/Telegram Desktop/**"
@@ -226,9 +223,6 @@
         },
         {
           "path": "$DATA/Opera Software/**"
-        },
-        {
-          "path": "$APPDATA/Mozilla/**"
         },
         {
           "path": "$DATA/Google/Chrome/**"
