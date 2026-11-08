@@ -97,7 +97,7 @@ export const platform: Platform = {
     return path;
   },
   httpFetch: tauriFetch as HttpFetch,
-  hostIsPrivate: (host) => invoke<boolean>("host_is_private", { host }),
+  previewFetch: (url, accept) => invoke("preview_fetch", { url, accept: accept ?? null }),
   telegram,
   appVersion: () => getVersion(),
   setWindowTheme: (theme) => getCurrentWindow().setTheme(theme),

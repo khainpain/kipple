@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import type { LookupAddress } from "node:dns";
 import type { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
-import { fetchLink, GET, privateIp } from "./fetch.js";
+import { fetchLink, fromOwnPage, GET, privateIp } from "./fetch.js";
 
 describe("privateIp", () => {
   it("catches private IPv4", () => {
@@ -30,6 +30,26 @@ describe("GET", () => {
   });
 
   it("refuses other sites", async () => expect((await ask("https://example.com", "cross-site")).status).toBe(403));
+});
+
+describe("fromOwnPage", () => {
+  const req = (headers: Record<string, string>) => new Request("https://kipple-api.test/api/fetch?url=x", { headers });
+
+  it("trusts Sec-Fetch-Site when the browser sends it", () => {
+    expect(fromOwnPage(req({ "sec-fetch-site": "same-origin" }))).toBe(true);
+    expect(fromOwnPage(req({ "sec-fetch-site": "cross-site", referer: "https://getkipple.io/app/" }))).toBe(false);
+    expect(fromOwnPage(req({ "sec-fetch-site": "none" }))).toBe(false);
+  });
+
+  it("falls back to Origin or Referer for old Safari, which sends no Sec-Fetch-Site", () => {
+    expect(fromOwnPage(req({ referer: "https://getkipple.io/app/" }))).toBe(true);
+    expect(fromOwnPage(req({ referer: "https://kipple-api.test/app/" }))).toBe(true);
+    expect(fromOwnPage(req({ origin: "https://www.getkipple.io" }))).toBe(true);
+    expect(fromOwnPage(req({ referer: "https://evil.example/getkipple.io" }))).toBe(false);
+    expect(fromOwnPage(req({ referer: "https://getkipple.io.evil.example/" }))).toBe(false);
+    expect(fromOwnPage(req({ origin: "null" }))).toBe(false);
+    expect(fromOwnPage(req({}))).toBe(false);
+  });
 });
 
 describe("GET limits", () => {

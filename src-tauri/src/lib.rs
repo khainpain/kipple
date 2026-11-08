@@ -61,7 +61,7 @@ pub fn run() {
             get_secret,
             set_secret,
             delete_secret,
-            net::host_is_private,
+            net::preview_fetch,
             telegram::tg_status,
             telegram::tg_account,
             telegram::tg_set_api,

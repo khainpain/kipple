@@ -129,12 +129,33 @@ export async function GET(request: Request): Promise<Response> {
   return fetchLink(request, { deadlineMs: 10_000, perMinute: perMinute(), lookup: publicLookup });
 }
 
+/** The site the web app is served from; /app/ there is proxied to this project, so its host differs. */
+const OWN_HOSTS = ["getkipple.io", "www.getkipple.io"];
+
+/**
+ * Only the web app's own fetch() calls, which browsers mark same-origin. Other requests (another
+ * site's page, a script, curl) are refused: otherwise they could put any page into the shared
+ * cache, to be opened later from this site's address. Safari before 16.4 sends no Sec-Fetch-Site;
+ * then the Origin or Referer, which a page can't fake, has to be one of ours.
+ */
+export function fromOwnPage(request: Request): boolean {
+  const site = request.headers.get("sec-fetch-site");
+  if (site !== null) return site === "same-origin";
+  const from = request.headers.get("origin") ?? request.headers.get("referer");
+  if (!from) return false;
+  let host: string;
+  try {
+    host = new URL(from).host.toLowerCase();
+  } catch {
+    return false;
+  }
+  const own = new Set([new URL(request.url).host.toLowerCase(), request.headers.get("x-forwarded-host")?.toLowerCase(), ...OWN_HOSTS]);
+  return own.has(host);
+}
+
 export async function fetchLink(request: Request, opts: Partial<FetchOptions> & Pick<FetchOptions, "lookup">): Promise<Response> {
   const { deadlineMs = 10_000, lookup: dns } = opts;
-  // Only the web app's own fetch() calls, which browsers mark same-origin. A request without the mark
-  // (a script, curl) is refused too: otherwise it could put any page into the shared cache, to be
-  // opened later from this site's address.
-  if (request.headers.get("sec-fetch-site") !== "same-origin") return text(403, "forbidden");
+  if (!fromOwnPage(request)) return text(403, "forbidden");
 
   // An outage of the counter store doesn't take link previews down with it.
   const allowed = await withinLimit("fetch", clientIp(request), opts.perMinute ?? perMinute(), 60).catch((e) => {
@@ -176,7 +197,7 @@ export async function fetchLink(request: Request, opts: Partial<FetchOptions> & 
     // The app only reads these as data. Opened directly, a fetched page must not run as this site.
     "content-security-policy": "sandbox; default-src 'none'",
     "content-disposition": "attachment",
-    vary: "Sec-Fetch-Site",
+    vary: "Sec-Fetch-Site, Origin, Referer",
   });
   if (status < 200 || status > 599) {
     res.destroy();

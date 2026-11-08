@@ -39,6 +39,8 @@ fn mark_secrets_moved(new: &Path) {
 }
 
 pub fn run() {
+    #[cfg(windows)]
+    remove_old_exe();
     #[cfg(not(windows))]
     move_secrets(false);
     #[cfg(windows)]
@@ -129,9 +131,35 @@ fn copy_missing(from: &Path, to: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// The program file was `saved-board.exe` (the old crate name) up to 0.1.18. The installer deletes
+/// it when updating, but not while that old program is still running (an update started from it,
+/// or installing over an open app). The new program then removes it on its first launch, if it sits
+/// next to it, so old shortcuts can't start an outdated copy.
+#[cfg(windows)]
+fn remove_old_exe() {
+    if let Some(old) = std::env::current_exe().ok().and_then(|exe| old_exe_beside(&exe)) {
+        let _ = std::fs::remove_file(old); // usually already gone
+    }
+}
+
+/// `saved-board.exe` in the folder of `exe`, unless `exe` is that very file.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn old_exe_beside(exe: &Path) -> Option<std::path::PathBuf> {
+    let old = exe.parent()?.join("saved-board.exe");
+    let same = exe.file_name().is_some_and(|n| n.eq_ignore_ascii_case("saved-board.exe"));
+    (!same).then_some(old)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn old_exe_only_beside_a_differently_named_exe() {
+        let dir = Path::new("app");
+        assert_eq!(old_exe_beside(&dir.join("kipple.exe")), Some(dir.join("saved-board.exe")));
+        assert_eq!(old_exe_beside(&dir.join("Saved-Board.exe")), None);
+    }
 
     #[test]
     fn old_secrets_overwrite_only_on_the_first_attempt() {

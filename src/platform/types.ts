@@ -140,6 +140,14 @@ export interface TelegramApi {
   sendNote(board: { channelId: number; accessHash: string }, topicId: number, replyTo: number, text: string, boldLen: number): Promise<number>;
 }
 
+/** What previewFetch returns: the last response after redirects, its body (at most 2 MB) in base64. */
+export interface PreviewResponse {
+  status: number;
+  url: string;
+  contentType: string;
+  body: string;
+}
+
 export interface Platform {
   kind: "desktop" | "web";
   /** Whether link previews can be loaded (the browser build goes through its Vercel function). */
@@ -167,11 +175,12 @@ export interface Platform {
   saveTextFile(defaultName: string, filter: { name: string; ext: string }, content: string): Promise<string | null>;
   httpFetch: HttpFetch;
   /**
-   * Desktop only: whether a host name is, or resolves to, a loopback/private/link-local address.
-   * Link previews check it for every address and redirect before fetching. Rejects when the name
-   * doesn't resolve. The browser build has no need: its /api/fetch refuses such addresses itself.
+   * Desktop only: fetches a link or its picture for a preview in Rust, refusing loopback/private/
+   * link-local addresses for every redirect and again at connect time (no DNS rebinding).
+   * Rejects with "PRIVATE_HOST" when a step leads there. The browser build has no need: its
+   * /api/fetch refuses such addresses itself.
    */
-  hostIsPrivate?(host: string): Promise<boolean>;
+  previewFetch?(url: string, accept?: string): Promise<PreviewResponse>;
   appVersion(): Promise<string>;
   checkUpdate(): Promise<AvailableUpdate | null>;
   /** Matches the native title bar to the app theme; null follows the OS. Desktop only. */

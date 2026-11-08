@@ -3,11 +3,11 @@ import { platform } from "@platform";
 
 const fetch = platform.httpFetch;
 import type { Card, LinkMeta } from "./types";
+import type { PreviewResponse } from "../platform/types";
 import { instagramCode, wantsImage, youtubeId, youtubeThumb } from "./embeds";
 
 const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|0\.|\[?::1\]?$|.*\.local$)/i;
 const MAX_HTML = 600_000;
-const MAX_REDIRECTS = 5;
 
 /** The link (or a redirect) leads into the user's own network: never fetched. */
 export class PrivateHostError extends Error {
@@ -18,34 +18,28 @@ export class PrivateHostError extends Error {
 
 type FetchInit = Parameters<typeof fetch>[1];
 
-/**
- * fetch() for the desktop app, which talks to sites directly: every address, the first and each
- * redirect, is checked first (`isPrivate` resolves the name in Rust), and redirects are followed
- * here, at most MAX_REDIRECTS, so none can lead to a router page or a local server.
- * Returns the response and the address it came from.
- */
-export async function guardedFetch(
-  url: string,
-  init: FetchInit,
-  deps: { fetch: (url: string, init: FetchInit & { maxRedirections?: number }) => Promise<Response>; isPrivate: (host: string) => Promise<boolean> },
-): Promise<{ res: Response; url: string }> {
-  let current = url;
-  for (let hop = 0; ; hop++) {
-    const u = new URL(current);
-    if (!/^https?:$/.test(u.protocol) || PRIVATE_HOST.test(u.hostname) || (await deps.isPrivate(u.hostname))) throw new PrivateHostError(u.hostname);
-    const res = await deps.fetch(current, { ...init, maxRedirections: 0 });
-    const location = res.status >= 300 && res.status < 400 ? res.headers.get("location") : null;
-    if (!location) return { res, url: current };
-    if (hop >= MAX_REDIRECTS) throw new Error("too many redirects");
-    void res.body?.cancel().catch(() => undefined);
-    current = new URL(location, current).toString();
-  }
+/** previewFetch's answer as a Response; statuses that can't carry a body get none. */
+export function previewResponse(r: PreviewResponse): Response {
+  const bin = atob(r.body);
+  const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  const status = r.status >= 200 && r.status <= 599 ? r.status : 502;
+  const empty = status === 204 || status === 205 || status === 304;
+  return new Response(empty ? null : bytes, { status, headers: { "content-type": r.contentType, "x-final-url": r.url } });
 }
 
-/** Desktop: guardedFetch. Browser: /api/fetch already refuses private addresses, redirects included. */
+/**
+ * Desktop: Rust's preview_fetch, which talks to sites directly and refuses every address (the
+ * first, each redirect, and the one it actually connects to) inside the user's network.
+ * Browser: /api/fetch already refuses private addresses, redirects included.
+ */
 async function get(url: string, init: FetchInit): Promise<{ res: Response; url: string }> {
-  const isPrivate = platform.hostIsPrivate;
-  if (isPrivate) return guardedFetch(url, init, { fetch, isPrivate });
+  if (platform.previewFetch) {
+    const accept = new Headers(init?.headers).get("accept") ?? undefined;
+    const r = await platform.previewFetch(url, accept).catch((e: unknown) => {
+      throw String(e).includes("PRIVATE_HOST") ? new PrivateHostError(new URL(url).hostname) : e;
+    });
+    return { res: previewResponse(r), url: r.url };
+  }
   const res = await fetch(url, init);
   return { res, url: finalUrl(res, url) };
 }

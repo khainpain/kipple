@@ -1,8 +1,9 @@
 //! Link previews must not reach the user's own network (router pages, NAS, local dev servers).
-//! The web view checks every address a link (and each redirect) goes to with `host_is_private`
-//! before fetching it (src/lib/linkmeta.ts). Same rules as the web build's api/fetch.ts.
-//! The fetch itself resolves the name again, so a hostile DNS server could still answer differently
-//! the second time (DNS rebinding): this is a guard for ordinary links, not a sandbox.
+//! The desktop app fetches previews only through `preview_fetch` (src/lib/linkmeta.ts): every address,
+//! the first and each redirect, is checked, and its resolver checks the very addresses it connects
+//! to, so a DNS server answering differently the second time (DNS rebinding) gets nowhere.
+//! Same rules as the web build's api/fetch.ts.
+//! (Through a system proxy the proxy resolves names; then only the check before the request applies.)
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, ToSocketAddrs};
 
@@ -80,13 +81,108 @@ fn resolve_is_private(host: &str) -> Result<bool, String> {
 }
 
 /// See the module comment. Resolution blocks, so it runs off the async runtime's workers.
-#[tauri::command]
-pub async fn host_is_private(host: String) -> Result<bool, String> {
+async fn host_is_private(host: String) -> Result<bool, String> {
     let lookup = tauri::async_runtime::spawn_blocking(move || resolve_is_private(&host));
     match tokio::time::timeout(std::time::Duration::from_secs(8), lookup).await {
         Ok(r) => r.map_err(|e| e.to_string())?,
         Err(_) => Err("RESOLVE_FAILED".into()),
     }
+}
+
+/// Resolves names for preview_fetch and refuses any that point at a non-public address, at the
+/// moment of connecting.
+struct PublicOnly;
+
+impl reqwest::dns::Resolve for PublicOnly {
+    fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
+        let host = name.as_str().to_string();
+        Box::pin(async move {
+            let addrs: Vec<std::net::SocketAddr> = tokio::net::lookup_host((host.as_str(), 0)).await?.collect();
+            if addrs.is_empty() || addrs.iter().any(|a| private_ip(a.ip())) {
+                return Err(Box::<dyn std::error::Error + Send + Sync>::from("PRIVATE_HOST"));
+            }
+            Ok(Box::new(addrs.into_iter()) as reqwest::dns::Addrs)
+        })
+    }
+}
+
+const PREVIEW_MAX_BYTES: usize = 2_000_000;
+const PREVIEW_MAX_REDIRECTS: usize = 5;
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PreviewResponse {
+    status: u16,
+    /// Where the last redirect led.
+    url: String,
+    content_type: String,
+    /// Base64 of at most PREVIEW_MAX_BYTES of the body.
+    body: String,
+}
+
+fn preview_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::builder()
+        .dns_resolver(std::sync::Arc::new(PublicOnly))
+        .redirect(reqwest::redirect::Policy::none())
+        .connect_timeout(std::time::Duration::from_secs(8))
+        .timeout(std::time::Duration::from_secs(15))
+        .user_agent("Mozilla/5.0 (compatible; Kipple/0.1; link preview)")
+        .build()
+        .map_err(|e| e.to_string())
+}
+
+/// Fetches a link (or its picture) for a preview: http(s) only, public addresses only (checked
+/// for every redirect, and again when connecting), at most 5 redirects and 2 MB. "PRIVATE_HOST"
+/// when a step leads into a home network.
+#[tauri::command]
+pub async fn preview_fetch(url: String, accept: Option<String>) -> Result<PreviewResponse, String> {
+    use base64::Engine;
+    let client = preview_client()?;
+    let mut current = reqwest::Url::parse(&url).map_err(|e| e.to_string())?;
+    for hop in 0..=PREVIEW_MAX_REDIRECTS {
+        if !matches!(current.scheme(), "http" | "https") {
+            return Err("PRIVATE_HOST".into());
+        }
+        let host = current.host_str().unwrap_or("").to_string();
+        // IP literals never reach the resolver, and with a proxy the proxy resolves: check here too.
+        if host_is_private(host).await? {
+            return Err("PRIVATE_HOST".into());
+        }
+        let mut req = client.get(current.clone());
+        if let Some(a) = &accept {
+            req = req.header(reqwest::header::ACCEPT, a);
+        }
+        let mut res = req.send().await.map_err(|e| {
+            if format!("{e:?}").contains("PRIVATE_HOST") { "PRIVATE_HOST".to_string() } else { e.to_string() }
+        })?;
+        let status = res.status();
+        if status.is_redirection() {
+            let Some(loc) = res.headers().get(reqwest::header::LOCATION).and_then(|v| v.to_str().ok()) else {
+                return Err("bad redirect".into());
+            };
+            if hop == PREVIEW_MAX_REDIRECTS {
+                return Err("too many redirects".into());
+            }
+            current = current.join(loc).map_err(|e| e.to_string())?;
+            continue;
+        }
+        let content_type = res.headers().get(reqwest::header::CONTENT_TYPE).and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
+        let mut body = Vec::new();
+        while let Some(chunk) = res.chunk().await.map_err(|e| e.to_string())? {
+            let room = PREVIEW_MAX_BYTES - body.len();
+            body.extend_from_slice(&chunk[..chunk.len().min(room)]);
+            if body.len() >= PREVIEW_MAX_BYTES {
+                break;
+            }
+        }
+        return Ok(PreviewResponse {
+            status: status.as_u16(),
+            url: current.to_string(),
+            content_type,
+            body: base64::engine::general_purpose::STANDARD.encode(body),
+        });
+    }
+    Err("too many redirects".into())
 }
 
 #[cfg(test)]

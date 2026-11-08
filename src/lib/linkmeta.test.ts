@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { guardedFetch, needsPreview, PARSE_VERSION, PrivateHostError } from "./linkmeta";
+import { needsPreview, PARSE_VERSION, previewResponse } from "./linkmeta";
 import type { Card, LinkMeta } from "./types";
 
 const card = (link?: Partial<LinkMeta>, url = "https://example.com/a"): Card => ({
@@ -38,43 +38,20 @@ describe("needsPreview", () => {
   });
 });
 
-describe("guardedFetch (desktop link previews)", () => {
-  const ok = (_url: string) => new Response("<html></html>", { status: 200, headers: { "content-type": "text/html" } });
-  const redirect = (to: string) => new Response(null, { status: 302, headers: { location: to } });
-
-  it("checks the host before fetching and follows redirects by hand, checking each hop", async () => {
-    const asked: string[] = [];
-    const fetched: Array<[string, unknown]> = [];
-    const res = await guardedFetch("https://a.example/x", {}, {
-      isPrivate: async (h) => (asked.push(h), false),
-      fetch: async (u, init) => (fetched.push([u, (init as { maxRedirections?: number }).maxRedirections]), u.endsWith("/x") ? redirect("/y") : ok(u)),
-    });
-    expect(res.res).toBeInstanceOf(Response);
-    expect(res.url).toBe("https://a.example/y");
-    expect(asked).toEqual(["a.example", "a.example"]);
-    expect(fetched).toEqual([["https://a.example/x", 0], ["https://a.example/y", 0]]);
+describe("previewResponse (desktop link previews)", () => {
+  it("turns preview_fetch's answer into a Response with the final address", async () => {
+    const res = previewResponse({ status: 200, url: "https://b.example/z", contentType: "text/html; charset=utf-8", body: btoa("<html>привет</html>".replace(/[^\x00-\x7f]/g, "")) });
+    expect(res.ok).toBe(true);
+    expect(res.headers.get("content-type")).toContain("text/html");
+    expect(res.headers.get("x-final-url")).toBe("https://b.example/z");
+    expect(await res.text()).toBe("<html></html>");
   });
 
-  it("refuses a redirect into the local network", async () => {
-    const fetched: string[] = [];
-    await expect(
-      guardedFetch("https://a.example/", {}, {
-        isPrivate: async (h) => h === "router.lan",
-        fetch: async (u) => (fetched.push(u), redirect("http://router.lan/admin")),
-      }),
-    ).rejects.toBeInstanceOf(PrivateHostError);
-    expect(fetched).toEqual(["https://a.example/"]);
-  });
-
-  it("refuses literal private hosts without asking, and gives up after 5 redirects", async () => {
-    await expect(guardedFetch("http://192.168.0.1/", {}, { isPrivate: async () => false, fetch: async (u) => ok(u) })).rejects.toBeInstanceOf(PrivateHostError);
-    let n = 0;
-    await expect(guardedFetch("https://a.example/0", {}, { isPrivate: async () => false, fetch: async () => redirect(`/${++n}`) })).rejects.toThrow(/redirect/i);
-    expect(n).toBe(6);
-  });
-
-  it("reports the final address", async () => {
-    const r = await guardedFetch("https://a.example/x", {}, { isPrivate: async () => false, fetch: async (u) => (u.endsWith("/x") ? redirect("https://b.example/z") : ok(u)) });
-    expect(r.url).toBe("https://b.example/z");
+  it("keeps bytes intact and copes with bodiless statuses", async () => {
+    const bytes = new Uint8Array([0, 255, 128, 10]);
+    const res = previewResponse({ status: 200, url: "https://a.example/i.png", contentType: "image/png", body: btoa(String.fromCharCode(...bytes)) });
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(bytes);
+    expect(previewResponse({ status: 304, url: "https://a.example/", contentType: "", body: "" }).status).toBe(304);
+    expect(previewResponse({ status: 404, url: "https://a.example/", contentType: "text/html", body: "" }).ok).toBe(false);
   });
 });
