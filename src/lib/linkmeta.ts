@@ -4,6 +4,7 @@ import { platform } from "@platform";
 const fetch = platform.httpFetch;
 import type { Card, LinkMeta } from "./types";
 import type { PreviewResponse } from "../platform/types";
+import { publicAssetUrl } from "./assetUrl";
 import { instagramCode, wantsImage, youtubeId, youtubeThumb } from "./embeds";
 
 const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|0\.|\[?::1\]?$|.*\.local$)/i;
@@ -96,9 +97,9 @@ export function parseHtml(html: string, url: string): Omit<LinkMeta, "fetchedAt"
     url,
     title: meta(doc, "og:title", "twitter:title") ?? doc.title?.trim() ?? undefined,
     description: meta(doc, "og:description", "twitter:description", "description"),
-    image: absolute(image, url),
+    image: publicAssetUrl(absolute(image, url)),
     siteName: meta(doc, "og:site_name"),
-    favicon: absolute(icon, url),
+    favicon: publicAssetUrl(absolute(icon, url)),
     excerpt: excerpt || undefined,
   };
 }

@@ -49,6 +49,8 @@ describe("fromOwnPage", () => {
     expect(fromOwnPage(req({ referer: "https://getkipple.io.evil.example/" }))).toBe(false);
     expect(fromOwnPage(req({ origin: "null" }))).toBe(false);
     expect(fromOwnPage(req({}))).toBe(false);
+    // A forwarded-host header is the client's word, not ours.
+    expect(fromOwnPage(req({ origin: "https://evil.example", "x-forwarded-host": "evil.example" }))).toBe(false);
   });
 });
 
@@ -62,6 +64,23 @@ describe("GET limits", () => {
     lookup: (host: string, o: object, cb: (e: Error | null, a: string | LookupAddress[], f?: number) => void) =>
       host === "slow.test" ? ((o as { all?: boolean }).all ? cb(null, [{ address: "127.0.0.1", family: 4 }]) : cb(null, "127.0.0.1", 4)) : cb(new Error("no"), []),
   };
+
+  it("doesn't pass on (or let the CDN cache) an answer cut off mid-way", async () => {
+    const server = createServer((_q, r) => {
+      r.writeHead(200, { "content-type": "text/html", "content-length": "100000" });
+      r.write("<html><head><title>half");
+      setTimeout(() => r.socket?.destroy(), 30);
+    }).listen(0, "127.0.0.1");
+    await new Promise((r) => server.once("listening", r));
+    port = (server.address() as AddressInfo).port;
+    try {
+      const res = await ask(`http://slow.test:${port}/`, "192.0.2.70");
+      expect(res.status).toBe(502);
+      expect(res.headers.get("cache-control") ?? "").not.toMatch(/max-age/);
+    } finally {
+      server.close();
+    }
+  });
 
   it("gives up on a server that never finishes its answer", async () => {
     const server = createServer((_q, r) => {

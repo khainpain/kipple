@@ -170,7 +170,8 @@ export interface Platform {
   /** A file of the export as bytes: for PDF and text previews, and for photos the user lets the AI name. */
   readMedia(sourceDir: string, rel: string): Promise<Blob>;
   openUrl(url: string): Promise<void>;
-  openFile(sourceDir: string, rel: string): Promise<void>;
+  /** Opens a card's file in its app. A file that would run as a program is only shown in its folder ("revealed"). */
+  openFile(sourceDir: string, rel: string): Promise<void | "revealed">;
   /** Asks where to save (desktop) or downloads (web). Returns where it went, or null if cancelled. */
   saveTextFile(defaultName: string, filter: { name: string; ext: string }, content: string): Promise<string | null>;
   httpFetch: HttpFetch;
@@ -224,6 +225,9 @@ export function normalizePath(p: string): string | null {
  * one of `roots`, else null. Windows paths compare case-insensitively. Used before opening or
  * reading a file a card points at: result.json comes from outside and could name any file.
  */
+/** Files Windows would run rather than open: from a chat export they are shown in the folder instead. */
+export const RUNNABLE = /\.(exe|com|bat|cmd|ps1|psm1|vbs|vbe|js|jse|wsf|wsh|hta|msi|msp|scr|pif|lnk|url|reg|cpl|jar|appref-ms|application|gadget|msc|inf|sct|chm|xll|settingcontent-ms|library-ms|search-ms|diagcab)$/i;
+
 export function resolveInside(roots: string[], dir: string, rel: string): string | null {
   if (!rel) return null;
   const full = normalizePath(joinPath(dir, rel));

@@ -133,10 +133,11 @@ export async function GET(request: Request): Promise<Response> {
 const OWN_HOSTS = ["getkipple.io", "www.getkipple.io"];
 
 /**
- * Only the web app's own fetch() calls, which browsers mark same-origin. Other requests (another
- * site's page, a script, curl) are refused: otherwise they could put any page into the shared
- * cache, to be opened later from this site's address. Safari before 16.4 sends no Sec-Fetch-Site;
- * then the Origin or Referer, which a page can't fake, has to be one of ours.
+ * Only the web app's own fetch() calls, which browsers mark same-origin. Another site's page is
+ * refused: it can't fake these headers, so it can't use a visitor's browser to fill the shared
+ * cache with pages later opened from this site's address. Safari before 16.4 sends no
+ * Sec-Fetch-Site; then the Origin or Referer has to be one of ours. A script or curl can send any
+ * header it likes: against those only the per-IP limit helps.
  */
 export function fromOwnPage(request: Request): boolean {
   const site = request.headers.get("sec-fetch-site");
@@ -149,7 +150,7 @@ export function fromOwnPage(request: Request): boolean {
   } catch {
     return false;
   }
-  const own = new Set([new URL(request.url).host.toLowerCase(), request.headers.get("x-forwarded-host")?.toLowerCase(), ...OWN_HOSTS]);
+  const own = new Set([new URL(request.url).host.toLowerCase(), ...OWN_HOSTS]);
   return own.has(host);
 }
 
@@ -224,9 +225,9 @@ export async function fetchLink(request: Request, opts: Partial<FetchOptions> & 
       }
     }
   } catch {
-    // A cut-off answer is not cached as if it were whole.
+    // A cut-off answer is never passed on (and cached for a week) as if it were whole.
     if (deadline.aborted) return timedOut();
-    if (!size) return text(502, "fetch failed");
+    return text(502, "fetch failed");
   } finally {
     deadline.removeEventListener("abort", stop);
   }

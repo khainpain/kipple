@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizePath, resolveInside } from "./types";
+import { normalizePath, resolveInside, RUNNABLE } from "./types";
 
 describe("normalizePath", () => {
   it("resolves . and .. and unifies separators", () => {
@@ -38,5 +38,12 @@ describe("resolveInside", () => {
     expect(resolveInside(["/home/u/exp"], "/home/u/exp", "photos/a.jpg")).toBe("/home/u/exp/photos/a.jpg");
     expect(resolveInside(["/home/u/exp"], "/home/u/exp", "../exp2/a.jpg")).toBeNull();
     expect(resolveInside(["/home/u/exp"], "/home/u/exp", "/Home/u/exp/a.jpg")).toBeNull();
+  });
+});
+
+describe("RUNNABLE", () => {
+  it("catches files Windows would run, not documents", () => {
+    for (const f of ["setup.exe", "x.BAT", "a.lnk", "b.hta", "c.js", "d.scr", "e.msi", "f.url"]) expect(RUNNABLE.test(f), f).toBe(true);
+    for (const f of ["report.pdf", "photo.jpg", "notes.txt", "song.mp3", "deck.pptx", "exe", "archive.zip"]) expect(RUNNABLE.test(f), f).toBe(false);
   });
 });

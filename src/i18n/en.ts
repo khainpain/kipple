@@ -475,6 +475,7 @@ export const en: Dict = {
     openModes: "How cards open",
     openFile: "Open the file in its app",
     fileOutside: "This file is outside the export folder, so Kipple won't open it.",
+    fileRunnable: "This file runs as a program, so Kipple showed it in its folder instead of opening it.",
     closeEsc: "Close (Esc)",
     titlePlaceholder: "Title",
     titleEditable: "You can edit the title",

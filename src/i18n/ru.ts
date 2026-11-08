@@ -483,6 +483,7 @@ export const ru = {
     openModes: "Как открывать карточки",
     openFile: "Открыть файл в его приложении",
     fileOutside: "Этот файл лежит вне папки экспорта, Kipple его не откроет.",
+    fileRunnable: "Этот файл запускается как программа, поэтому Kipple показал его в папке, а не открыл.",
     closeEsc: "Закрыть (Esc)",
     titlePlaceholder: "Заголовок",
     titleEditable: "Название можно поправить",
