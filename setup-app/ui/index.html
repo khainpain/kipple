@@ -17,11 +17,13 @@ html,body{margin:0;height:100%;overflow:hidden;user-select:none;cursor:default}
 .stage{flex:1;display:grid;grid-template-columns:230px 1fr;align-items:center;padding:0 36px 34px 18px;pointer-events:none}
 .stage button,.stage label,.stage .opts{pointer-events:auto}
 .art{position:relative;height:230px}
-.mascot{position:absolute;left:50%;top:50%;width:132px;height:132px;transform:translate(-50%,-50%);animation:breathe 6s ease-in-out infinite}
-@keyframes breathe{50%{transform:translate(-50%,calc(-50% - 3px))}}
-/* The kipple: messages, links and photos. Positions and the intro are driven from JS (Web Animations). */
+.mascot{position:absolute;left:50%;top:50%;width:132px;height:132px;transform:translate(-50%,-50%);animation:bob 4.5s ease-in-out infinite}
+@keyframes bob{50%{transform:translate(-50%,-54%) rotate(-1.5deg)}}
+/* The kipple: messages, links and photos. Positions and the intro are driven from JS. */
 .art{overflow:visible}
 .it{position:absolute;left:0;top:0;width:46px;height:30px;border-radius:7px;background:var(--card);box-shadow:0 2px 7px rgba(40,30,20,.14);opacity:0;will-change:transform}
+/* Flying cards pass in front of Kipple; the ones it eats (and, while installing, swallows) go behind it. */
+.it{z-index:2}.mascot{z-index:1}.it.extra,.installing .it{z-index:0}
 .it.msg{border-bottom-left-radius:2px}
 .it.msg::before{content:"";position:absolute;left:7px;top:8px;width:20px;height:4px;border-radius:2px;background:var(--accent)}
 .it.msg::after{content:"";position:absolute;left:7px;top:17px;width:30px;height:4px;border-radius:2px;background:var(--line)}
@@ -31,7 +33,7 @@ html,body{margin:0;height:100%;overflow:hidden;user-select:none;cursor:default}
 .it.pic{width:38px;height:32px;background:var(--accent-soft);overflow:hidden}
 .it.pic::before{content:"";position:absolute;right:7px;top:6px;width:7px;height:7px;border-radius:50%;background:#f2a58f}
 .it.pic::after{content:"";position:absolute;left:-2px;bottom:-1px;width:44px;height:18px;background:var(--accent);opacity:.75;clip-path:polygon(0 100%,30% 25%,52% 70%,70% 40%,100% 100%)}
-.text{opacity:1}
+.text{opacity:1;position:relative;z-index:1}
 .intro .text{opacity:0}
 .mascot{opacity:1}
 .intro .mascot{opacity:0}
@@ -70,7 +72,7 @@ p{margin:0;color:var(--muted);line-height:1.45}
   </div>
   <div class="stage" data-tauri-drag-region>
     <div class="art" data-tauri-drag-region>
-      <span class="it msg"></span><span class="it url"></span><span class="it pic"></span><span class="it pic"></span><span class="it url"></span><span class="it msg"></span>
+      <span class="it msg"></span><span class="it url"></span><span class="it pic"></span><span class="it pic"></span><span class="it url"></span><span class="it msg"></span><span class="it url extra"></span><span class="it msg extra"></span><span class="it pic extra"></span><span class="it msg extra"></span><span class="it url extra"></span><span class="it msg extra"></span><span class="it pic extra"></span><span class="it url extra"></span>
       <svg class="mascot" viewBox="0 0 100 100" aria-hidden="true"><g transform="translate(50 56) scale(1.04 0.97) translate(-50 -56)"><path d="M50.00 23.70 L51.84 23.25 L53.81 22.21 L55.90 21.30 L57.94 21.20 L59.75 22.17 L61.23 23.91 L62.55 25.70 L64.01 26.90 L65.86 27.29 L68.09 27.21 L70.37 27.29 L72.26 28.09 L73.46 29.75 L74.04 31.96 L74.46 34.15 L75.25 35.86 L76.75 37.02 L78.79 37.91 L80.81 38.97 L82.16 40.51 L82.52 42.53 L82.09 44.77 L81.52 46.92 L81.49 48.81 L82.33 50.51 L83.79 52.19 L85.15 54.03 L85.70 56.00 L85.15 57.97 L83.79 59.81 L82.33 61.49 L81.49 63.19 L81.52 65.08 L82.09 67.23 L82.52 69.47 L82.16 71.49 L80.81 73.03 L78.79 74.09 L76.75 74.98 L75.25 76.14 L74.46 77.85 L74.04 80.04 L73.46 82.25 L72.26 83.91 L70.37 84.71 L68.09 84.79 L65.86 84.71 L64.01 85.10 L62.55 86.30 L61.23 88.09 L59.75 89.83 L57.94 90.80 L55.90 90.70 L53.81 89.79 L51.84 88.75 L50.00 88.30 L48.16 88.75 L46.19 89.79 L44.10 90.70 L42.06 90.80 L40.25 89.83 L38.77 88.09 L37.45 86.30 L35.99 85.10 L34.14 84.71 L31.91 84.79 L29.63 84.71 L27.74 83.91 L26.54 82.25 L25.96 80.04 L25.54 77.85 L24.75 76.14 L23.25 74.98 L21.21 74.09 L19.19 73.03 L17.84 71.49 L17.48 69.47 L17.91 67.23 L18.48 65.08 L18.51 63.19 L17.67 61.49 L16.21 59.81 L14.85 57.97 L14.30 56.00 L14.85 54.03 L16.21 52.19 L17.67 50.51 L18.51 48.81 L18.48 46.92 L17.91 44.77 L17.48 42.53 L17.84 40.51 L19.19 38.97 L21.21 37.91 L23.25 37.02 L24.75 35.86 L25.54 34.15 L25.96 31.96 L26.54 29.75 L27.74 28.09 L29.63 27.29 L31.91 27.21 L34.14 27.29 L35.99 26.90 L37.45 25.70 L38.77 23.91 L40.25 22.17 L42.06 21.20 L44.10 21.30 L46.19 22.21 L48.16 23.25 L50.00 23.70Z" fill="#D9573B"/></g><g transform="rotate(22 62 20)"><rect x="53" y="12" width="18" height="15" rx="4" fill="#F2A58F" /></g><path d="M32.5 46 Q38 38.5 43.5 46" fill="none" stroke="#23211E" stroke-width="4.6" stroke-linecap="round"/><path d="M56.5 46 Q62 38.5 67.5 46" fill="none" stroke="#23211E" stroke-width="4.6" stroke-linecap="round"/><path d="M46 53 Q50 56.5 54 53" fill="none" stroke="#23211E" stroke-width="3.2" stroke-linecap="round"/><g transform="rotate(-5 50 71)"><rect x="32" y="60" width="36" height="24" rx="5.5" fill="#FFFDF9" /><rect x="38" y="66" width="13" height="4.2" rx="2.1" fill="#D9573B" /><rect x="38" y="73.5" width="23" height="4.2" rx="2.1" fill="#E9DFD3" /></g><circle cx="32.5" cy="72" r="5.8" fill="#D9573B"/><circle cx="67.5" cy="70" r="5.8" fill="#D9573B"/></svg>
     </div>
     <div class="text" data-tauri-drag-region>
@@ -153,11 +155,13 @@ const invoke = tauri ? tauri.core.invoke : async (cmd) => {
 const appWin = tauri ? tauri.window.getCurrentWindow() : null;
 
 
-// ---- Motion: a loose pile of kipple settles into neat rows around Kipple. Quiet: one short ease-out, no overshoot. ----
+// ---- Motion: the kipple drifts around, Kipple arrives and tames it into neat rows. ----
+// The intro is drawn frame by frame so the cards move along smooth curves and blend into place
+// while still moving. Each launch picks one of a few choreographies and fresh paths, so it never repeats exactly.
 const items = [...document.querySelectorAll(".it")];
 const mascot = document.querySelector(".mascot");
 const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-const EASE = "cubic-bezier(.22,1,.36,1)";
+const ART = 230, MID = ART / 2;
 const size = el => [el.offsetWidth, el.offsetHeight];
 // Tidy board: one column per kind (messages, links, photos), one row above and one below Kipple.
 const COLS = { msg: 40, url: 115, pic: 190 };
@@ -165,47 +169,130 @@ const seen = {};
 const tidy = items.map(el => {
   const kind = el.classList[1];
   const [w, h] = size(el);
+  // The extra ones are eaten by Kipple while it tidies up.
+  if (el.classList.contains("extra")) return { x: MID - w / 2, y: MID - h / 2, gone: true };
   const row = seen[kind] = (seen[kind] || 0) + 1;
   return { x: COLS[kind] - w / 2, y: row === 1 ? 22 - h / 2 : 208 - h / 2 };
 });
-const tf = (x, y, r = 0) => `translate(${x}px, ${y}px) rotate(${r}deg)`;
-const place = () => items.forEach((el, i) => { el.style.transform = tf(tidy[i].x, tidy[i].y); el.style.opacity = 1; });
-// Each card starts a little off its spot, tilted, as if dropped there; fixed offsets so every launch looks the same.
-const MESS = [[-14, 10, -9], [10, 14, 7], [16, -8, 10], [-12, -12, -6], [8, -14, 8], [-16, 8, -10]];
+const tf = (x, y, r = 0, k = 1) => `translate(${x}px, ${y}px) rotate(${r}deg) scale(${k})`;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
+const easeInOut = v => v < .5 ? 4 * v * v * v : 1 - Math.pow(-2 * v + 2, 3) / 2;
+const easeOut = v => 1 - Math.pow(1 - v, 3);
+const place = () => items.forEach((el, i) => { el.style.transform = tf(tidy[i].x, tidy[i].y, 0, tidy[i].gone ? 0.2 : 1); el.style.opacity = tidy[i].gone ? 0 : 1; });
 
+// Choreographies: each makes a path (seconds → x, y, rotation, scale) for one card, centred on the card.
+const CHOREO = {
+  // Floating as if in water: two slow sine waves per axis.
+  drift: () => {
+    const cx = rnd(10, 400), cy = rnd(0, 220), ax = rnd(25, 60), ay = rnd(18, 40), bx = rnd(8, 20), by = rnd(8, 20);
+    const w1 = rnd(.5, .9), w2 = rnd(1.1, 1.6), p = rnd(0, 6.3), q = rnd(0, 6.3), r0 = rnd(-25, 25), k = rnd(.9, 1.15);
+    return t => [cx + ax * Math.sin(w1 * t + p) + bx * Math.sin(w2 * t + q), cy + ay * Math.cos(w1 * .8 * t + q) + by * Math.sin(w2 * t + p), r0 + 14 * Math.sin(w1 * t + q), k];
+  },
+  // A slow whirl around the spot where Kipple will appear.
+  orbit: (i, n, dir) => {
+    const a0 = (i / n) * Math.PI * 2 + rnd(-.3, .3), rad = rnd(70, 150), w = rnd(.55, .8) * dir, wob = rnd(6, 16), k = rnd(.9, 1.12);
+    return t => {
+      const a = a0 + w * t, rr = rad + wob * Math.sin(1.3 * t + a0);
+      return [MID + 40 + rr * 1.35 * Math.cos(a), MID + rr * .75 * Math.sin(a), dir * (Math.cos(a) * 18), k];
+    };
+  },
+  // Falling in from above like leaves, swaying.
+  fall: (i, n) => {
+    const x0 = rnd(0, 420), y1 = rnd(20, 210), sway = rnd(15, 35), w = rnd(1, 1.6), p = rnd(0, 6.3), d = rnd(0, .9), k = rnd(.9, 1.12);
+    return t => {
+      const v = easeOut(clamp01((t - d) / 2.4));
+      return [x0 + sway * Math.sin(w * t + p), -70 + (y1 + 70) * v, 28 * Math.sin(w * t + p + 1), k];
+    };
+  },
+  // Spilling out of the middle and slowly spreading like a dropped pile.
+  burst: () => {
+    const a = rnd(0, Math.PI * 2), dist = rnd(80, 190), spin = rnd(-60, 60), k = rnd(.9, 1.15), lag = rnd(0, .4);
+    return t => {
+      const v = easeOut(clamp01((t - lag) / 2.2));
+      return [MID + 30 + Math.cos(a) * dist * 1.3 * v + 6 * Math.sin(1.7 * t + a), MID + Math.sin(a) * dist * .7 * v + 6 * Math.cos(1.3 * t + a), spin * v + 8 * Math.sin(t + a), .6 + (k - .6) * v];
+    };
+  },
+};
+
+// Timeline, seconds. Slow on purpose: about five seconds from first card to the last one in place.
+const MASCOT_AT = 2.1, EAT_AT = 2.4, TIDY_AT = 3.0, STEP = .17, SETTLE = 1.2;
+let raf = 0;
 function intro() {
   const win = $("win");
   if (reduced) { place(); win.classList.remove("intro"); return; }
-  win.classList.remove("intro");
-  mascot.animate(
-    [{ opacity: 0, transform: "translate(-50%, calc(-50% + 8px)) scale(.96)" }, { opacity: 1, transform: "translate(-50%, -50%)" }],
-    { duration: 600, easing: EASE, fill: "backwards" });
-  items.forEach((el, i) => {
-    const t = tidy[i];
-    const [dx, dy, r] = MESS[i % MESS.length];
-    el.animate(
-      [{ transform: tf(t.x + dx, t.y + dy, r), opacity: 0 }, { transform: tf(t.x, t.y), opacity: 1 }],
-      { duration: 800, delay: 150 + i * 70, easing: EASE, fill: "backwards" });
-  });
-  document.querySelector(".text").animate(
-    [{ opacity: 0, transform: "translateY(6px)" }, { opacity: 1, transform: "none" }],
-    { duration: 600, delay: 250, easing: EASE, fill: "backwards" });
+  const asked = new URLSearchParams(location.search).get("m"); // ?m=orbit in a browser shows one choreography
+  const name = CHOREO[asked] ? asked : pick(Object.keys(CHOREO));
+  const dir = pick([1, -1]);
+  const n = items.length;
+  const paths = items.map((el, i) => CHOREO[name](i, n, dir));
+  // Order of arrival: extras get eaten first, then the board fills in a random order.
+  const keep = items.map((_, i) => i).filter(i => !tidy[i].gone).sort(() => Math.random() - .5);
+  const eat = items.map((_, i) => i).filter(i => tidy[i].gone);
+  const start = {};
+  eat.forEach((i, j) => start[i] = EAT_AT + j * .09);
+  keep.forEach((i, j) => start[i] = TIDY_AT + j * STEP);
+  const appear = items.map(() => rnd(0, .7));
+  const sizes = items.map(size);
+  const t0 = performance.now();
+  let shown = false;
+  const frame = now => {
+    const t = (now - t0) / 1000;
+    let busy = false;
+    items.forEach((el, i) => {
+      const [w, h] = sizes[i], g = tidy[i];
+      const [px, py, pr, pk] = paths[i](t);
+      const s = easeInOut(clamp01((t - start[i]) / (g.gone ? .8 : SETTLE)));
+      if (s < 1) busy = true;
+      const x = px - w / 2 + (g.x - (px - w / 2)) * s;
+      const y = py - h / 2 + (g.y - (py - h / 2)) * s;
+      const r = pr * (1 - s), k = pk + ((g.gone ? .2 : 1) - pk) * s;
+      const fade = easeOut(clamp01((t - appear[i]) / .9));
+      el.style.transform = tf(x, y, r, k);
+      el.style.opacity = g.gone ? fade * (1 - s) : fade;
+    });
+    if (!shown && t >= MASCOT_AT) {
+      shown = true;
+      win.classList.remove("intro");
+      mascot.animate([
+        { transform: "translate(-50%, 20%) scale(.6) rotate(-10deg)", opacity: 0 },
+        { transform: "translate(-50%, -58%) scale(1.05) rotate(3deg)", opacity: 1, offset: 0.6 },
+        { transform: "translate(-50%, -50%) scale(1) rotate(0)" },
+      ], { duration: 1100, easing: "cubic-bezier(.3,1.15,.5,1)" });
+      document.querySelector(".text").animate(
+        [{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }],
+        { duration: 1000, delay: 1500, easing: "cubic-bezier(.22,1,.36,1)", fill: "backwards" });
+    }
+    raf = busy || !shown ? requestAnimationFrame(frame) : 0;
+    if (!raf) place();
+  };
+  raf = requestAnimationFrame(frame);
 }
 
-// While installing, the cards dim and come back one after another, a slow wave around Kipple (clockwise: DOM order).
+// While installing, Kipple swallows the cards one by one along a little arc and they reappear on the board, on a loop.
 let loops = [];
-function wave(on) {
+function swallow(on) {
   loops.forEach(a => a.cancel());
   loops = [];
   if (!on || reduced) return;
-  items.forEach((el, i) => {
-    const t = tidy[i];
+  if (raf) { cancelAnimationFrame(raf); raf = 0; place(); $("win").classList.remove("intro"); }
+  const keep = items.map((_, i) => i).filter(i => !tidy[i].gone);
+  keep.forEach((i, j) => {
+    const el = items[i], [w, h] = size(el), t = tidy[i];
+    const cx = MID - w / 2, cy = MID - h / 2;
+    // Lift away from the centre first, then curve into Kipple.
+    const ox = t.x + (t.x - cx) * .12, oy = t.y + (t.y - cy) * .12 - 8;
+    const spin = j % 2 ? -1 : 1;
     loops.push(el.animate([
       { transform: tf(t.x, t.y), opacity: 1 },
-      { transform: tf(t.x, t.y - 3), opacity: 0.45, offset: 0.25 },
-      { transform: tf(t.x, t.y), opacity: 1, offset: 0.5 },
+      { transform: tf(ox, oy, spin * 8, 1.05), opacity: 1, offset: 0.14, easing: "cubic-bezier(.55,0,.8,.3)" },
+      { transform: tf((ox + cx) / 2 + spin * 12, (oy + cy) / 2 - 10, spin * 40, .65), opacity: .9, offset: 0.28 },
+      { transform: tf(cx, cy, spin * 80, .15), opacity: 0, offset: 0.4 },
+      { transform: tf(t.x, t.y + 6, 0, .85), opacity: 0, offset: 0.62, easing: "cubic-bezier(.22,1,.36,1)" },
+      { transform: tf(t.x, t.y), opacity: 1, offset: 0.8 },
       { transform: tf(t.x, t.y), opacity: 1 },
-    ], { duration: 2400, delay: i * 200, easing: "ease-in-out", iterations: Infinity }));
+    ], { duration: 3600, delay: j * 600, iterations: Infinity, easing: "ease-in-out" }));
   });
 }
 
@@ -214,7 +301,7 @@ function show(s) {
   const w = $("win");
   w.dataset.s = s;
   w.classList.toggle("installing", s === 2);
-  wave(s === 2);
+  swallow(s === 2);
   w.classList.toggle("done", s === 3);
   const focus = { 1: "go", 3: "open", 4: "retry" }[s];
   if (focus) setTimeout(() => $(focus).focus(), 50);
