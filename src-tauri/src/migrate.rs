@@ -22,11 +22,16 @@ const SECRETS: &[&str] = &["anthropic_api_key", "kipple_install_id", "telegram_s
 const MARKER: &str = "migrated-from-savedboard";
 
 pub fn run() {
-    move_secrets();
+    #[cfg(not(windows))]
+    move_secrets(false);
     #[cfg(windows)]
     {
         if let Some(roaming) = std::env::var_os("APPDATA") {
             let roaming = Path::new(&roaming);
+            // Until the data has been copied, the old install is the one in use: its credentials
+            // win over any left in the new place (e.g. after going back to an older version and
+            // deleting the new folder to migrate again).
+            move_secrets(!roaming.join(APP_ID).join(MARKER).exists());
             let _ = copy_data(&roaming.join(OLD_APP_ID), &roaming.join(APP_ID));
         }
         if let Some(local) = std::env::var_os("LOCALAPPDATA") {
@@ -41,12 +46,14 @@ pub fn run() {
     }
 }
 
-/// Copies credentials to the new service name; the old entry goes once the copy reads back.
-fn move_secrets() {
+/// Copies credentials to the new service name (over an existing one when `overwrite`); the old
+/// entry goes once the copy reads back.
+fn move_secrets(overwrite: bool) {
     for name in SECRETS {
         let (Ok(old), Ok(new)) = (keyring::Entry::new(OLD_APP_ID, name), keyring::Entry::new(APP_ID, name)) else { continue };
         let Ok(value) = old.get_password() else { continue };
-        if matches!(new.get_password(), Err(keyring::Error::NoEntry)) && new.set_password(&value).is_err() {
+        let missing = matches!(new.get_password(), Err(keyring::Error::NoEntry));
+        if (overwrite || missing) && new.set_password(&value).is_err() {
             continue;
         }
         if new.get_password().is_ok_and(|v| v == value) {
