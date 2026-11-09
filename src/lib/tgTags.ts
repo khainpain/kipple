@@ -46,6 +46,14 @@ export function topTags(cards: Card[], max = MAX_TG_TAGS): string[] {
     .map(([t]) => t);
 }
 
+/**
+ * Tags to give a Telegram tag: the most used ones, plus those already put on messages, so a tag
+ * that drops out of the top doesn't come off messages that have it.
+ */
+export function syncTitles(cards: Card[], state: TagSyncState): string[] {
+  return [...new Set([...topTags(cards), ...Object.values(state.tags).flatMap((t) => t.titles)])];
+}
+
 const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
 
 export interface TagItem {
@@ -67,11 +75,15 @@ export function tagPlan(cards: Card[], state: TagSyncState, usable: Set<string>)
   return items.sort(oldestFirst);
 }
 
+/** Messages that can't have a caption, so hashtags have nowhere to go. */
+const NO_CAPTION = new Set<Card["kind"]>(["sticker", "video_note", "poll", "location", "contact"]);
+
 /** Hashtags still to add to each card's own message. */
 export function hashtagPlan(cards: Card[], state: TagSyncState): TagItem[] {
   const items: TagItem[] = [];
   for (const c of pool(cards)) {
     if (c.forwardedFrom) continue; // Telegram doesn't let anyone edit a forwarded message
+    if (NO_CAPTION.has(c.kind)) continue;
     const have = new Set([...c.hashtags.map((h) => hashtag(h)), ...(state.hashtags[String(c.id)] ?? [])].map((h) => h?.toLowerCase()));
     const want = [...new Set(effectiveTags(c).map(hashtag))].filter((h): h is string => !!h && !have.has(h.toLowerCase()));
     if (want.length) items.push({ cardId: c.id, date: unix(c), want });
@@ -120,7 +132,7 @@ export async function syncTags(cards: Card[], state: TagSyncState, mode: TagMode
     onFlood: () => (delay = Math.min(Math.round(delay * 1.5), 8000)),
   });
 
-  const titles = mode === "tags" ? topTags(cards) : [];
+  const titles = mode === "tags" ? syncTitles(cards, state) : [];
   const setup = await call(() => tg.tagsSetup(titles));
   if (mode === "tags" && !setup.premium) throw new NoPremiumError();
   if (state.owner !== undefined && state.owner !== setup.owner) Object.assign(state, emptyTagSyncState());
@@ -138,8 +150,9 @@ export async function syncTags(cards: Card[], state: TagSyncState, mode: TagMode
       const add = item.want.map((t) => reactionOf.get(t)!);
       const before = state.tags[key]?.reactions ?? [];
       const res = await call(() => tg.tagsApply(item.cardId, item.date, setup.owner, add, before.filter((r) => !add.includes(r))));
-      if (res.status === "missing" || res.status === "changed" || res.status === "full") progress.skipped++;
-      if (res.status !== "missing" && res.status !== "changed") {
+      const failed = res.status === "missing" || res.status === "changed" || res.status === "not_editable";
+      if (failed || res.status === "full") progress.skipped++;
+      if (!failed) {
         // Even with no room for all of them, the card isn't retried until its tags change.
         if (item.want.length || res.applied.length) state.tags[key] = { titles: item.want, reactions: res.applied };
         else delete state.tags[key];

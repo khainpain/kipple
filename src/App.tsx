@@ -849,7 +849,7 @@ export default function App() {
       {settingsDialog}
       {consentDialog}
       {showTelegram && platform.telegram && (
-        <TelegramDialog tg={platform.telegram} cards={lib.cards} running={sendingTg} onStart={sendTelegram} syncingTags={syncingTags} onSyncTags={syncTagsToTelegram} onOpenSettings={() => (setShowTelegram(false), setShowSettings(true))} onClose={() => setShowTelegram(false)} />
+        <TelegramDialog tg={platform.telegram} cards={lib.cards} running={sendingTg} onStart={sendTelegram} syncingTags={syncingTags} otherJob={!!job && !sendingTg && !syncingTags} onSyncTags={syncTagsToTelegram} onOpenSettings={() => (setShowTelegram(false), setShowSettings(true))} onClose={() => setShowTelegram(false)} />
       )}
       <Toast text={toast} onClose={() => setToast(null)} />
     </div>

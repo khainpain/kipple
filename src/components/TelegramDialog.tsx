@@ -3,7 +3,7 @@ import type { TelegramApi } from "../platform/types";
 import type { Card } from "../lib/types";
 import { BOARD_TITLE, buildPlan, otherTopic, telegramErrorText, type BoardState, type SendOptions } from "../lib/telegram";
 import { loadBoardState, loadTagSyncState } from "../lib/store";
-import { hashtagPlan, MAX_TG_TAGS, tagPlan, TAGS_PER_MESSAGE, topTags, type TagMode, type TagSyncState } from "../lib/tgTags";
+import { hashtagPlan, MAX_TG_TAGS, tagPlan, TAGS_PER_MESSAGE, syncTitles, type TagMode, type TagSyncState } from "../lib/tgTags";
 import { T } from "../i18n";
 
 type Step = "loading" | "noApi" | "phone" | "code" | "password" | "ready";
@@ -16,6 +16,8 @@ export function TelegramDialog(props: {
   onStart: (opts: SendOptions) => void;
   /** Tags are being copied to Saved Messages right now. */
   syncingTags: boolean;
+  /** Something else is running (AI tagging, loading): starting now would stop it. */
+  otherJob: boolean;
   onSyncTags: (mode: TagMode) => void;
   /** Only for builds without a built-in Telegram key: the user's own key lives in Settings → Advanced. */
   onOpenSettings: () => void;
@@ -80,7 +82,7 @@ export function TelegramDialog(props: {
   const mode: TagMode = premium ? (tagMode ?? "tags") : "hashtags";
   const tagCount = useMemo(() => {
     if (!tagState) return 0;
-    return (mode === "tags" ? tagPlan(props.cards, tagState, new Set(topTags(props.cards))) : hashtagPlan(props.cards, tagState)).length;
+    return (mode === "tags" ? tagPlan(props.cards, tagState, new Set(syncTitles(props.cards, tagState))) : hashtagPlan(props.cards, tagState)).length;
   }, [props.cards, tagState, mode]);
 
   const L = T.telegram;
@@ -227,7 +229,7 @@ export function TelegramDialog(props: {
             <p className="hint">{tagCount ? L.tagsPlan(tagCount) : L.tagsNothing}</p>
             <div className="dialog-buttons">
               <span className="spacer" />
-              <button disabled={busy || props.running || props.syncingTags || !tagCount} onClick={() => props.onSyncTags(mode)}>
+              <button disabled={busy || props.running || props.syncingTags || props.otherJob || !tagCount} onClick={() => props.onSyncTags(mode)}>
                 {props.syncingTags ? L.tagsRunning : L.tagsStart}
               </button>
             </div>

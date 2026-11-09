@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { TelegramApi, TagResult } from "../platform/types";
 import type { Card } from "./types";
-import { emptyTagSyncState, hashtagPlan, NoPremiumError, syncTags, tagPlan, topTags } from "./tgTags";
+import { emptyTagSyncState, hashtagPlan, NoPremiumError, syncTags, syncTitles, tagPlan, topTags } from "./tgTags";
 
 const card = (id: number, date: string, tags: string[], extra: Partial<Card> = {}): Card => ({
   id,
@@ -139,5 +139,26 @@ describe("syncTags", () => {
     await syncTags(cards, emptyTagSyncState(), "tags", { tg, save: async () => {}, onProgress: (p) => p.waitSeconds && waits.push(p.waitSeconds), sleep: noSleep });
     expect(waits).toEqual([3]);
     expect(log).toHaveLength(3);
+  });
+});
+
+describe("edge cases", () => {
+  it("leaves out messages that can't have a caption", () => {
+    const sticker = card(6, "2026-06-01T00:00:00Z", ["fun"], { kind: "sticker" });
+    expect(hashtagPlan([sticker], emptyTagSyncState())).toEqual([]);
+  });
+
+  it("keeps tags that dropped out of the top usable, so they don't come off messages", () => {
+    const state = { ...emptyTagSyncState(), tags: { "9": { titles: ["rare"], reactions: ["🦄"] } } };
+    expect(syncTitles(cards, state)).toContain("rare");
+  });
+
+  it("retries a message Telegram refused next time instead of marking it done", async () => {
+    const { tg } = fakeTg({ results: { 1: "not_editable" } });
+    const state = emptyTagSyncState();
+    const res = await syncTags(cards, state, "tags", { tg, save: async () => {}, onProgress: () => {}, sleep: noSleep });
+    expect(res.skipped).toBe(1);
+    expect(state.tags["1"]).toBeUndefined();
+    expect(state.tags["2"]).toBeDefined();
   });
 });

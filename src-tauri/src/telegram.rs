@@ -1296,6 +1296,12 @@ pub async fn tg_backup_info(app: tauri::AppHandle) -> Result<BackupInfo, String>
 // Before touching a message both check that it is in Saved Messages of `owner` and has the
 // card's date: a library loaded from another account would otherwise point at other messages.
 
+/// Telegram refused this one message (400): a message it won't take a tag or a caption on,
+/// a caption over the length limit and the like. The run skips the message and goes on.
+fn refused(e: &InvocationError) -> bool {
+    matches!(e, InvocationError::Rpc(r) if r.code == 400)
+}
+
 /// Telegram's limit for a tag's name.
 const TAG_TITLE_MAX: usize = 12;
 
@@ -1393,8 +1399,8 @@ pub async fn tg_tags_setup(state: tauri::State<'_, TgState>, titles: Vec<String>
 pub struct TagResult {
     /// "ok", "same" (nothing to change), "full" (no room for more tags), "missing" (the message
     /// is gone), "changed" (another message has this id: different account or date),
-    /// "forwarded" (hashtags: not the user's own text) or "not_editable" (hashtags: Telegram
-    /// won't take a caption or the longer text).
+    /// "forwarded" (hashtags: not the user's own text) or "not_editable" (Telegram refused the
+    /// tag, the caption or the longer text for this message).
     status: &'static str,
     /// What Kipple's tags on the message are now: reactions, or the hashtags it added.
     applied: Vec<String>,
@@ -1484,6 +1490,7 @@ pub async fn tg_tags_apply(
             }
             Err(e) if e.is("REACTIONS_TOO_MANY") => return Ok(TagResult::skip("full")),
             Err(e) if e.is("MESSAGE_ID_INVALID") => return Ok(TagResult::skip("missing")),
+            Err(e) if refused(&e) => return Ok(TagResult::skip("not_editable")),
             Err(e) => return Err(err(e)),
         }
     }
@@ -1592,13 +1599,8 @@ pub async fn tg_tags_hashtags(
         Ok(_) => Ok(TagResult { status: "ok", applied: added }),
         Err(e) if e.is("MESSAGE_NOT_MODIFIED") => Ok(TagResult { status: "same", applied: vec![] }),
         Err(e) if e.is("MESSAGE_ID_INVALID") => Ok(TagResult::skip("missing")),
-        Err(e)
-            if ["MESSAGE_EDIT_TIME_EXPIRED", "MESSAGE_AUTHOR_REQUIRED", "MEDIA_CAPTION_TOO_LONG", "MESSAGE_TOO_LONG", "MESSAGE_EMPTY", "ENTITY_BOUNDS_INVALID", "ENTITY_MENTION_USER_INVALID", "DOCUMENT_INVALID"]
-                .iter()
-                .any(|n| e.is(n)) =>
-        {
-            Ok(TagResult::skip("not_editable"))
-        }
+        // MEDIA_CAPTION_TOO_LONG, MESSAGE_TOO_LONG, MESSAGE_EDIT_TIME_EXPIRED, ENTITY_* and so on.
+        Err(e) if refused(&e) => Ok(TagResult::skip("not_editable")),
         Err(e) => Err(err(e)),
     }
 }
