@@ -51,6 +51,13 @@ export const en: Dict = {
     tgMissing: (n) => ` ${num(n)} message${s(n)} ${n === 1 ? "is" : "are"} no longer in Saved Messages and ${n === 1 ? "was" : "were"} skipped.`,
     tgStopped: (done, total) => `Stopped: sent ${num(done)} of ${num(total)}. Press "Send" again to continue.`,
     tgDone: (n, board) => `Done: ${cards(n)} in the "${board}" group.`,
+    jobTags: "Tags to Telegram",
+    jobTagsPause: (sec) => `Tags to Telegram, waiting ${sec} s`,
+    tagsDone: (n, skipped) =>
+      `Done: tags on ${num(n)} message${s(n)} in Saved Messages.` +
+      (skipped ? ` ${num(skipped)} skipped: forwarded, deleted or out of room for tags.` : ""),
+    tagsStopped: (done, total) => `Stopped: ${num(done)} of ${num(total)}. Press "Copy tags" again to continue.`,
+    tagsNoPremium: "Tags in Saved Messages need Telegram Premium. Choose hashtags instead.",
     wiped: "All data has been deleted from this computer.",
     statsNotice: "Kipple now sends anonymous usage stats: no id, no message text. You can turn them off in Settings.",
     webBanner: (version) =>
@@ -546,6 +553,19 @@ export const en: Dict = {
     untagged: (n, other) => ` ${cards(n)} without AI tags yet will go to the "${other}" topic; better press "Tag" first.`,
     sending: "Sending…",
     send: (n) => `Send ${num(n)}`,
+    tagsTitle: "Tags in Saved Messages",
+    tagsIntro: "Kipple's tags show up on the messages themselves in Telegram. Nothing changes until you press the button.",
+    tagsModeTags: "As Telegram tags",
+    tagsModeTagsHint: (max, per) =>
+      `Your ${num(max)} most used tags become Saved Messages tags, up to ${num(per)} per message. Tags you added yourself stay.`,
+    tagsNoPremium: "Tags in Saved Messages need Telegram Premium.",
+    tagsModeHashtags: "As hashtags in the text",
+    tagsModeHashtagsHint:
+      "Hashtags go at the end of messages you wrote yourself. Telegram doesn't allow editing forwarded ones, so those stay as they are. Each message is copied to the local backup before it changes.",
+    tagsPlan: (n) => `To update: ${num(n)} message${s(n)}.`,
+    tagsNothing: "All tags are in Telegram already.",
+    tagsStart: "Copy tags",
+    tagsRunning: "Copying…",
     boardAbout: (board) => `Sorted Saved Messages: topics, summaries and tags from ${board}.`,
     otherTopic: "Other",
     noteLabel: "Note",

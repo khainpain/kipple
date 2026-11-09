@@ -55,6 +55,13 @@ export const ru = {
     tgMissing: (n: number) => ` ${num(n)} ${plural(n, "сообщения", "сообщений", "сообщений")} уже нет в «Избранном», они пропущены.`,
     tgStopped: (done: number, total: number) => `Остановлено: отправлено ${num(done)} из ${num(total)}. Нажми «Отправить» ещё раз, чтобы продолжить.`,
     tgDone: (n: number, board: string) => `Готово: ${cards(n)} в группе «${board}».`,
+    jobTags: "Теги в Telegram",
+    jobTagsPause: (s: number) => `Теги в Telegram, пауза ${s} с`,
+    tagsDone: (n: number, skipped: number) =>
+      `Готово: теги у ${num(n)} ${plural(n, "сообщения", "сообщений", "сообщений")} в «Избранном».` +
+      (skipped ? ` ${num(skipped)} ${plural(skipped, "пропущено", "пропущены", "пропущены")}: пересланные, удалённые или без места для меток.` : ""),
+    tagsStopped: (done: number, total: number) => `Остановлено: ${num(done)} из ${num(total)}. Нажми «Перенести теги» ещё раз, чтобы продолжить.`,
+    tagsNoPremium: "Метки в «Избранном» есть только с Telegram Premium. Выбери хештеги.",
     wiped: "Все данные удалены с этого компьютера.",
     statsNotice: "Kipple теперь отправляет анонимную статистику: без id и текста сообщений. Выключить можно в Настройках.",
     webBanner: (version: string) =>
@@ -554,6 +561,20 @@ export const ru = {
     untagged: (n: number, other: string) => ` ${cards(n)} ещё без AI-разметки ${plural(n, "попадёт", "попадут", "попадут")} в тему «${other}»; лучше сначала нажать «Разметить».`,
     sending: "Уже отправляю…",
     send: (n: number) => `Отправить ${num(n)}`,
+    // Tags on the messages in Saved Messages (src/lib/tgTags.ts).
+    tagsTitle: "Теги в «Избранном»",
+    tagsIntro: "Теги из Kipple появятся у самих сообщений в Telegram. Ничего не меняется, пока не нажмёшь кнопку.",
+    tagsModeTags: "Метками Telegram",
+    tagsModeTagsHint: (max: number, per: number) =>
+      `Самые частые теги (до ${num(max)}) станут метками «Избранного», у каждого сообщения до ${num(per)}. Твои собственные метки останутся.`,
+    tagsNoPremium: "Метки в «Избранном» есть только с Telegram Premium.",
+    tagsModeHashtags: "Хештегами в тексте",
+    tagsModeHashtagsHint:
+      "Хештеги допишутся в конец твоих собственных сообщений. Пересланные Telegram менять не даёт, они останутся как есть. Перед правкой текст сохраняется в локальной копии.",
+    tagsPlan: (n: number) => `К обновлению: ${num(n)} ${plural(n, "сообщение", "сообщения", "сообщений")}.`,
+    tagsNothing: "Все теги уже в Telegram.",
+    tagsStart: "Перенести теги",
+    tagsRunning: "Переношу…",
     // What goes into the group itself.
     boardAbout: (board: string) => `Разобранное «Избранное»: темы, описания и теги из ${board}.`,
     otherTopic: "Разное",
