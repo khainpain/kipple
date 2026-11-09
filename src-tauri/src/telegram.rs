@@ -62,6 +62,8 @@ pub struct TgStatus {
     custom_api: bool,
     authorized: bool,
     name: Option<String>,
+    /// The account has Telegram Premium (needed for tags in Saved Messages).
+    premium: bool,
 }
 
 /// The signed-in account, for the sidebar header.
@@ -252,10 +254,11 @@ fn user_name(u: &tl::enums::User) -> String {
     }
 }
 
-async fn me(client: &Client) -> Result<Option<String>, InvocationError> {
+/// The signed-in account's name and whether it has Premium; None when nobody is signed in.
+async fn me(client: &Client) -> Result<Option<(String, bool)>, InvocationError> {
     let req = tl::functions::users::GetUsers { id: vec![tl::enums::InputUser::UserSelf] };
     match client.invoke(&req).await {
-        Ok(users) => Ok(users.first().map(user_name)),
+        Ok(users) => Ok(users.first().map(|u| (user_name(u), matches!(u, tl::enums::User::User(u) if u.premium)))),
         Err(InvocationError::Rpc(e)) if e.code == 401 => Ok(None),
         Err(e) => Err(e),
     }
@@ -266,16 +269,18 @@ pub async fn tg_status(state: tauri::State<'_, TgState>) -> Result<TgStatus, Str
     let built_in_api = built_in_api().is_some();
     let custom_api = custom_api();
     if api_credentials().is_none() {
-        return Ok(TgStatus { has_api: false, built_in_api, custom_api, authorized: false, name: None });
+        return Ok(TgStatus { has_api: false, built_in_api, custom_api, authorized: false, name: None, premium: false });
     }
     // Without a saved session there's nothing to check, and no reason to connect yet.
     let connected = state.0.lock().await.is_some();
     if read_secret(SESSION_KEY).is_none() && !connected {
-        return Ok(TgStatus { has_api: true, built_in_api, custom_api, authorized: false, name: None });
+        return Ok(TgStatus { has_api: true, built_in_api, custom_api, authorized: false, name: None, premium: false });
     }
     let c = conn(&state).await?;
-    let name = me(&c.client).await.map_err(err)?;
-    Ok(TgStatus { has_api: true, built_in_api, custom_api, authorized: name.is_some(), name })
+    let who = me(&c.client).await.map_err(err)?;
+    let premium = who.as_ref().is_some_and(|w| w.1);
+    let name = who.map(|w| w.0);
+    Ok(TgStatus { has_api: true, built_in_api, custom_api, authorized: name.is_some(), name, premium })
 }
 
 /// The small profile photo of the signed-in user.
@@ -925,6 +930,9 @@ pub struct SavedMessage {
     /// The message has a link preview with a picture (Telegram's own copy of the page's
     /// og:image); tg_saved_photos downloads it like a photo.
     web_photo: bool,
+    /// Backup before an edit only: every formatting entity, as Telegram had it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    raw_entities: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -1081,6 +1089,7 @@ fn saved_message(m: &tl::types::Message, names: &HashMap<i64, String>) -> SavedM
         grouped_id: m.grouped_id.map(|g| g.to_string()),
         media: m.media.as_ref().and_then(media_of),
         web_photo: m.media.as_ref().and_then(photo_of).is_some_and(|(_, web)| web),
+        raw_entities: None,
     }
 }
 
@@ -1186,7 +1195,8 @@ struct BackupState {
 struct BackupLine<'a> {
     /// Unix seconds when the line was written.
     backed_up_at: i64,
-    /// Why: "history" (read from Saved Messages) or "before_delete" (Kipple was about to delete it).
+    /// Why: "history" (read from Saved Messages), "before_delete" (Kipple was about to delete it)
+    /// or "before_edit" (Kipple was about to add hashtags to it).
     reason: &'static str,
     #[serde(flatten)]
     message: &'a SavedMessage,
@@ -1276,6 +1286,354 @@ pub async fn tg_backup_info(app: tauri::AppHandle) -> Result<BackupInfo, String>
         }
     }
     Ok(BackupInfo { dir: dir.to_string_lossy().into_owned(), messages })
+}
+
+// ---- Kipple tags in Saved Messages ------------------------------------------------------
+//
+// Only when the user presses the button (src/lib/tgTags.ts runs it, one message at a time).
+// Two ways, the user picks one:
+// - Telegram's own tags in Saved Messages: an emoji reaction with a name, Premium only. Kipple
+//   names one free emoji per tag (or reuses a tag with that name), then sets the tags on each
+//   message next to the ones the user put there.
+// - Hashtags at the end of the text of the user's own messages (forwarded ones can't be edited).
+//   The message goes into the local backup before it's changed.
+// Before touching a message both check that it is in Saved Messages of `owner` and has the
+// card's date: a library loaded from another account would otherwise point at other messages.
+
+/// Telegram refused this one message (400): a message it won't take a tag or a caption on,
+/// a caption over the length limit and the like. The run skips the message and goes on.
+fn refused(e: &InvocationError) -> bool {
+    matches!(e, InvocationError::Rpc(r) if r.code == 400)
+}
+
+/// Telegram's limit for a tag's name.
+const TAG_TITLE_MAX: usize = 12;
+
+/// A reaction as a string: the emoji itself, or "custom:<document id>" for a custom emoji.
+fn reaction_key(r: &tl::enums::Reaction) -> Option<String> {
+    match r {
+        tl::enums::Reaction::Emoji(e) => Some(e.emoticon.clone()),
+        tl::enums::Reaction::CustomEmoji(c) => Some(format!("custom:{}", c.document_id)),
+        _ => None,
+    }
+}
+
+fn reaction_of(key: &str) -> tl::enums::Reaction {
+    match key.strip_prefix("custom:").and_then(|id| id.parse().ok()) {
+        Some(document_id) => tl::types::ReactionCustomEmoji { document_id }.into(),
+        None => tl::types::ReactionEmoji { emoticon: key.to_string() }.into(),
+    }
+}
+
+/// A Kipple tag as a Telegram tag name: trimmed and cut to Telegram's length.
+fn tag_title(s: &str) -> String {
+    s.trim().chars().take(TAG_TITLE_MAX).collect::<String>().trim_end().to_string()
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TagReaction {
+    /// The Kipple tag, as asked.
+    title: String,
+    /// Its reaction (see reaction_key).
+    reaction: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TagSetup {
+    premium: bool,
+    /// The signed-in account's user id: pass it back with every message.
+    owner: i64,
+    /// The tags that have an emoji now, in the order asked. Tags past the last free emoji are left out.
+    tags: Vec<TagReaction>,
+}
+
+/// Gives each Kipple tag in `titles` a Telegram tag: an existing one with the same name, or a
+/// free emoji from Telegram's default tag set named after it. Without Premium it changes nothing.
+#[tauri::command]
+pub async fn tg_tags_setup(state: tauri::State<'_, TgState>, titles: Vec<String>) -> Result<TagSetup, String> {
+    let c = conn(&state).await?;
+    let me = self_user(&c).await.ok_or("NO_ACCOUNT")?;
+    if !me.premium || titles.is_empty() {
+        return Ok(TagSetup { premium: me.premium, owner: me.id, tags: vec![] });
+    }
+    let req = tl::functions::messages::GetSavedReactionTags { peer: None, hash: 0 };
+    let existing = match c.client.invoke(&req).await.map_err(err)? {
+        tl::enums::messages::SavedReactionTags::Tags(t) => t.tags,
+        tl::enums::messages::SavedReactionTags::NotModified => vec![],
+    };
+    let mut by_title: HashMap<String, String> = HashMap::new();
+    let mut used: std::collections::HashSet<String> = std::collections::HashSet::new();
+    for tl::enums::SavedReactionTag::Tag(t) in &existing {
+        let Some(key) = reaction_key(&t.reaction) else { continue };
+        used.insert(key.clone());
+        if let Some(title) = t.title.as_deref().map(tag_title).filter(|t| !t.is_empty()) {
+            by_title.entry(title.to_lowercase()).or_insert(key);
+        }
+    }
+    let req = tl::functions::messages::GetDefaultTagReactions { hash: 0 };
+    let defaults = match c.client.invoke(&req).await.map_err(err)? {
+        tl::enums::messages::Reactions::Reactions(r) => r.reactions,
+        tl::enums::messages::Reactions::NotModified => vec![],
+    };
+    let mut free = defaults.iter().filter_map(reaction_key).filter(|k| !used.contains(k));
+    let mut tags = Vec::new();
+    for title in titles {
+        let name = tag_title(&title);
+        if name.is_empty() {
+            continue;
+        }
+        if let Some(key) = by_title.get(&name.to_lowercase()) {
+            tags.push(TagReaction { title, reaction: key.clone() });
+            continue;
+        }
+        // Out of free emoji: this tag goes without, the ones after it may still have a tag already.
+        let Some(key) = free.next() else { continue };
+        let req = tl::functions::messages::UpdateSavedReactionTag { reaction: reaction_of(&key), title: Some(name.clone()) };
+        c.client.invoke(&req).await.map_err(err)?;
+        by_title.insert(name.to_lowercase(), key.clone());
+        tags.push(TagReaction { title, reaction: key });
+        tokio::time::sleep(Duration::from_millis(300)).await;
+    }
+    Ok(TagSetup { premium: true, owner: me.id, tags })
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TagResult {
+    /// "ok", "same" (nothing to change), "full" (no room for more tags), "missing" (the message
+    /// is gone), "changed" (another message has this id: different account or date),
+    /// "forwarded" (hashtags: not the user's own text) or "not_editable" (Telegram refused the
+    /// tag, the caption or the longer text for this message).
+    status: &'static str,
+    /// What Kipple's tags on the message are now: reactions, or the hashtags it added.
+    applied: Vec<String>,
+}
+
+impl TagResult {
+    fn skip(status: &'static str) -> Self {
+        TagResult { status, applied: vec![] }
+    }
+}
+
+/// Message `id` of Saved Messages, if it's still there and really is the card's message.
+async fn own_saved_message(c: &Conn, id: i32, date: i32, owner: i64) -> Result<Result<tl::types::Message, &'static str>, String> {
+    let req = tl::functions::messages::GetMessages { id: vec![tl::types::InputMessageId { id }.into()] };
+    use tl::enums::messages::Messages as R;
+    let messages = match c.client.invoke(&req).await.map_err(err)? {
+        R::Messages(m) => m.messages,
+        R::Slice(m) => m.messages,
+        R::ChannelMessages(m) => m.messages,
+        R::NotModified(_) => vec![],
+    };
+    let Some(m) = messages.into_iter().find_map(|m| match m {
+        tl::enums::Message::Message(m) if m.id == id => Some(m),
+        _ => None,
+    }) else {
+        return Ok(Err("missing"));
+    };
+    let in_saved = matches!(&m.peer_id, tl::enums::Peer::User(p) if p.user_id == owner);
+    Ok(if in_saved && m.date == date { Ok(m) } else { Err("changed") })
+}
+
+/// The tags set on a message, in the order they were added.
+fn chosen_reactions(m: &tl::types::Message) -> Vec<String> {
+    let Some(tl::enums::MessageReactions::Reactions(r)) = &m.reactions else { return vec![] };
+    let mut chosen: Vec<(i32, String)> = r
+        .results
+        .iter()
+        .filter_map(|tl::enums::ReactionCount::Count(rc)| Some((rc.chosen_order?, reaction_key(&rc.reaction)?)))
+        .collect();
+    chosen.sort();
+    chosen.into_iter().map(|(_, k)| k).collect()
+}
+
+/// Puts tags `add` on Saved Message `id` and takes off `remove` (tags Kipple put there before),
+/// keeping the user's other tags. When Telegram allows fewer tags, the last ones of `add` stay off.
+#[tauri::command]
+pub async fn tg_tags_apply(
+    state: tauri::State<'_, TgState>,
+    id: i32,
+    date: i32,
+    owner: i64,
+    add: Vec<String>,
+    remove: Vec<String>,
+    // Every tag Kipple put on this message before: the others already on it are the user's.
+    owned: Vec<String>,
+) -> Result<TagResult, String> {
+    let c = conn(&state).await?;
+    let m = match own_saved_message(&c, id, date, owner).await? {
+        Ok(m) => m,
+        Err(status) => return Ok(TagResult::skip(status)),
+    };
+    let current = chosen_reactions(&m);
+    let mut next: Vec<String> = current.iter().filter(|k| !remove.contains(k)).cloned().collect();
+    let theirs = next.len();
+    for k in &add {
+        if !next.contains(k) {
+            next.push(k.clone());
+        }
+    }
+    // Kipple's on the message: what it adds now or put there before, never a tag the user had
+    // already set (taking that one off later would delete the user's own tag).
+    let ours = |next: &[String]| add.iter().filter(|k| next.contains(k) && (!current.contains(k) || owned.contains(k))).cloned().collect::<Vec<_>>();
+    let wanted = add.iter().filter(|k| !current.contains(k) || owned.contains(k)).count();
+    let status = |next: &[String]| if ours(next).len() < wanted { "full" } else { "ok" };
+    if next == current {
+        return Ok(TagResult { status: if status(&next) == "full" { "full" } else { "same" }, applied: ours(&next) });
+    }
+    loop {
+        let req = tl::functions::messages::SendReaction {
+            big: false,
+            add_to_recent: false,
+            peer: tl::enums::InputPeer::PeerSelf,
+            msg_id: id,
+            reaction: Some(next.iter().map(|k| reaction_of(k)).collect()),
+        };
+        match c.client.invoke(&req).await {
+            Ok(_) => return Ok(TagResult { status: status(&next), applied: ours(&next) }),
+            Err(e) if e.is("REACTIONS_TOO_MANY") && next.len() > theirs => {
+                next.pop();
+                if next == current {
+                    return Ok(TagResult { status: "full", applied: ours(&next) });
+                }
+            }
+            Err(e) if e.is("REACTIONS_TOO_MANY") => return Ok(TagResult::skip("full")),
+            Err(e) if e.is("MESSAGE_ID_INVALID") => return Ok(TagResult::skip("missing")),
+            Err(e) if refused(&e) => return Ok(TagResult::skip("not_editable")),
+            Err(e) => return Err(err(e)),
+        }
+    }
+}
+
+/// The hashtags (as lowercase "#word") already in a text.
+fn hashtags_in(text: &str) -> std::collections::HashSet<String> {
+    let mut out = std::collections::HashSet::new();
+    let mut rest = text;
+    let mut prev: Option<char> = None;
+    while let Some(i) = rest.find('#') {
+        // "page#design" in a link or "C#" isn't a hashtag.
+        let glued = rest[..i].chars().next_back().or(if i == 0 { prev } else { None }).is_some_and(|ch| ch.is_alphanumeric() || "/_&#".contains(ch));
+        let tail = &rest[i + 1..];
+        let end = tail.find(|ch: char| !(ch.is_alphanumeric() || ch == '_')).unwrap_or(tail.len());
+        if end > 0 && !glued {
+            out.insert(format!("#{}", tail[..end].to_lowercase()));
+        }
+        prev = tail[..end].chars().next_back().or(Some('#'));
+        rest = &tail[end..];
+    }
+    out
+}
+
+/// A hashtag Kipple may add: "#" and letters, digits or "_".
+fn valid_hashtag(h: &str) -> bool {
+    h.strip_prefix('#').is_some_and(|w| !w.is_empty() && w.chars().all(|ch| ch.is_alphanumeric() || ch == '_'))
+}
+
+/// The text with the missing hashtags on a line of their own at the end, and the hashtags'
+/// entities (offsets in UTF-16 units). None when all of them are there already.
+fn with_hashtags(text: &str, hashtags: &[String]) -> Option<(String, Vec<tl::enums::MessageEntity>, Vec<String>)> {
+    let have = hashtags_in(text);
+    let mut add: Vec<String> = Vec::new();
+    for h in hashtags.iter().filter(|h| valid_hashtag(h)) {
+        if !have.contains(&h.to_lowercase()) && !add.iter().any(|a| a.to_lowercase() == h.to_lowercase()) {
+            add.push(h.clone());
+        }
+    }
+    if add.is_empty() {
+        return None;
+    }
+    let mut out = text.to_string();
+    if !out.is_empty() {
+        out.push_str(if out.ends_with('\n') { "\n" } else { "\n\n" });
+    }
+    let mut entities = Vec::new();
+    for (i, h) in add.iter().enumerate() {
+        if i > 0 {
+            out.push(' ');
+        }
+        let offset = out.encode_utf16().count() as i32;
+        out.push_str(h);
+        entities.push(tl::types::MessageEntityHashtag { offset, length: h.encode_utf16().count() as i32 }.into());
+    }
+    Some((out, entities, add))
+}
+
+/// Adds `hashtags` to the end of the text of Saved Message `id`, when it's the user's own
+/// message (not forwarded). Hashtags the text already has are skipped. The message is copied to
+/// the local backup first; if that fails, nothing is changed.
+#[tauri::command]
+pub async fn tg_tags_hashtags(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, TgState>,
+    id: i32,
+    date: i32,
+    owner: i64,
+    hashtags: Vec<String>,
+) -> Result<TagResult, String> {
+    let c = conn(&state).await?;
+    let m = match own_saved_message(&c, id, date, owner).await? {
+        Ok(m) => m,
+        Err(status) => return Ok(TagResult::skip(status)),
+    };
+    if m.fwd_from.is_some() || m.via_bot_id.is_some() {
+        return Ok(TagResult::skip("forwarded"));
+    }
+    // Text or a caption only: polls, places, contacts and the like have none.
+    let captioned = match &m.media {
+        None => true,
+        Some(tl::enums::MessageMedia::Photo(_) | tl::enums::MessageMedia::Document(_) | tl::enums::MessageMedia::WebPage(_)) => true,
+        Some(_) => false,
+    };
+    // Re-sent formatting must be what Telegram accepts as input; a mention of a user by name isn't.
+    let entities = m.entities.clone().unwrap_or_default();
+    if !captioned || entities.iter().any(|e| matches!(e, tl::enums::MessageEntity::MentionName(_))) {
+        return Ok(TagResult::skip("not_editable"));
+    }
+    // A preview the user picked (not the first link) or sized by hand: ask for the same one again,
+    // or Telegram rebuilds it from the first link in the text.
+    let media = match &m.media {
+        Some(tl::enums::MessageMedia::WebPage(w)) if w.manual || w.force_large_media || w.force_small_media => match &w.webpage {
+            tl::enums::WebPage::Page(p) => Some(
+                tl::types::InputMediaWebPage { force_large_media: w.force_large_media, force_small_media: w.force_small_media, optional: true, url: p.url.clone() }.into(),
+            ),
+            _ => None,
+        },
+        _ => None,
+    };
+    let Some((text, added_entities, added)) = with_hashtags(&m.message, &hashtags) else {
+        return Ok(TagResult { status: "same", applied: vec![] });
+    };
+    let mut copy = to_saved(&[tl::enums::Message::Message(m.clone())], &[], &[]);
+    // All of the formatting (bold, code, custom emoji…), so the text can be put back exactly.
+    for c in &mut copy {
+        c.raw_entities = m.entities.as_ref().map(|e| format!("{e:?}"));
+    }
+    append_backup(&backup_dir(&app)?, owner, &copy, "before_edit")?;
+    let req = tl::functions::messages::EditMessage {
+        // Keep the link preview as it was: a text with a link but no preview had it turned off.
+        no_webpage: m.media.is_none(),
+        invert_media: m.invert_media,
+        peer: tl::enums::InputPeer::PeerSelf,
+        id,
+        message: Some(text),
+        media,
+        reply_markup: None,
+        entities: Some([entities, added_entities].concat()),
+        schedule_date: None,
+        schedule_repeat_period: None,
+        quick_reply_shortcut_id: None,
+        rich_message: None,
+    };
+    match c.client.invoke(&req).await {
+        Ok(_) => Ok(TagResult { status: "ok", applied: added }),
+        Err(e) if e.is("MESSAGE_NOT_MODIFIED") => Ok(TagResult { status: "same", applied: vec![] }),
+        Err(e) if e.is("MESSAGE_ID_INVALID") => Ok(TagResult::skip("missing")),
+        // MEDIA_CAPTION_TOO_LONG, MESSAGE_TOO_LONG, MESSAGE_EDIT_TIME_EXPIRED, ENTITY_* and so on.
+        Err(e) if refused(&e) => Ok(TagResult::skip("not_editable")),
+        Err(e) => Err(err(e)),
+    }
 }
 
 /// A photo size to download: a custom location so we can ask for the ~800px version
@@ -1408,7 +1766,7 @@ mod tests {
     fn backup_only_appends() {
         let dir = std::env::temp_dir().join(format!("kipple-backup-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let msg = |id| SavedMessage { id, date: 1, text: format!("m{id}"), entities: vec![], forwarded_from: None, grouped_id: None, media: None, web_photo: false };
+        let msg = |id| SavedMessage { id, date: 1, text: format!("m{id}"), entities: vec![], forwarded_from: None, grouped_id: None, media: None, web_photo: false, raw_entities: None };
         append_backup(&dir, 7, &[msg(1), msg(2)], "history").unwrap();
         append_backup(&dir, 7, &[msg(2)], "before_delete").unwrap();
         append_backup(&dir, 7, &[], "history").unwrap();
@@ -1457,5 +1815,35 @@ mod tests {
         let only_big = vec![size("w", 2560, 1706)];
         assert_eq!(pick_photo_size(&only_big).as_deref(), Some("w"));
         assert_eq!(pick_photo_size(&[]), None);
+    }
+
+    #[test]
+    fn tag_titles_fit_telegram() {
+        assert_eq!(tag_title("  design  "), "design");
+        assert_eq!(tag_title("машинное обучение"), "машинное обу");
+        assert_eq!(tag_title("read later  now"), "read later");
+    }
+
+    #[test]
+    fn reactions_round_trip() {
+        for key in ["👍", "custom:5368324170671202286"] {
+            assert_eq!(reaction_key(&reaction_of(key)).as_deref(), Some(key));
+        }
+    }
+
+    #[test]
+    fn hashtags_go_on_their_own_line_once() {
+        let (text, entities, added) = with_hashtags("Привет 👋 #Design", &["#design".into(), "#идеи".into(), "#идеи".into(), "bad tag".into()]).unwrap();
+        assert_eq!(text, "Привет 👋 #Design\n\n#идеи");
+        assert_eq!(added, vec!["#идеи".to_string()]);
+        let tl::enums::MessageEntity::Hashtag(h) = &entities[0] else { panic!() };
+        // UTF-16 offsets: the emoji counts as two.
+        assert_eq!((h.offset, h.length), (19, 5));
+        assert!(with_hashtags("x #a_b", &["#A_B".into()]).is_none());
+        // A link fragment or "C#" doesn't count as the hashtag being there.
+        let (text, _, _) = with_hashtags("https://site.io/page#design and C#", &["#design".into()]).unwrap();
+        assert!(text.ends_with("\n\n#design"));
+        let (text, _, _) = with_hashtags("", &["#a".into(), "#b".into()]).unwrap();
+        assert_eq!(text, "#a #b");
     }
 }

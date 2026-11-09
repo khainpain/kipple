@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { TelegramApi } from "../platform/types";
 import type { Card } from "../lib/types";
 import { BOARD_TITLE, buildPlan, otherTopic, telegramErrorText, type BoardState, type SendOptions } from "../lib/telegram";
-import { loadBoardState } from "../lib/store";
+import { loadBoardState, loadTagSyncState } from "../lib/store";
+import { hashtagPlan, MAX_TG_TAGS, tagPlan, TAGS_PER_MESSAGE, syncTitles, type TagMode, type TagSyncState } from "../lib/tgTags";
 import { T } from "../i18n";
 
 type Step = "loading" | "noApi" | "phone" | "code" | "password" | "ready";
@@ -13,6 +14,11 @@ export function TelegramDialog(props: {
   cards: Card[];
   running: boolean;
   onStart: (opts: SendOptions) => void;
+  /** Tags are being copied to Saved Messages right now. */
+  syncingTags: boolean;
+  /** Something else is running (AI tagging, loading): starting now would stop it. */
+  otherJob: boolean;
+  onSyncTags: (mode: TagMode) => void;
   /** Only for builds without a built-in Telegram key: the user's own key lives in Settings → Advanced. */
   onOpenSettings: () => void;
   onClose: () => void;
@@ -28,13 +34,18 @@ export function TelegramDialog(props: {
   const [hint, setHint] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [opts, setOpts] = useState<SendOptions>({ includeJunk: false, includeSensitive: false });
+  const [premium, setPremium] = useState(false);
+  const [tagState, setTagState] = useState<TagSyncState | null>(null);
+  const [tagMode, setTagMode] = useState<TagMode | null>(null);
 
   async function refresh() {
     setError(null);
     try {
-      const [s, b] = await Promise.all([tg.status(), loadBoardState()]);
+      const [s, b, t] = await Promise.all([tg.status(), loadBoardState(), loadTagSyncState()]);
       setState(b);
+      setTagState(t);
       setName(s.name ?? "");
+      setPremium(!!s.premium);
       setStep(!s.hasApi ? "noApi" : s.authorized ? "ready" : "phone");
     } catch (e) {
       setError(telegramErrorText(e));
@@ -66,6 +77,13 @@ export function TelegramDialog(props: {
     const ids = new Set(plan.map((p) => p.cardId));
     return props.cards.filter((c) => ids.has(c.id) && !c.ai && !c.user?.topic).length;
   }, [plan, props.cards]);
+
+  // Without Premium only hashtags are possible; with it, Telegram's own tags are the natural pick.
+  const mode: TagMode = premium ? (tagMode ?? "tags") : "hashtags";
+  const tagCount = useMemo(() => {
+    if (!tagState) return 0;
+    return (mode === "tags" ? tagPlan(props.cards, tagState, new Set(syncTitles(props.cards, tagState))) : hashtagPlan(props.cards, tagState)).length;
+  }, [props.cards, tagState, mode]);
 
   const L = T.telegram;
 
@@ -189,6 +207,30 @@ export function TelegramDialog(props: {
               </button>
               <button disabled={busy || props.running || !plan.length} onClick={() => props.onStart(opts)}>
                 {props.running ? L.sending : L.send(plan.length)}
+              </button>
+            </div>
+
+            <h3>{L.tagsTitle}</h3>
+            <p className="hint">{L.tagsIntro}</p>
+            <fieldset className="tg-tag-mode">
+              <label className="check">
+                <input type="radio" name="tg-tag-mode" disabled={!premium} checked={mode === "tags"} onChange={() => setTagMode("tags")} />
+                <span>
+                  <b>{L.tagsModeTags}</b> · {premium ? L.tagsModeTagsHint(MAX_TG_TAGS, TAGS_PER_MESSAGE) : L.tagsNoPremium}
+                </span>
+              </label>
+              <label className="check">
+                <input type="radio" name="tg-tag-mode" checked={mode === "hashtags"} onChange={() => setTagMode("hashtags")} />
+                <span>
+                  <b>{L.tagsModeHashtags}</b> · {L.tagsModeHashtagsHint}
+                </span>
+              </label>
+            </fieldset>
+            <p className="hint">{tagCount ? L.tagsPlan(tagCount) : L.tagsNothing}</p>
+            <div className="dialog-buttons">
+              <span className="spacer" />
+              <button disabled={busy || props.running || props.syncingTags || props.otherJob || !tagCount} onClick={() => props.onSyncTags(mode)}>
+                {props.syncingTags ? L.tagsRunning : L.tagsStart}
               </button>
             </div>
           </>

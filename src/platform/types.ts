@@ -25,6 +25,8 @@ export interface TelegramStatus {
   customApi: boolean;
   authorized: boolean;
   name?: string | null;
+  /** The account has Telegram Premium: needed for tags in Saved Messages. */
+  premium?: boolean;
 }
 
 /** The signed-in Telegram account, shown in the sidebar header. */
@@ -70,6 +72,16 @@ export interface SavedMessage {
     lastName?: string | null;
     phone?: string | null;
   } | null;
+}
+
+/**
+ * What happened to one message: "ok", "same" (nothing to change), "full" (no room for more tags),
+ * "missing" (the message is gone), "changed" (the id is another message now: another account),
+ * "forwarded" or "not_editable" (hashtags couldn't be added). `applied`: Kipple's tags on it now.
+ */
+export interface TagResult {
+  status: "ok" | "same" | "full" | "missing" | "changed" | "forwarded" | "not_editable";
+  applied: string[];
 }
 
 export interface SavedPage {
@@ -133,6 +145,20 @@ export interface TelegramApi {
   createTopic(board: { channelId: number; accessHash: string }, title: string, iconColor?: number): Promise<number>;
   /** Returns the new message ids; empty when the originals no longer exist in Saved Messages. */
   forward(board: { channelId: number; accessHash: string }, topicId: number, ids: number[]): Promise<number[]>;
+  /**
+   * Gives each of these tags a Telegram tag in Saved Messages (an existing one with that name, or
+   * a free emoji named after it). Premium only: without it `tags` is empty. `owner` is the
+   * signed-in account, to pass to tagsApply / tagsHashtags.
+   */
+  tagsSetup(titles: string[]): Promise<{ premium: boolean; owner: number; tags: Array<{ title: string; reaction: string }> }>;
+  /**
+   * Puts Telegram tags (reactions from tagsSetup) on a Saved Message and takes `remove` off,
+   * keeping the user's own. `owned`: the tags Kipple put there before; any other tag already on
+   * the message is the user's and never counts as Kipple's in `applied`.
+   */
+  tagsApply(id: number, date: number, owner: number, add: string[], remove: string[], owned: string[]): Promise<TagResult>;
+  /** Adds hashtags to the end of the user's own Saved Message (backed up first). */
+  tagsHashtags(id: number, date: number, owner: number, hashtags: string[]): Promise<TagResult>;
   sendNote(board: { channelId: number; accessHash: string }, topicId: number, replyTo: number, text: string, boldLen: number): Promise<number>;
 }
 

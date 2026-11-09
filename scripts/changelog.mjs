@@ -13,6 +13,7 @@ export const changelog = [
       "A local backup of your Saved Messages that only grows (Settings → Data)",
       "Loading from Telegram and AI tagging start only when you press the button",
       "A new installer window: bigger, livelier, with Kipple tidying up your kipple",
+      "Copy your tags to Telegram: as Saved Messages tags with Premium, or as hashtags in your own messages",
     ],
     ru: [
       "«Открыть в Telegram»: переход от карточки к её сообщению в Избранном",
@@ -20,6 +21,7 @@ export const changelog = [
       "Локальная резервная копия «Избранного», которая только пополняется (Настройки → Данные)",
       "Загрузка из Telegram и AI-теги запускаются только по твоей кнопке",
       "Новое окно установки: крупнее и живее, Киппл наводит порядок в хламе",
+      "Теги можно перенести в Telegram: метками «Избранного» с Premium или хештегами в твоих сообщениях",
     ],
   },
   {

@@ -33,6 +33,9 @@ const telegram: TelegramApi = {
   ensureBoard: (prev, title, about) => invoke("tg_ensure_board", { channelId: prev?.channelId ?? null, accessHash: prev?.accessHash ?? null, title, about }),
   createTopic: (b, title, iconColor) => invoke("tg_create_topic", { channelId: b.channelId, accessHash: b.accessHash, title, iconColor: iconColor ?? null }),
   forward: (b, topicId, ids) => invoke("tg_forward", { channelId: b.channelId, accessHash: b.accessHash, topicId, ids }),
+  tagsSetup: (titles) => invoke("tg_tags_setup", { titles }),
+  tagsApply: (id, date, owner, add, remove, owned) => invoke("tg_tags_apply", { id, date, owner, add, remove, owned }),
+  tagsHashtags: (id, date, owner, hashtags) => invoke("tg_tags_hashtags", { id, date, owner, hashtags }),
   sendNote: (b, topicId, replyTo, text, boldLen) => invoke("tg_send_note", { channelId: b.channelId, accessHash: b.accessHash, topicId, replyTo, text, boldLen }),
 };
 

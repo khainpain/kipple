@@ -2,6 +2,7 @@ import { platform } from "@platform";
 import type { EditEvent, Library } from "./types";
 import { annotateContext, applyEdits, type Aliases } from "./library";
 import { emptyBoardState, type BoardState } from "./telegram";
+import { emptyTagSyncState, type TagSyncState } from "./tgTags";
 import type { LangPref } from "../i18n";
 import { DEFAULT_AI_MODEL, type AiModel } from "./ai";
 import type { Skips, TodayState } from "./today";
@@ -13,6 +14,7 @@ const EDITS = "edits.jsonl";
 const SETTINGS = "settings.json";
 const TELEGRAM = "telegram.json";
 const REPLIES = "telegram-replies.json";
+const TAGS = "telegram-tags.json";
 
 export interface Settings {
   /** AI tagging on. Only counts together with aiConsentAt: see aiAllowed. */
@@ -111,6 +113,21 @@ export async function saveBoardState(s: BoardState) {
   await atomicWrite(TELEGRAM, JSON.stringify(s));
 }
 
+/** Which tags already went to Saved Messages (src/lib/tgTags.ts). */
+export async function loadTagSyncState(): Promise<TagSyncState> {
+  if (!(await exists(TAGS))) return emptyTagSyncState();
+  try {
+    const s = JSON.parse(await read(TAGS)) as Partial<TagSyncState> | null;
+    return { ...emptyTagSyncState(), ...s };
+  } catch {
+    return emptyTagSyncState(); // a broken file only means tags are set again; Telegram keeps one of each
+  }
+}
+
+export async function saveTagSyncState(s: TagSyncState) {
+  await atomicWrite(TAGS, JSON.stringify(s));
+}
+
 /** "Open in Telegram" helper replies still to delete from Saved Messages. */
 export async function loadPendingReplies(): Promise<PendingReply[]> {
   if (!(await exists(REPLIES))) return [];
@@ -130,4 +147,5 @@ export async function wipeAll() {
   await atomicWrite(EDITS, "");
   await atomicWrite(TELEGRAM, "null");
   await atomicWrite(REPLIES, "[]");
+  await atomicWrite(TAGS, "null");
 }

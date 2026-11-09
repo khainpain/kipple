@@ -6,9 +6,10 @@ import "./App.css";
 import type { Card, Library, UserFields } from "./lib/types";
 import type { Skips, TodayState } from "./lib/today";
 import { effectiveTags, effectiveTopic, findTopic, getOwnTopics, makeEdit, matchesFilter, mergeAlias, NO_ALIASES, setAliases, setOwnTopics, topicName, type Aliases } from "./lib/library";
-import { aiAllowed, appendEdit, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadPendingReplies, loadSettings, saveBoardState, saveLibrary, savePendingReplies, saveSettings, wipeAll, type Settings } from "./lib/store";
+import { aiAllowed, appendEdit, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadPendingReplies, loadSettings, loadTagSyncState, saveBoardState, saveLibrary, savePendingReplies, saveSettings, saveTagSyncState, wipeAll, type Settings } from "./lib/store";
 import { dueReplies, nextDue, replyText, scheduleReply, withoutReplies, type PendingReply } from "./lib/tgReplies";
 import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type SendOptions } from "./lib/telegram";
+import { NoPremiumError, syncTags, type TagMode } from "./lib/tgTags";
 import { TelegramDialog } from "./components/TelegramDialog";
 import { importFolder, pickExportFolder } from "./lib/importer";
 import { fetchLinkMeta, needsPreview } from "./lib/linkmeta";
@@ -45,6 +46,7 @@ export default function App() {
   const [showTelegram, setShowTelegram] = useState(false);
   const tgAccount = useTelegramAccount(!showTelegram && lib !== null);
   const [sendingTg, setSendingTg] = useState(false);
+  const [syncingTags, setSyncingTags] = useState(false);
   const [job, setJob] = useState<Job>(null);
   /** The consent dialog is open; resolving it with the answer carries on with what asked. */
   const [consent, setConsent] = useState<((ok: boolean) => void) | null>(null);
@@ -518,6 +520,33 @@ export default function App() {
     }
   }
 
+  /** Copies the library's tags onto the messages in Saved Messages; only from the dialog's button. */
+  async function syncTagsToTelegram(mode: TagMode) {
+    const tg = platform.telegram;
+    if (!lib || !tg) return;
+    setShowTelegram(false);
+    abortRef.current?.abort();
+    const ctl = new AbortController();
+    abortRef.current = ctl;
+    setSyncingTags(true);
+    try {
+      const state = await loadTagSyncState();
+      const res = await syncTags(lib.cards, state, mode, {
+        tg,
+        save: saveTagSyncState,
+        signal: ctl.signal,
+        onProgress: (p) => setJob({ label: p.waitSeconds ? T.app.jobTagsPause(p.waitSeconds) : T.app.jobTags, done: p.done, total: p.total }),
+      });
+      notify(ctl.signal.aborted ? T.app.tagsStopped(res.done, res.total) : T.app.tagsDone(res.done - res.skipped, res.skipped));
+    } catch (e) {
+      notify(e instanceof NoPremiumError ? T.app.tagsNoPremium : telegramErrorText(e));
+      if (e instanceof TelegramAuthError || e instanceof NoPremiumError) setShowTelegram(true);
+    } finally {
+      setSyncingTags(false);
+      setJob(null);
+    }
+  }
+
   function askConsent(): Promise<boolean> {
     return new Promise((resolve) => setConsent(() => (ok: boolean) => (setConsent(null), resolve(ok))));
   }
@@ -820,7 +849,7 @@ export default function App() {
       {settingsDialog}
       {consentDialog}
       {showTelegram && platform.telegram && (
-        <TelegramDialog tg={platform.telegram} cards={lib.cards} running={sendingTg} onStart={sendTelegram} onOpenSettings={() => (setShowTelegram(false), setShowSettings(true))} onClose={() => setShowTelegram(false)} />
+        <TelegramDialog tg={platform.telegram} cards={lib.cards} running={sendingTg} onStart={sendTelegram} syncingTags={syncingTags} otherJob={!!job && !sendingTg && !syncingTags} onSyncTags={syncTagsToTelegram} onOpenSettings={() => (setShowTelegram(false), setShowSettings(true))} onClose={() => setShowTelegram(false)} />
       )}
       <Toast text={toast} onClose={() => setToast(null)} />
     </div>

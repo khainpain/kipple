@@ -116,6 +116,9 @@ function fakeTg(opts: { floodOnce?: boolean; missing?: number[] } = {}) {
       return ids.map(() => nextMsg++);
     },
     sendNote: async (_b, topic, replyTo) => (log.push(`note ${replyTo} in ${topic}`), nextMsg++),
+    tagsSetup: async () => ({ premium: false, owner: 1, tags: [] }),
+    tagsApply: async () => ({ status: "same", applied: [] }),
+    tagsHashtags: async () => ({ status: "same", applied: [] }),
   };
   return { tg, log };
 }
