@@ -151,8 +151,12 @@ export interface TelegramApi {
    * signed-in account, to pass to tagsApply / tagsHashtags.
    */
   tagsSetup(titles: string[]): Promise<{ premium: boolean; owner: number; tags: Array<{ title: string; reaction: string }> }>;
-  /** Puts Telegram tags (reactions from tagsSetup) on a Saved Message and takes `remove` off, keeping the user's own. */
-  tagsApply(id: number, date: number, owner: number, add: string[], remove: string[]): Promise<TagResult>;
+  /**
+   * Puts Telegram tags (reactions from tagsSetup) on a Saved Message and takes `remove` off,
+   * keeping the user's own. `owned`: the tags Kipple put there before; any other tag already on
+   * the message is the user's and never counts as Kipple's in `applied`.
+   */
+  tagsApply(id: number, date: number, owner: number, add: string[], remove: string[], owned: string[]): Promise<TagResult>;
   /** Adds hashtags to the end of the user's own Saved Message (backed up first). */
   tagsHashtags(id: number, date: number, owner: number, hashtags: string[]): Promise<TagResult>;
   sendNote(board: { channelId: number; accessHash: string }, topicId: number, replyTo: number, text: string, boldLen: number): Promise<number>;

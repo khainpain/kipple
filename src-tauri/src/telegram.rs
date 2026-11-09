@@ -930,6 +930,9 @@ pub struct SavedMessage {
     /// The message has a link preview with a picture (Telegram's own copy of the page's
     /// og:image); tg_saved_photos downloads it like a photo.
     web_photo: bool,
+    /// Backup before an edit only: every formatting entity, as Telegram had it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    raw_entities: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -1086,6 +1089,7 @@ fn saved_message(m: &tl::types::Message, names: &HashMap<i64, String>) -> SavedM
         grouped_id: m.grouped_id.map(|g| g.to_string()),
         media: m.media.as_ref().and_then(media_of),
         web_photo: m.media.as_ref().and_then(photo_of).is_some_and(|(_, web)| web),
+        raw_entities: None,
     }
 }
 
@@ -1384,7 +1388,8 @@ pub async fn tg_tags_setup(state: tauri::State<'_, TgState>, titles: Vec<String>
             tags.push(TagReaction { title, reaction: key.clone() });
             continue;
         }
-        let Some(key) = free.next() else { break };
+        // Out of free emoji: this tag goes without, the ones after it may still have a tag already.
+        let Some(key) = free.next() else { continue };
         let req = tl::functions::messages::UpdateSavedReactionTag { reaction: reaction_of(&key), title: Some(name.clone()) };
         c.client.invoke(&req).await.map_err(err)?;
         by_title.insert(name.to_lowercase(), key.clone());
@@ -1454,6 +1459,8 @@ pub async fn tg_tags_apply(
     owner: i64,
     add: Vec<String>,
     remove: Vec<String>,
+    // Every tag Kipple put on this message before: the others already on it are the user's.
+    owned: Vec<String>,
 ) -> Result<TagResult, String> {
     let c = conn(&state).await?;
     let m = match own_saved_message(&c, id, date, owner).await? {
@@ -1468,9 +1475,13 @@ pub async fn tg_tags_apply(
             next.push(k.clone());
         }
     }
-    let ours = |next: &[String]| add.iter().filter(|k| next.contains(k)).cloned().collect::<Vec<_>>();
+    // Kipple's on the message: what it adds now or put there before, never a tag the user had
+    // already set (taking that one off later would delete the user's own tag).
+    let ours = |next: &[String]| add.iter().filter(|k| next.contains(k) && (!current.contains(k) || owned.contains(k))).cloned().collect::<Vec<_>>();
+    let wanted = add.iter().filter(|k| !current.contains(k) || owned.contains(k)).count();
+    let status = |next: &[String]| if ours(next).len() < wanted { "full" } else { "ok" };
     if next == current {
-        return Ok(TagResult { status: "same", applied: ours(&next) });
+        return Ok(TagResult { status: if status(&next) == "full" { "full" } else { "same" }, applied: ours(&next) });
     }
     loop {
         let req = tl::functions::messages::SendReaction {
@@ -1481,7 +1492,7 @@ pub async fn tg_tags_apply(
             reaction: Some(next.iter().map(|k| reaction_of(k)).collect()),
         };
         match c.client.invoke(&req).await {
-            Ok(_) => return Ok(TagResult { status: "ok", applied: ours(&next) }),
+            Ok(_) => return Ok(TagResult { status: status(&next), applied: ours(&next) }),
             Err(e) if e.is("REACTIONS_TOO_MANY") && next.len() > theirs => {
                 next.pop();
                 if next == current {
@@ -1500,12 +1511,16 @@ pub async fn tg_tags_apply(
 fn hashtags_in(text: &str) -> std::collections::HashSet<String> {
     let mut out = std::collections::HashSet::new();
     let mut rest = text;
+    let mut prev: Option<char> = None;
     while let Some(i) = rest.find('#') {
+        // "page#design" in a link or "C#" isn't a hashtag.
+        let glued = rest[..i].chars().next_back().or(if i == 0 { prev } else { None }).is_some_and(|ch| ch.is_alphanumeric() || "/_&#".contains(ch));
         let tail = &rest[i + 1..];
         let end = tail.find(|ch: char| !(ch.is_alphanumeric() || ch == '_')).unwrap_or(tail.len());
-        if end > 0 {
+        if end > 0 && !glued {
             out.insert(format!("#{}", tail[..end].to_lowercase()));
         }
+        prev = tail[..end].chars().next_back().or(Some('#'));
         rest = &tail[end..];
     }
     out
@@ -1576,10 +1591,26 @@ pub async fn tg_tags_hashtags(
     if !captioned || entities.iter().any(|e| matches!(e, tl::enums::MessageEntity::MentionName(_))) {
         return Ok(TagResult::skip("not_editable"));
     }
+    // A preview the user picked (not the first link) or sized by hand: ask for the same one again,
+    // or Telegram rebuilds it from the first link in the text.
+    let media = match &m.media {
+        Some(tl::enums::MessageMedia::WebPage(w)) if w.manual || w.force_large_media || w.force_small_media => match &w.webpage {
+            tl::enums::WebPage::Page(p) => Some(
+                tl::types::InputMediaWebPage { force_large_media: w.force_large_media, force_small_media: w.force_small_media, optional: true, url: p.url.clone() }.into(),
+            ),
+            _ => None,
+        },
+        _ => None,
+    };
     let Some((text, added_entities, added)) = with_hashtags(&m.message, &hashtags) else {
         return Ok(TagResult { status: "same", applied: vec![] });
     };
-    append_backup(&backup_dir(&app)?, owner, &to_saved(&[tl::enums::Message::Message(m.clone())], &[], &[]), "before_edit")?;
+    let mut copy = to_saved(&[tl::enums::Message::Message(m.clone())], &[], &[]);
+    // All of the formatting (bold, code, custom emoji…), so the text can be put back exactly.
+    for c in &mut copy {
+        c.raw_entities = m.entities.as_ref().map(|e| format!("{e:?}"));
+    }
+    append_backup(&backup_dir(&app)?, owner, &copy, "before_edit")?;
     let req = tl::functions::messages::EditMessage {
         // Keep the link preview as it was: a text with a link but no preview had it turned off.
         no_webpage: m.media.is_none(),
@@ -1587,7 +1618,7 @@ pub async fn tg_tags_hashtags(
         peer: tl::enums::InputPeer::PeerSelf,
         id,
         message: Some(text),
-        media: None,
+        media,
         reply_markup: None,
         entities: Some([entities, added_entities].concat()),
         schedule_date: None,
@@ -1735,7 +1766,7 @@ mod tests {
     fn backup_only_appends() {
         let dir = std::env::temp_dir().join(format!("kipple-backup-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        let msg = |id| SavedMessage { id, date: 1, text: format!("m{id}"), entities: vec![], forwarded_from: None, grouped_id: None, media: None, web_photo: false };
+        let msg = |id| SavedMessage { id, date: 1, text: format!("m{id}"), entities: vec![], forwarded_from: None, grouped_id: None, media: None, web_photo: false, raw_entities: None };
         append_backup(&dir, 7, &[msg(1), msg(2)], "history").unwrap();
         append_backup(&dir, 7, &[msg(2)], "before_delete").unwrap();
         append_backup(&dir, 7, &[], "history").unwrap();
@@ -1809,6 +1840,9 @@ mod tests {
         // UTF-16 offsets: the emoji counts as two.
         assert_eq!((h.offset, h.length), (19, 5));
         assert!(with_hashtags("x #a_b", &["#A_B".into()]).is_none());
+        // A link fragment or "C#" doesn't count as the hashtag being there.
+        let (text, _, _) = with_hashtags("https://site.io/page#design and C#", &["#design".into()]).unwrap();
+        assert!(text.ends_with("\n\n#design"));
         let (text, _, _) = with_hashtags("", &["#a".into(), "#b".into()]).unwrap();
         assert_eq!(text, "#a #b");
     }

@@ -153,12 +153,19 @@ describe("edge cases", () => {
     expect(syncTitles(cards, state)).toContain("rare");
   });
 
-  it("retries a message Telegram refused next time instead of marking it done", async () => {
-    const { tg } = fakeTg({ results: { 1: "not_editable" } });
+  it("doesn't retry a message Telegram refused until the card changes, but retries a gone one", async () => {
+    const { tg } = fakeTg({ results: { 1: "not_editable", 2: "missing" } });
     const state = emptyTagSyncState();
     const res = await syncTags(cards, state, "tags", { tg, save: async () => {}, onProgress: () => {}, sleep: noSleep });
-    expect(res.skipped).toBe(1);
-    expect(state.tags["1"]).toBeUndefined();
-    expect(state.tags["2"]).toBeDefined();
+    expect(res.skipped).toBe(2);
+    expect(state.tags["1"]).toEqual({ titles: ["design", "ux", "fonts"], reactions: [] });
+    expect(state.tags["2"]).toBeUndefined();
+  });
+
+  it("gives tags that share an emoji one slot", async () => {
+    const { tg, log } = fakeTg();
+    tg.tagsSetup = async () => ({ premium: true, owner: 42, tags: [{ title: "design", reaction: "🎨" }, { title: "ux", reaction: "🎨" }, { title: "ideas", reaction: "💡" }] });
+    await syncTags([cards[0]], emptyTagSyncState(), "tags", { tg, save: async () => {}, onProgress: () => {}, sleep: noSleep });
+    expect(log).toEqual(["tags 1@42 +🎨💡 -"]);
   });
 });

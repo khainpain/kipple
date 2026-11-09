@@ -138,7 +138,9 @@ export async function syncTags(cards: Card[], state: TagSyncState, mode: TagMode
   if (state.owner !== undefined && state.owner !== setup.owner) Object.assign(state, emptyTagSyncState());
   state.owner = setup.owner;
 
-  const reactionOf = new Map(setup.tags.map((t) => [t.title, t.reaction]));
+  // Two tags cut to the same 12 characters share an emoji: only the first takes a slot.
+  const reactionOf = new Map<string, string>();
+  for (const t of setup.tags) if (![...reactionOf.values()].includes(t.reaction)) reactionOf.set(t.title, t.reaction);
   const plan = mode === "tags" ? tagPlan(cards, state, new Set(reactionOf.keys())) : hashtagPlan(cards, state);
   progress.total = plan.length;
   onProgress({ ...progress });
@@ -149,9 +151,10 @@ export async function syncTags(cards: Card[], state: TagSyncState, mode: TagMode
     if (mode === "tags") {
       const add = item.want.map((t) => reactionOf.get(t)!);
       const before = state.tags[key]?.reactions ?? [];
-      const res = await call(() => tg.tagsApply(item.cardId, item.date, setup.owner, add, before.filter((r) => !add.includes(r))));
-      const failed = res.status === "missing" || res.status === "changed" || res.status === "not_editable";
-      if (failed || res.status === "full") progress.skipped++;
+      const res = await call(() => tg.tagsApply(item.cardId, item.date, setup.owner, add, before.filter((r) => !add.includes(r)), before));
+      // Gone or another message: try again next time. Refused ("not_editable") or full: not until the card changes.
+      const failed = res.status === "missing" || res.status === "changed";
+      if (failed || res.status === "full" || res.status === "not_editable") progress.skipped++;
       if (!failed) {
         // Even with no room for all of them, the card isn't retried until its tags change.
         if (item.want.length || res.applied.length) state.tags[key] = { titles: item.want, reactions: res.applied };
