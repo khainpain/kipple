@@ -39,6 +39,7 @@ CI (`.github/workflows/build.yml`) runs tests and both builds on every PR. Deskt
 - **Keep the identifier `io.getkipple.app`.** Data dir, keyring entries and web view storage depend on it. It replaced `com.khainpain.savedboard` after v0.1.17; `src-tauri/src/migrate.rs` copies the old data over on first launch, so never remove that migration or change the identifier again without a new one.
 - **Secrets:** Anthropic key and Telegram session in the OS keyring; Telegram api id/hash from Actions secrets `TG_API_ID`/`TG_API_HASH`. Never commit or log secrets; test fixtures must be synthetic.
 - **Both languages.** Any new UI string goes into `ru.ts` and `en.ts`, written natively.
+- **Reuse first.** Before writing code, use what Kipple, the platform or an installed dependency already has; write only what the task needs, never cutting privacy, validation, data-loss handling or accessibility. Details: skill `reuse-first`.
 - **UI taste:** quiet and polished; subtle focus states (no loud outlines); `prefers-reduced-motion` makes animations static. Visual design comes from the owner's Claude Design handoffs (kept in `khainpain/kipple-site`, `design/`).
 
 ## Agents and skills
@@ -47,6 +48,7 @@ Project agents live in `.claude/agents/`, skills in `.claude/skills/` (most adap
 
 - Code review: `react-reviewer`, `rust-reviewer`, `tauri-reviewer`, `security-reviewer`, `silent-failure-hunter`; build failures: `rust-build-resolver`.
 - Design and decisions: `architect`, skills `architecture-decision-records` (`docs/adr/`) and `council`.
+- Writing any feature or fix: skill `reuse-first` (from Ponytail).
 - Before a PR: skill `verification-loop`; for UI text: `i18n-sync`.
 - UI/UX: skills `make-interfaces-feel-better`, `design-system`, `click-path-audit`, `motion-foundations`, `frontend-a11y`, `ui-demo` (demo videos).
 - Public repo hygiene: `opensource-sanitizer` before releases, `opensource-packager` for contributor docs.
