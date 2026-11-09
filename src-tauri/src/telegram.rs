@@ -779,6 +779,16 @@ async fn self_user(c: &Conn) -> Option<tl::types::User> {
     }
 }
 
+/// The signed-in account. Unlike self_user, Telegram's error comes through (FLOOD_WAIT is
+/// waited out, an ended session asks to sign in again); "NO_ACCOUNT" when nobody is signed in.
+async fn signed_in_user(c: &Conn) -> Result<tl::types::User, String> {
+    let me = tl::functions::users::GetUsers { id: vec![tl::enums::InputUser::UserSelf] };
+    match c.client.invoke(&me).await.map_err(err)?.into_iter().next() {
+        Some(tl::enums::User::User(u)) => Ok(u),
+        _ => Err("NO_ACCOUNT".into()),
+    }
+}
+
 /// Replies to message `id` in Saved Messages with `text` and returns the reply's id and a link
 /// to the chat. "NO_ORIGINAL" when the original is gone.
 #[tauri::command]
@@ -1354,7 +1364,7 @@ pub struct TagSetup {
 #[tauri::command]
 pub async fn tg_tags_setup(state: tauri::State<'_, TgState>, titles: Vec<String>) -> Result<TagSetup, String> {
     let c = conn(&state).await?;
-    let me = self_user(&c).await.ok_or("NO_ACCOUNT")?;
+    let me = signed_in_user(&c).await?;
     if !me.premium || titles.is_empty() {
         return Ok(TagSetup { premium: me.premium, owner: me.id, tags: vec![] });
     }
@@ -1391,7 +1401,12 @@ pub async fn tg_tags_setup(state: tauri::State<'_, TgState>, titles: Vec<String>
         // Out of free emoji: this tag goes without, the ones after it may still have a tag already.
         let Some(key) = free.next() else { continue };
         let req = tl::functions::messages::UpdateSavedReactionTag { reaction: reaction_of(&key), title: Some(name.clone()) };
-        c.client.invoke(&req).await.map_err(err)?;
+        match c.client.invoke(&req).await {
+            Ok(_) => {}
+            // Telegram won't take this name: the tag goes without, the rest carry on.
+            Err(e) if refused(&e) => continue,
+            Err(e) => return Err(err(e)),
+        }
         by_title.insert(name.to_lowercase(), key.clone());
         tags.push(TagReaction { title, reaction: key });
         tokio::time::sleep(Duration::from_millis(300)).await;
@@ -1419,6 +1434,10 @@ impl TagResult {
 
 /// Message `id` of Saved Messages, if it's still there and really is the card's message.
 async fn own_saved_message(c: &Conn, id: i32, date: i32, owner: i64) -> Result<Result<tl::types::Message, &'static str>, String> {
+    // `owner` comes from the web view: check it against who is signed in, not just trust it.
+    if signed_in_user(c).await?.id != owner {
+        return Ok(Err("changed"));
+    }
     let req = tl::functions::messages::GetMessages { id: vec![tl::types::InputMessageId { id }.into()] };
     use tl::enums::messages::Messages as R;
     let messages = match c.client.invoke(&req).await.map_err(err)? {
@@ -1468,6 +1487,9 @@ pub async fn tg_tags_apply(
         Err(status) => return Ok(TagResult::skip(status)),
     };
     let current = chosen_reactions(&m);
+    // When nothing could be changed, Kipple's earlier tags are still on the message and stay its own.
+    let kept: Vec<String> = current.iter().filter(|k| owned.contains(k)).cloned().collect();
+    let skip = |status| Ok(TagResult { status, applied: kept.clone() });
     let mut next: Vec<String> = current.iter().filter(|k| !remove.contains(k)).cloned().collect();
     let theirs = next.len();
     for k in &add {
@@ -1499,9 +1521,9 @@ pub async fn tg_tags_apply(
                     return Ok(TagResult { status: "full", applied: ours(&next) });
                 }
             }
-            Err(e) if e.is("REACTIONS_TOO_MANY") => return Ok(TagResult::skip("full")),
+            Err(e) if e.is("REACTIONS_TOO_MANY") => return skip("full"),
             Err(e) if e.is("MESSAGE_ID_INVALID") => return Ok(TagResult::skip("missing")),
-            Err(e) if refused(&e) => return Ok(TagResult::skip("not_editable")),
+            Err(e) if refused(&e) => return skip("not_editable"),
             Err(e) => return Err(err(e)),
         }
     }
@@ -1579,6 +1601,10 @@ pub async fn tg_tags_hashtags(
     };
     if m.fwd_from.is_some() || m.via_bot_id.is_some() {
         return Ok(TagResult::skip("forwarded"));
+    }
+    // An album shows one caption; giving a caption to an item without one would add a second.
+    if m.grouped_id.is_some() && m.message.is_empty() {
+        return Ok(TagResult::skip("not_editable"));
     }
     // Text or a caption only: polls, places, contacts and the like have none.
     let captioned = match &m.media {

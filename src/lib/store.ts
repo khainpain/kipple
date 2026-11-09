@@ -116,12 +116,10 @@ export async function saveBoardState(s: BoardState) {
 /** Which tags already went to Saved Messages (src/lib/tgTags.ts). */
 export async function loadTagSyncState(): Promise<TagSyncState> {
   if (!(await exists(TAGS))) return emptyTagSyncState();
-  try {
-    const s = JSON.parse(await read(TAGS)) as Partial<TagSyncState> | null;
-    return { ...emptyTagSyncState(), ...s };
-  } catch {
-    return emptyTagSyncState(); // a broken file only means tags are set again; Telegram keeps one of each
-  }
+  // A broken file is an error, not an empty state: starting over would forget which Telegram tags
+  // are Kipple's, and they could never be taken off again.
+  const s = JSON.parse(await read(TAGS)) as Partial<TagSyncState> | null;
+  return { ...emptyTagSyncState(), ...s };
 }
 
 export async function saveTagSyncState(s: TagSyncState) {

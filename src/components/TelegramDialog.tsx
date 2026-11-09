@@ -3,7 +3,7 @@ import type { TelegramApi } from "../platform/types";
 import type { Card } from "../lib/types";
 import { BOARD_TITLE, buildPlan, otherTopic, telegramErrorText, type BoardState, type SendOptions } from "../lib/telegram";
 import { loadBoardState, loadTagSyncState } from "../lib/store";
-import { hashtagPlan, MAX_TG_TAGS, tagPlan, TAGS_PER_MESSAGE, syncTitles, type TagMode, type TagSyncState } from "../lib/tgTags";
+import { hashtagPlan, MAX_TG_TAGS, tagPlan, TAGS_PER_MESSAGE, likelyUsable, type TagMode, type TagSyncState } from "../lib/tgTags";
 import { T } from "../i18n";
 
 type Step = "loading" | "noApi" | "phone" | "code" | "password" | "ready";
@@ -82,7 +82,7 @@ export function TelegramDialog(props: {
   const mode: TagMode = premium ? (tagMode ?? "tags") : "hashtags";
   const tagCount = useMemo(() => {
     if (!tagState) return 0;
-    return (mode === "tags" ? tagPlan(props.cards, tagState, new Set(syncTitles(props.cards, tagState))) : hashtagPlan(props.cards, tagState)).length;
+    return (mode === "tags" ? tagPlan(props.cards, tagState, likelyUsable(props.cards, tagState)) : hashtagPlan(props.cards, tagState)).length;
   }, [props.cards, tagState, mode]);
 
   const L = T.telegram;
@@ -210,9 +210,9 @@ export function TelegramDialog(props: {
               </button>
             </div>
 
-            <h3>{L.tagsTitle}</h3>
+            <h3 id="tg-tags-title">{L.tagsTitle}</h3>
             <p className="hint">{L.tagsIntro}</p>
-            <fieldset className="tg-tag-mode">
+            <fieldset className="tg-tag-mode" aria-labelledby="tg-tags-title">
               <label className="check">
                 <input type="radio" name="tg-tag-mode" disabled={!premium} checked={mode === "tags"} onChange={() => setTagMode("tags")} />
                 <span>

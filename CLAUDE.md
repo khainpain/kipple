@@ -43,10 +43,17 @@ CI (`.github/workflows/build.yml`) runs tests and both builds on every PR. Deskt
 
 ## Agents and skills
 
-Project agents live in `.claude/agents/`, skills in `.claude/skills/` (most adapted from Everything Claude Code, see `.claude/THIRD_PARTY_NOTICES.md`). Use them on request or when clearly relevant, not on every change:
+Project agents live in `.claude/agents/`, skills in `.claude/skills/` (most adapted from Everything Claude Code, see `.claude/THIRD_PARTY_NOTICES.md`). The owner added them to be used: the "before every PR" list below is required, not optional. The rest is for when it fits the task.
 
-- Code review: `react-reviewer`, `rust-reviewer`, `tauri-reviewer`, `security-reviewer`, `silent-failure-hunter`; build failures: `rust-build-resolver`.
+**Before every PR (and before pushing fixes that change behaviour):**
+- Review the diff with the reviewers that match the changed files: `rust-reviewer` and `tauri-reviewer` for `src-tauri/` and Tauri commands, `react-reviewer` for `src/`, `security-reviewer` when the change touches Telegram, the AI proxy, secrets or user data, and `silent-failure-hunter` for anything with error handling or background work. Fix what they confirm.
+- Run skill `verification-loop`; for UI text also `i18n-sync`.
+- If the session started outside the repo and these agents aren't offered as agent types, run them anyway: start a general-purpose agent that reads `.claude/agents/<name>.md` and follows it.
+- Superpowers skills (when installed): `requesting-code-review` before merge, `verification-before-completion` before saying something is done, `systematic-debugging` + `test-driven-development` for bugs.
+
+Other agents and skills:
+
+- Build failures: `rust-build-resolver`.
 - Design and decisions: `architect`, skills `architecture-decision-records` (`docs/adr/`) and `council`.
-- Before a PR: skill `verification-loop`; for UI text: `i18n-sync`.
 - UI/UX: skills `make-interfaces-feel-better`, `design-system`, `click-path-audit`, `motion-foundations`, `frontend-a11y`, `ui-demo` (demo videos).
 - Public repo hygiene: `opensource-sanitizer` before releases, `opensource-packager` for contributor docs.

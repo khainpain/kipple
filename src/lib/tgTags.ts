@@ -29,6 +29,8 @@ export interface TagSyncState {
   tags: Record<string, { titles: string[]; reactions: string[] }>;
   /** Card id → hashtags Kipple added to its message. */
   hashtags: Record<string, string[]>;
+  /** Tags that got no Telegram tag on the last run (out of emoji, or sharing one): the dialog doesn't count them. */
+  unusable?: string[];
 }
 
 export const emptyTagSyncState = (): TagSyncState => ({ tags: {}, hashtags: {} });
@@ -52,6 +54,12 @@ export function topTags(cards: Card[], max = MAX_TG_TAGS): string[] {
  */
 export function syncTitles(cards: Card[], state: TagSyncState): string[] {
   return [...new Set([...topTags(cards), ...Object.values(state.tags).flatMap((t) => t.titles)])];
+}
+
+/** What the dialog counts with: the tags to sync, without those that got no Telegram tag last time. */
+export function likelyUsable(cards: Card[], state: TagSyncState): Set<string> {
+  const skip = new Set(state.unusable ?? []);
+  return new Set(syncTitles(cards, state).filter((t) => !skip.has(t)));
 }
 
 const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
@@ -84,6 +92,7 @@ export function hashtagPlan(cards: Card[], state: TagSyncState): TagItem[] {
   for (const c of pool(cards)) {
     if (c.forwardedFrom) continue; // Telegram doesn't let anyone edit a forwarded message
     if (NO_CAPTION.has(c.kind)) continue;
+    if (c.sensitive) continue; // looks like a password or a card number: leave the message alone
     const have = new Set([...c.hashtags.map((h) => hashtag(h)), ...(state.hashtags[String(c.id)] ?? [])].map((h) => h?.toLowerCase()));
     const want = [...new Set(effectiveTags(c).map(hashtag))].filter((h): h is string => !!h && !have.has(h.toLowerCase()));
     if (want.length) items.push({ cardId: c.id, date: unix(c), want });
@@ -141,6 +150,7 @@ export async function syncTags(cards: Card[], state: TagSyncState, mode: TagMode
   // Two tags cut to the same 12 characters share an emoji: only the first takes a slot.
   const reactionOf = new Map<string, string>();
   for (const t of setup.tags) if (![...reactionOf.values()].includes(t.reaction)) reactionOf.set(t.title, t.reaction);
+  if (mode === "tags") state.unusable = titles.filter((t) => !reactionOf.has(t));
   const plan = mode === "tags" ? tagPlan(cards, state, new Set(reactionOf.keys())) : hashtagPlan(cards, state);
   progress.total = plan.length;
   onProgress({ ...progress });
@@ -152,9 +162,9 @@ export async function syncTags(cards: Card[], state: TagSyncState, mode: TagMode
       const add = item.want.map((t) => reactionOf.get(t)!);
       const before = state.tags[key]?.reactions ?? [];
       const res = await call(() => tg.tagsApply(item.cardId, item.date, setup.owner, add, before.filter((r) => !add.includes(r)), before));
-      // Gone or another message: try again next time. Refused ("not_editable") or full: not until the card changes.
-      const failed = res.status === "missing" || res.status === "changed";
-      if (failed || res.status === "full" || res.status === "not_editable") progress.skipped++;
+      // Another account's message: try again next time. Gone, refused or full: not until the card changes.
+      const failed = res.status === "changed";
+      if (res.status !== "ok" && res.status !== "same") progress.skipped++;
       if (!failed) {
         // Even with no room for all of them, the card isn't retried until its tags change.
         if (item.want.length || res.applied.length) state.tags[key] = { titles: item.want, reactions: res.applied };
