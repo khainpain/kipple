@@ -43,6 +43,8 @@ export function Overview(props: {
   onJunk: (c: Card) => void;
   onPin: (c: Card) => void;
   onMove: (c: Card, topic: string) => void;
+  /** Show every card from this channel (a click on the name on a card). */
+  onSource?: (name: string) => void;
   onOpenLink: (url: string) => void;
   /** Today's tasks in plan order, null for a finished one; undefined when there's no plan. */
   today?: Array<DailyTask | null>;
@@ -119,6 +121,7 @@ export function Overview(props: {
                 onPin={() => props.onPin(c)}
                 topics={props.topics.map(([t]) => t)}
                 onMove={(t) => props.onMove(c, t)}
+                onSource={props.onSource}
                 onOpenLink={props.onOpenLink}
               />
             ))}

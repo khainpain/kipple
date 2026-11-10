@@ -1,4 +1,4 @@
-import type { Card } from "../lib/types";
+import { ACTIONS, type Action, type Card } from "../lib/types";
 import { T, compareText, locale } from "../i18n";
 import { effectiveAction, effectiveTitle, effectiveTopic, matchesFilter } from "../lib/library";
 import { isImportant, isRecent, isUnsorted } from "../lib/smart";
@@ -8,7 +8,7 @@ export type ListKey = "all" | "important" | "read_later" | "ideas" | "reference"
 /** What the sidebar points at: the overview, a smart list, one topic, or cards without a topic. */
 export type Scope = { kind: "home" } | { kind: "list"; key: ListKey } | { kind: "topic"; name: string } | { kind: "notopic" };
 
-export type TypeKey = "links" | "photos" | "videos" | "docs" | "notes";
+export type TypeKey = "links" | "photos" | "videos" | "docs" | "audio" | "notes";
 export type SortKey = "new" | "old" | "title" | "title_desc" | "priority";
 export type ViewKey = "masonry" | "grid" | "list" | "headlines";
 export type OpenMode = "center" | "side" | "full";
@@ -34,6 +34,7 @@ export const TYPES: Array<{ key: TypeKey; label: string; icon: string }> = [
   { key: "photos", get label() { return T.nav.photos; }, icon: "photo" },
   { key: "videos", get label() { return T.nav.videos; }, icon: "video" },
   { key: "docs", get label() { return T.nav.docs; }, icon: "file" },
+  { key: "audio", get label() { return T.nav.audio; }, icon: "music" },
   { key: "notes", get label() { return T.nav.notes; }, icon: "text" },
 ];
 
@@ -224,4 +225,26 @@ export function loadPanelWidth(): number {
   } catch {
     return PANEL_WIDTH.default;
   }
+}
+
+/**
+ * Keys that sort the open card: I toggles important, 1-4 set a status (in the order of the status
+ * menu), Delete sends it to junk. Read by physical key, so they work on the Russian layout too.
+ */
+export type CardKey = { kind: "pin" } | { kind: "action"; action: Action };
+
+/** Hint shown next to each status in the menu. */
+export const ACTION_KEYS: Record<Action, string> = { read_later: "1", idea: "2", reference: "3", todo: "4", junk: "Del" };
+
+export function cardKey(e: { code: string; key: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean }): CardKey | null {
+  if (e.ctrlKey || e.metaKey || e.altKey) return null;
+  if (e.key === "Delete") return { kind: "action", action: "junk" };
+  if (e.code === "KeyI") return { kind: "pin" };
+  const digit = /^(?:Digit|Numpad)([1-4])$/.exec(e.code);
+  return digit ? { kind: "action", action: ACTIONS[Number(digit[1]) - 1] } : null;
+}
+
+/** Cards forwarded from this channel or person, matched by the exact name (not a search). */
+export function matchesSource(c: Card, source: string | null): boolean {
+  return !source || c.forwardedFrom === source;
 }
