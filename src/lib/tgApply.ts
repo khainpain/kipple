@@ -82,7 +82,7 @@ export interface ApplyDeps {
   baseDelayMs?: number;
 }
 
-/** Telegram deletes up to 100 messages per call. */
+/** Telegram deletes up to 100 messages per call (an album has at most 10). */
 const BATCH = 100;
 
 export async function applyToTelegram(cards: Card[], state: PinState, opts: ApplyOptions, deps: ApplyDeps): Promise<ApplyProgress> {
@@ -111,18 +111,16 @@ export async function applyToTelegram(cards: Card[], state: PinState, opts: Appl
 
   const byId = new Map(cards.map((c) => [c.id, c]));
   for (let i = 0; i < deletes.length && !signal?.aborted; ) {
-    // Whole cards per call, up to 100 messages (an album bigger than that goes alone).
-    const batch: DeleteItem[] = [];
-    let size = 0;
-    while (i < deletes.length && (batch.length === 0 || size + deletes[i].ids.length <= BATCH)) {
-      size += deletes[i].ids.length;
-      batch.push(deletes[i++]);
-    }
-    const res = await call(() => tg.deleteCards(batch.flatMap((d) => d.ids.map((id) => ({ id, date: d.date })))));
+    // An album goes alone and whole (all its messages or none); single messages up to 100 a call.
+    const whole = deletes[i].ids.length > 1;
+    const batch: DeleteItem[] = [deletes[i++]];
+    while (!whole && i < deletes.length && deletes[i].ids.length === 1 && batch.length < BATCH) batch.push(deletes[i++]);
+    const res = await call(() => tg.deleteCards(batch.flatMap((d) => d.ids.map((id) => ({ id, date: d.date }))), whole));
     const status = new Map(res.map((r) => [r.id, r.status]));
     for (const d of batch) {
-      // A card counts as deleted only when every one of its messages was.
-      if (d.ids.every((id) => status.get(id) === "deleted")) {
+      // A card counts as deleted only when every one of its messages is gone. "missing" too: a
+      // call retried after a lost answer finds the messages it just deleted gone already.
+      if (d.ids.every((id) => status.get(id) === "deleted" || status.get(id) === "missing")) {
         byId.get(d.cardId)!.removed = true;
         progress.deleted++;
       } else progress.skipped++;
@@ -139,11 +137,11 @@ export async function applyToTelegram(cards: Card[], state: PinState, opts: Appl
     if (status === "ok") {
       if (p.pin) progress.pinned++;
       else progress.unpinned++;
-    } else progress.skipped++;
-    // "changed": another message has this id now (another account's library); try again later.
-    if (status === "ok" || status === "missing") {
-      state.pinned = p.pin && status === "ok" ? [...state.pinned, p.cardId] : state.pinned.filter((id) => id !== p.cardId);
-    }
+    } else if (status !== "same") progress.skipped++;
+    // Only a pin Kipple made is Kipple's: "same" on pinning means the user pinned it in Telegram.
+    // "changed" (another message has this id now) and "refused" are tried again next time.
+    if (p.pin && status === "ok") state.pinned = [...state.pinned, p.cardId];
+    else if (!p.pin && status !== "changed" && status !== "refused") state.pinned = state.pinned.filter((id) => id !== p.cardId);
     progress.done++;
     await deps.savePins(state);
     onProgress({ ...progress });

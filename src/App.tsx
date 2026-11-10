@@ -10,7 +10,7 @@ import { aiAllowed, appendEdit, DEFAULT_SETTINGS, loadBoardState, loadLibrary, l
 import { dueReplies, nextDue, replyText, scheduleReply, withoutReplies, type PendingReply } from "./lib/tgReplies";
 import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type SendOptions } from "./lib/telegram";
 import { NoPremiumError, syncTags, type TagMode } from "./lib/tgTags";
-import { applyToTelegram, type ApplyOptions } from "./lib/tgApply";
+import { applyToTelegram, type ApplyOptions, type ApplyProgress } from "./lib/tgApply";
 import { TelegramDialog } from "./components/TelegramDialog";
 import { importFolder, pickExportFolder } from "./lib/importer";
 import { fetchLinkMeta, needsPreview } from "./lib/linkmeta";
@@ -540,27 +540,41 @@ export default function App() {
   /** Junk deleted and important pinned in Saved Messages (src/lib/tgApply.ts); only from the dialog's button. */
   async function applyTelegram(opts: ApplyOptions) {
     const tg = platform.telegram;
-    if (!lib || !tg || demoRef.current) return;
+    // Another job (AI, loading) would be stopped by starting this one: leave it running.
+    if (!lib || !tg || demoRef.current || job) return;
     setShowTelegram(false);
     abortRef.current?.abort();
     const ctl = new AbortController();
     abortRef.current = ctl;
     setApplying(true);
+    let last: ApplyProgress | null = null;
     try {
       const res = await applyToTelegram(lib.cards, await loadPinState(), opts, {
         tg,
         // Deleted cards are marked removed right away: if that can't be saved, stop before deleting more.
         saveCards: async () => {
+          // The library may have been replaced meanwhile: carry the removals over to the current one.
+          const cur = libRef.current ?? lib;
+          if (cur !== lib) {
+            const gone = new Set(lib.cards.filter((c) => c.removed).map((c) => c.id));
+            for (const c of cur.cards) if (gone.has(c.id)) c.removed = true;
+          }
           setRev((r) => r + 1);
-          await saveLibrary(lib);
+          await saveLibrary(cur);
         },
         savePins: savePinState,
         signal: ctl.signal,
-        onProgress: (p) => setJob({ label: p.waitSeconds ? T.app.jobApplyPause(p.waitSeconds) : T.app.jobApply, done: p.done, total: p.total }),
+        onProgress: (p) => {
+          last = p;
+          setJob({ label: p.waitSeconds ? T.app.jobApplyPause(p.waitSeconds) : T.app.jobApply, done: p.done, total: p.total });
+        },
       });
       notify(ctl.signal.aborted ? T.app.applyStopped(res.done, res.total) : T.app.applyDone(res.deleted, res.pinned, res.unpinned, res.skipped));
     } catch (e) {
-      notify(telegramErrorText(e));
+      // Say what was already done in Telegram before the error: deletions can't be undone.
+      const p = last as ApplyProgress | null;
+      const done = p && (p.deleted || p.pinned || p.unpinned) ? T.app.applyDone(p.deleted, p.pinned, p.unpinned, 0) + " " : "";
+      notify(done + telegramErrorText(e));
       if (e instanceof TelegramAuthError) setShowTelegram(true);
     } finally {
       setApplying(false);

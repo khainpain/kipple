@@ -134,10 +134,14 @@ export interface TelegramApi {
    * Each is checked first: still there, in the signed-in account's Saved Messages, with this
    * date; and copied to the local backup. "deleted", "missing" (gone already) or "changed"
    * (another message has this id) per message; nothing is deleted if the backup fails.
+   * `whole` (one album): if any message is "changed", none is deleted and the rest are "kept".
    */
-  deleteCards(items: Array<{ id: number; date: number }>): Promise<Array<{ id: number; status: "deleted" | "missing" | "changed" }>>;
-  /** Pins (or unpins) a Saved Message after the same check as deleteCards. Silent: no notification. */
-  pinSaved(id: number, date: number, pin: boolean): Promise<"ok" | "missing" | "changed">;
+  deleteCards(items: Array<{ id: number; date: number }>, whole: boolean): Promise<Array<{ id: number; status: "deleted" | "missing" | "changed" | "kept" }>>;
+  /**
+   * Pins (or unpins) a Saved Message after the same check as deleteCards. Silent: no notification.
+   * "same" when it's pinned (unpinned) already; "refused" when Telegram won't, e.g. too many pins.
+   */
+  pinSaved(id: number, date: number, pin: boolean): Promise<"ok" | "same" | "missing" | "changed" | "refused">;
   /**
    * Copies one page of Saved Messages that aren't in the local backup yet into it (the whole
    * history on the first run, then only newer messages). Call until `done`. The backup only grows.

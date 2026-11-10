@@ -21,6 +21,7 @@ export const en: Dict = {
     loading: "Loading…",
     close: "Close",
     cancel: "Cancel",
+    holdHint: (s) => `Press and hold for ${s} seconds to confirm`,
     save: "Save",
     open: "Open",
     stop: "Stop",

@@ -899,7 +899,8 @@ pub struct CardRef {
 #[derive(Serialize)]
 pub struct CardStatus {
     id: i32,
-    /// "deleted", "missing" (gone already) or "changed" (another message has this id).
+    /// "deleted", "missing" (gone already), "changed" (another message has this id) or "kept"
+    /// (fine, but another message of its album wasn't, so none of them went).
     status: &'static str,
 }
 
@@ -916,11 +917,20 @@ fn card_checks(items: &[CardRef], found: &HashMap<i32, (bool, i32)>) -> Vec<(i32
         .collect()
 }
 
+/// The ids to delete. `whole` (one album): all of them or none, so a card is never left half
+/// deleted; ones already gone don't stop the rest.
+fn to_delete(checks: &[(i32, &'static str)], whole: bool) -> Vec<i32> {
+    if whole && checks.iter().any(|(_, s)| *s == "changed") {
+        return vec![];
+    }
+    checks.iter().filter(|(_, s)| *s == "ok").map(|(id, _)| *id).collect()
+}
+
 /// Deletes the messages of cards the user sent to junk (for everyone, i.e. on all devices).
 /// Only messages that pass card_checks go, and each is copied to the local backup first: if that
 /// fails, nothing is deleted.
 #[tauri::command]
-pub async fn tg_delete_cards(app: tauri::AppHandle, state: tauri::State<'_, TgState>, items: Vec<CardRef>) -> Result<Vec<CardStatus>, String> {
+pub async fn tg_delete_cards(app: tauri::AppHandle, state: tauri::State<'_, TgState>, items: Vec<CardRef>, whole: bool) -> Result<Vec<CardStatus>, String> {
     if items.is_empty() {
         return Ok(vec![]);
     }
@@ -945,29 +955,34 @@ pub async fn tg_delete_cards(app: tauri::AppHandle, state: tauri::State<'_, TgSt
         })
         .collect();
     let checks = card_checks(&items, &found);
-    let ok: Vec<i32> = checks.iter().filter(|(_, s)| *s == "ok").map(|(id, _)| *id).collect();
+    let ok = to_delete(&checks, whole);
     if !ok.is_empty() {
         let keep: Vec<SavedMessage> = to_saved(&messages, &users, &chats).into_iter().filter(|m| ok.contains(&m.id)).collect();
         append_backup(&backup_dir(&app)?, me, &keep, "before_delete")?;
         let req = tl::functions::messages::DeleteMessages { revoke: true, id: ok.clone() };
         c.client.invoke(&req).await.map_err(err)?;
     }
-    Ok(checks.into_iter().map(|(id, s)| CardStatus { id, status: if s == "ok" { "deleted" } else { s } }).collect())
+    Ok(checks.into_iter().map(|(id, s)| CardStatus { id, status: if ok.contains(&id) { "deleted" } else if s == "ok" { "kept" } else { s } }).collect())
 }
 
-/// Pins (or unpins) a card's message in Saved Messages, without a notification:
-/// "ok", "missing" or "changed" (see own_saved_message).
+/// Pins (or unpins) a card's message in Saved Messages, without a notification: "ok", "same"
+/// (it already is), "missing" or "changed" (see own_saved_message), "refused" (e.g. too many pins).
 #[tauri::command]
 pub async fn tg_pin_saved(state: tauri::State<'_, TgState>, id: i32, date: i32, pin: bool) -> Result<&'static str, String> {
     let c = conn(&state).await?;
     let me = signed_in_user(&c).await?.id;
-    if let Err(status) = own_saved_message(&c, id, date, me).await? {
-        return Ok(status);
+    let m = match own_saved_message(&c, id, date, me).await? {
+        Ok(m) => m,
+        Err(status) => return Ok(status),
+    };
+    if m.pinned == pin {
+        return Ok("same");
     }
     let req = tl::functions::messages::UpdatePinnedMessage { silent: true, unpin: !pin, pm_oneside: false, peer: tl::enums::InputPeer::PeerSelf, id };
     match c.client.invoke(&req).await {
         Ok(_) => Ok("ok"),
         Err(e) if e.is("MESSAGE_ID_INVALID") => Ok("missing"),
+        Err(e) if refused(&e) => Ok("refused"),
         Err(e) => Err(err(e)),
     }
 }
@@ -1881,6 +1896,14 @@ mod tests {
         // id → (in the signed-in account's Saved Messages, date)
         let found: HashMap<i32, (bool, i32)> = [(1, (true, 100)), (2, (true, 999)), (4, (false, 400))].into();
         assert_eq!(card_checks(&items, &found), vec![(1, "ok"), (2, "changed"), (3, "missing"), (4, "changed")]);
+    }
+
+    #[test]
+    fn an_album_goes_whole_or_not_at_all() {
+        let checks = vec![(1, "ok"), (2, "changed"), (3, "ok")];
+        assert_eq!(to_delete(&checks, false), vec![1, 3]);
+        assert!(to_delete(&checks, true).is_empty());
+        assert_eq!(to_delete(&[(1, "ok"), (2, "missing")], true), vec![1]);
     }
 
     #[test]

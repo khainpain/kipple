@@ -62,9 +62,9 @@ describe("pinPlan", () => {
 function fakeTg(over: Partial<TelegramApi> = {}) {
   const calls: string[] = [];
   const tg = {
-    deleteCards: async (items: Array<{ id: number; date: number }>) => {
-      calls.push(`delete ${items.map((i) => i.id).join(",")}`);
-      return items.map((i) => ({ id: i.id, status: i.id === 9 ? ("changed" as const) : ("deleted" as const) }));
+    deleteCards: async (items: Array<{ id: number; date: number }>, whole: boolean) => {
+      calls.push(`delete ${items.map((i) => i.id).join(",")}${whole ? " whole" : ""}`);
+      return items.map((i) => ({ id: i.id, status: i.id === 9 ? ("changed" as const) : i.id === 8 ? ("missing" as const) : ("deleted" as const) }));
     },
     pinSaved: async (id: number, _date: number, pin: boolean) => {
       calls.push(`${pin ? "pin" : "unpin"} ${id}`);
@@ -95,7 +95,7 @@ describe("applyToTelegram", () => {
       onProgress: () => {},
       sleep: noSleep,
     });
-    expect(calls).toEqual(["delete 1,2,9", "pin 5"]);
+    expect(calls).toEqual(["delete 1,2 whole", "delete 9", "pin 5"]);
     expect(cards.map((c) => !!c.removed)).toEqual([true, false, false]);
     expect(saved[0]).toEqual([1]);
     expect(state.pinned).toEqual([5]);
@@ -114,6 +114,35 @@ describe("applyToTelegram", () => {
     });
     expect(cards[0].removed).toBeFalsy();
     expect(res.skipped).toBe(1);
+  });
+
+  it("counts a message already gone (say, deleted by a retried call) as deleted", async () => {
+    const cards = [card(8, JAN, { user: { action: "junk" } })];
+    const { tg } = fakeTg();
+    const res = await applyToTelegram(cards, emptyPinState(), { deleteJunk: true, pins: false }, {
+      tg,
+      saveCards: async () => {},
+      savePins: async () => {},
+      onProgress: () => {},
+      sleep: noSleep,
+    });
+    expect(cards[0].removed).toBe(true);
+    expect(res).toMatchObject({ deleted: 1, skipped: 0 });
+  });
+
+  it("never takes over a pin the user made in Telegram", async () => {
+    const cards = [card(5, FEB, { user: { pinned: true } }), card(6, FEB, { user: { pinned: true } })];
+    const { tg } = fakeTg({ pinSaved: async (id: number) => (id === 5 ? "same" : "refused") } as Partial<TelegramApi>);
+    const state = emptyPinState();
+    const res = await applyToTelegram(cards, state, { deleteJunk: false, pins: true }, {
+      tg,
+      saveCards: async () => {},
+      savePins: async () => {},
+      onProgress: () => {},
+      sleep: noSleep,
+    });
+    expect(state.pinned).toEqual([]);
+    expect(res).toMatchObject({ pinned: 0, skipped: 1 });
   });
 
   it("forgets a pin when the message is gone, keeps it when another account answered", async () => {

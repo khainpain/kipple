@@ -25,6 +25,7 @@ export const ru = {
     loading: "Загрузка…",
     close: "Закрыть",
     cancel: "Отмена",
+    holdHint: (s: number) => `Нажми и удерживай ${String(s).replace(".", ",")} с, чтобы подтвердить`,
     save: "Сохранить",
     open: "Открыть",
     stop: "Стоп",
