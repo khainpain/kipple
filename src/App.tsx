@@ -34,6 +34,8 @@ const isWeb = platform.kind === "web";
  * Vercel previews (behind Vercel sign-in) and local builds keep the full browser build.
  */
 const demoOnly = isWeb && __WEB_DEMO_ONLY__;
+/** The early followers' group in Telegram, where the app comes first (same link as the landing). */
+const WAITLIST = "https://t.me/+uvCQAMKVznUwNmIy";
 
 export default function App() {
   const [lib, setLib] = useState<Library | null>(null);
@@ -724,11 +726,17 @@ export default function App() {
     <>
       {demoOnly && (
         <div className="banner demo">
-          <span className="wide-only">{T.app.webDemoBanner}</span>
+          <span className="wide-only">{__WEB_DOWNLOAD__ ? T.app.webDemoBanner : T.app.webDemoBannerWaitlist}</span>
           <span className="narrow-only">{T.app.webDemoBannerShort}</span>
-          <a className="banner-link" href="/download">
-            {T.app.webDemoDownload}
-          </a>
+          {__WEB_DOWNLOAD__ ? (
+            <a className="banner-link" href="/download">
+              {T.app.webDemoDownload}
+            </a>
+          ) : (
+            <a className="banner-link" href={WAITLIST} target="_blank" rel="noopener noreferrer">
+              {T.app.webDemoWaitlist}
+            </a>
+          )}
         </div>
       )}
       {isWeb && !demoOnly && (

@@ -56,9 +56,13 @@ export const en: Dict = {
     webBanner: (version) =>
       `Web build for trying out the interface${version ? ` (${version})` : ""}. Data stays in this browser only, link previews aren't loaded, and photos show until the page is reloaded.`,
     webDemoBanner: "This is the Kipple demo: look around and try things, nothing is saved. Your own Saved Messages open in the Windows app.",
+    /** Waitlist mode: the app isn't downloadable yet. */
+    webDemoBannerWaitlist: "This is the Kipple demo: look around and try things, nothing is saved. The Windows app for your own Saved Messages goes to the waitlist first.",
     /** The same on a phone, where the long one takes a third of the screen. */
     webDemoBannerShort: "A demo to try out: nothing is saved.",
     webDemoDownload: "Download for Windows",
+    /** Instead of the download while the app is in waitlist mode: opens the Telegram group. */
+    webDemoWaitlist: "Join the waitlist",
     demoBanner: "This is the demo: look around and try things, but nothing is saved or touches your library.",
     demoExit: "Exit demo",
     updateAvailable: (v) => `Version ${v} is out. Update now?`,

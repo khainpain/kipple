@@ -60,9 +60,13 @@ export const ru = {
     webBanner: (version: string) =>
       `Веб-версия для проверки интерфейса${version ? ` (${version})` : ""}. Данные хранятся только в этом браузере, превью ссылок не загружаются, фото видны до перезагрузки страницы.`,
     webDemoBanner: "Это демо Kipple: смотри и пробуй, ничего не сохраняется. Свои сохранёнки открываются в приложении для Windows.",
+    /** Waitlist mode: the app isn't downloadable yet. */
+    webDemoBannerWaitlist: "Это демо Kipple: смотри и пробуй, ничего не сохраняется. Приложение для Windows, где открываются твои сохранёнки, первыми получат те, кто в листе ожидания.",
     /** The same on a phone, where the long one takes a third of the screen. */
     webDemoBannerShort: "Это демо: смотри и пробуй, ничего не сохраняется.",
     webDemoDownload: "Скачать для Windows",
+    /** Instead of the download while the app is in waitlist mode: opens the Telegram group. */
+    webDemoWaitlist: "Встать в лист ожидания",
     demoBanner: "Это демо: можно смотреть и пробовать, но ничего не сохраняется и не влияет на твою библиотеку.",
     demoExit: "Выйти из демо",
     updateAvailable: (v: string) => `Вышла новая версия ${v}. Обновиться сейчас?`,

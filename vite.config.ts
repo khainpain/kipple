@@ -10,6 +10,9 @@ const buildId = (process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || 
 // The site in production (getkipple.io/app/) is only the demo; Vercel previews and local builds
 // keep the full browser build with import, for checking changes.
 const webDemoOnly = process.env.VERCEL_ENV === "production";
+// Same switch as the landing (kipple-site): until KIPPLE_DOWNLOAD=1, the demo banner points to the
+// waitlist group in Telegram instead of /download.
+const webDownload = process.env.KIPPLE_DOWNLOAD === "1";
 
 // The browser build is a demo, not a page for search engines: the landing (getkipple.io) is.
 // vercel.json also sends X-Robots-Tag: noindex for everything this deployment serves.
@@ -32,7 +35,7 @@ export default defineConfig(({ mode }) => ({
       "@platform": fileURLToPath(new URL(mode === "web" ? "./src/platform/web.ts" : "./src/platform/tauri.ts", import.meta.url)),
     },
   },
-  define: { __BUILD_ID__: JSON.stringify(buildId), __WEB_DEMO_ONLY__: JSON.stringify(webDemoOnly) },
+  define: { __BUILD_ID__: JSON.stringify(buildId), __WEB_DEMO_ONLY__: JSON.stringify(webDemoOnly), __WEB_DOWNLOAD__: JSON.stringify(webDownload) },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
