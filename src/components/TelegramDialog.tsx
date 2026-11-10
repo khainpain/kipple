@@ -3,7 +3,7 @@ import type { TelegramApi } from "../platform/types";
 import type { Card } from "../lib/types";
 import { BOARD_TITLE, buildPlan, otherTopic, telegramErrorText, type BoardState, type SendOptions } from "../lib/telegram";
 import { loadBoardState, loadPinState, loadTagSyncState } from "../lib/store";
-import { deletePlan, pinPlan, type ApplyOptions, type PinState } from "../lib/tgApply";
+import { deletePlan, deleteWithFiles, pinPlan, type ApplyOptions, type PinState } from "../lib/tgApply";
 import { HoldToConfirm } from "./Motion";
 import { hashtagPlan, MAX_TG_TAGS, tagPlan, TAGS_PER_MESSAGE, likelyUsable, type TagMode, type TagSyncState } from "../lib/tgTags";
 import { T } from "../i18n";
@@ -99,6 +99,7 @@ export function TelegramDialog(props: {
   }, [props.cards, tagState, mode]);
 
   const junkCount = useMemo(() => deletePlan(props.cards).length, [props.cards]);
+  const junkFiles = useMemo(() => deleteWithFiles(props.cards), [props.cards]);
   const pins = useMemo(() => (pinState ? pinPlan(props.cards, pinState) : []), [props.cards, pinState]);
   const pinCount = pins.filter((p) => p.pin).length;
   const toDelete = apply.deleteJunk && junkCount > 0;
@@ -216,7 +217,10 @@ export function TelegramDialog(props: {
               <input type="checkbox" disabled={!junkCount} checked={apply.deleteJunk && !!junkCount} onChange={(e) => setApply({ ...apply, deleteJunk: e.target.checked })} />
               {L.deleteJunk(junkCount)}
             </label>
-            <p className="hint">{L.deleteJunkHint}</p>
+            <p className="hint">
+              {L.deleteJunkHint}
+              {apply.deleteJunk && junkFiles > 0 && <> <strong>{L.deleteJunkFiles(junkFiles)}</strong></>}
+            </p>
             <label className="check">
               <input type="checkbox" disabled={!pins.length} checked={apply.pins && !!pins.length} onChange={(e) => setApply({ ...apply, pins: e.target.checked })} />
               {L.pinImportant(pinCount, pins.length - pinCount)}

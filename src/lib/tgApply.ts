@@ -38,6 +38,15 @@ export function deletePlan(cards: Card[]): DeleteItem[] {
     .map((c) => ({ cardId: c.id, ids: [c.id, ...(c.albumIds ?? [])], date: unix(c) }));
 }
 
+/**
+ * How many of those carry a photo, video or file. The backup keeps only text and a file's
+ * description, so the files themselves are gone for good once Telegram deletes them.
+ */
+export function deleteWithFiles(cards: Card[]): number {
+  const described = new Set<Card["kind"]>(["poll", "location", "contact"]);
+  return cards.filter((c) => !c.removed && c.user?.action === "junk" && !described.has(c.kind) && (c.media || c.album?.length)).length;
+}
+
 export interface PinItem {
   cardId: number;
   date: number;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { TelegramApi } from "../platform/types";
 import type { Card } from "./types";
-import { applyToTelegram, deletePlan, emptyPinState, pinPlan } from "./tgApply";
+import { applyToTelegram, deletePlan, deleteWithFiles, emptyPinState, pinPlan } from "./tgApply";
 
 const card = (id: number, date: string, extra: Partial<Card> = {}): Card => ({
   id,
@@ -33,6 +33,18 @@ describe("deletePlan", () => {
       card(2, FEB, { user: { action: "junk" }, kind: "photo", albumIds: [3, 4] }),
     ];
     expect(deletePlan(cards)).toEqual([{ cardId: 2, ids: [2, 3, 4], date: 1769904000 }]);
+  });
+
+  it("counts junk cards whose files the text-only backup can't keep", () => {
+    const cards = [
+      card(1, JAN, { user: { action: "junk" } }),
+      card(2, JAN, { user: { action: "junk" }, kind: "document", media: { inTelegram: true } }),
+      card(3, JAN, { user: { action: "junk" }, kind: "photo", album: [{ inTelegram: true }] }),
+      card(4, JAN, { kind: "video", media: { inTelegram: true } }),
+      card(5, JAN, { user: { action: "junk" }, media: {}, removed: true }),
+      card(6, JAN, { user: { action: "junk" }, kind: "poll", media: {} }),
+    ];
+    expect(deleteWithFiles(cards)).toBe(2);
   });
 });
 
