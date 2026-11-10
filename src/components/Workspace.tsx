@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { platform } from "@platform";
 import type { Card, Library, UserFields } from "../lib/types";
-import { effectiveAction, effectiveTags, effectiveTopic, getOwnTopics, matchesFilter, tagName, topicName } from "../lib/library";
+import { effectiveAction, effectiveTags, effectiveTopic, getOwnTopics, getTopicRules, matchesFilter, tagName, topicName } from "../lib/library";
 import { countDuplicateGroups, findDuplicates, groupDuplicates, isImportant, isUnsorted } from "../lib/smart";
 import { Overview, type OverviewSection } from "./Overview";
 import { TidyDialog, type TidyKind } from "./TidyDialog";
@@ -87,6 +87,8 @@ export function Workspace(props: {
   onOpenInTelegram?: (card: Card) => void;
   onStop: () => void;
   onEdit: (ids: number[], patch: UserFields) => void;
+  /** Everything from a channel goes to a topic from now on; "" drops the rule. */
+  onChannelRule: (channel: string, topic: string) => void;
   /** Merged topics and tags, and saving a change to them. */
   aliases: Aliases;
   onAliases: (a: Aliases) => void;
@@ -110,6 +112,8 @@ export function Workspace(props: {
   const [tag, setTag] = useState<string | null>(null);
   /** Cards forwarded from one channel or person, picked by clicking its name on a card. */
   const [source, setSource] = useState<string | null>(null);
+  /** "Topic for this channel" menu, open next to the channel filter. */
+  const [ruleAt, setRuleAt] = useState<HTMLElement | null>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>(() => loadPref("sort", SORTS.map((s) => s.key), "new"));
   // Default is the even grid (all cards the same size); a new pref key so earlier saved "masonry" doesn't stick.
@@ -656,6 +660,20 @@ export function Workspace(props: {
                 <button className="pill active" onClick={() => setSource(null)} title={T.card.allFrom(source)}>
                   {source} <Icon name="close" size={12} />
                 </button>
+              )}
+              {source && (
+                <button className="pill ghost" aria-haspopup="listbox" aria-expanded={!!ruleAt} onClick={(e) => setRuleAt(ruleAt ? null : e.currentTarget)} title={T.rules.channelHint}>
+                  <Icon name="folder" size={13} /> {getTopicRules().channels[source] ? T.rules.channelIs(topicName(getTopicRules().channels[source])) : T.rules.channelPick}
+                </button>
+              )}
+              {source && ruleAt && (
+                <TopicMenu
+                  anchor={ruleAt}
+                  topics={topicNames}
+                  current={getTopicRules().channels[source] ? topicName(getTopicRules().channels[source]) : undefined}
+                  onPick={(t) => props.onChannelRule(source, t)}
+                  onClose={() => setRuleAt(null)}
+                />
               )}
               {tag && (
                 <button className="pill active" onClick={() => setTag(null)}>

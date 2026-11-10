@@ -1,6 +1,6 @@
 import { platform } from "@platform";
 import type { EditEvent, Library } from "./types";
-import { annotateContext, applyEdits, type Aliases } from "./library";
+import { annotateContext, applyEdits, type Aliases, type TopicRules } from "./library";
 import { emptyBoardState, type BoardState } from "./telegram";
 import type { LangPref } from "../i18n";
 import { DEFAULT_AI_MODEL, type AiModel } from "./ai";
@@ -37,6 +37,8 @@ export interface Settings {
   aliases?: Aliases;
   /** Topics the user made by hand: shown even when empty, offered to the AI first. */
   topics?: string[];
+  /** Topics without AI: everything from a channel or site goes to a topic (see TopicRules in library.ts). */
+  topicRules?: TopicRules;
   /** Anonymous usage statistics (src/lib/telemetry.ts); on unless turned off. */
   telemetry: boolean;
   /** Today's "Three for today" plan (src/lib/today.ts). */

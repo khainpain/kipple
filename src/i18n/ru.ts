@@ -381,6 +381,35 @@ export const ru = {
     clear: "Убрать из темы",
   },
 
+  /** Topics without AI: everything from a channel or site goes to a topic. */
+  rules: {
+    offerChannel: (channel: string, topic: string, n: number) => `Отправлять в «${topic}» всё из «${channel}»? Сейчас это ещё ${cards(n)}.`,
+    offerSite: (site: string, topic: string, n: number) => `Отправлять в «${topic}» всё с ${site}? Сейчас это ещё ${cards(n)}.`,
+    always: "Да, всегда",
+    added: "Готово. Правила можно поменять в Настройках.",
+    channelPick: "Тема для канала",
+    channelIs: (topic: string) => `Тема: ${topic}`,
+    channelHint: "Всё из этого канала будет попадать в одну тему, и новые карточки тоже",
+    title: "Темы без ИИ",
+    desc: "Всё из канала или с сайта попадает в свою тему. Тема, выбранная вручную, важнее правила. Ссылки на известные сайты (GitHub, IMDb, Spotify и другие) получают тему сами, если её не задали вы или ИИ.",
+    empty: "Правил пока нет. Поставьте тему карточке из канала, и Kipple предложит правило.",
+    channel: (name: string) => `Канал «${name}»`,
+    site: (domain: string) => `Сайт ${domain}`,
+    remove: (what: string) => `Удалить правило: ${what}`,
+  },
+  /** Topics for well-known sites (src/lib/siteTopics.ts), given with no AI. */
+  siteTopics: {
+    dev: "Разработка",
+    design: "Дизайн",
+    science: "Наука",
+    movies: "Кино",
+    books: "Книги",
+    music: "Музыка",
+    shopping: "Покупки",
+    travel: "Путешествия",
+    recipes: "Рецепты",
+    learning: "Учёба",
+  },
   topics: {
     add: "Новая тема",
     namePlaceholder: "Название темы",

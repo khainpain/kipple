@@ -5,7 +5,8 @@ import { useTelegramAccount } from "./useTelegramAccount";
 import "./App.css";
 import type { Card, Library, UserFields } from "./lib/types";
 import type { Skips, TodayState } from "./lib/today";
-import { effectiveTags, effectiveTopic, findTopic, getOwnTopics, makeEdit, matchesFilter, mergeAlias, NO_ALIASES, setAliases, setOwnTopics, topicName, type Aliases } from "./lib/library";
+import { effectiveTags, effectiveTopic, findTopic, getOwnTopics, makeEdit, matchesFilter, mergeAlias, NO_ALIASES, NO_RULES, setAliases, setOwnTopics, setTopicRules, topicName, type Aliases, type TopicRules } from "./lib/library";
+import { ruleOffer, withoutRulesTo } from "./lib/topicRules";
 import { aiAllowed, appendEdit, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadPendingReplies, loadSettings, saveBoardState, saveLibrary, savePendingReplies, saveSettings, wipeAll, type Settings } from "./lib/store";
 import { dueReplies, nextDue, replyText, scheduleReply, withoutReplies, type PendingReply } from "./lib/tgReplies";
 import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type SendOptions } from "./lib/telegram";
@@ -24,7 +25,7 @@ import { demoLibrary } from "./lib/demo";
 import { backupSaved, emptyTelegramLibrary, syncSaved } from "./lib/tgImport";
 import { T, lang, resolveLang, setLang } from "./i18n";
 import type { AiLang } from "./lib/ai";
-import { Toast } from "./components/Motion";
+import { Toast, type ToastMsg } from "./components/Motion";
 import { initTelemetry, markImported, maybeSendPing, setTelemetryEnabled, setTelemetrySuspended, telemetrySupported, track } from "./lib/telemetry";
 
 const isWeb = platform.kind === "web";
@@ -50,7 +51,7 @@ export default function App() {
   const [job, setJob] = useState<Job>(null);
   /** The consent dialog is open; resolving it with the answer carries on with what asked. */
   const [consent, setConsent] = useState<((ok: boolean) => void) | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastMsg | null>(null);
   const [version, setVersion] = useState("");
   const [updating, setUpdating] = useState<number | null | false>(false);
   const updatingRef = useRef(updating);
@@ -65,6 +66,9 @@ export default function App() {
   /** Merges tried out in the demo stay in memory, apart from the real ones in settings. */
   const [demoAliases, setDemoAliases] = useState<Aliases>(NO_ALIASES);
   const [demoTopics, setDemoTopics] = useState<string[]>([]);
+  const [demoRules, setDemoRules] = useState<TopicRules>(NO_RULES);
+  /** Channels and sites already offered a rule this session, so the offer doesn't nag on every move. */
+  const offered = useRef(new Set<string>());
   /** "Three for today" in the demo: in memory only, like its merges. */
   const [demoToday, setDemoToday] = useState<{ today?: TodayState; skips: Skips }>({ skips: {} });
   const demoRef = useRef(demo);
@@ -77,9 +81,10 @@ export default function App() {
   const hasKeyRef = useRef(hasKey);
   hasKeyRef.current = hasKey;
 
-  const notify = useCallback((msg: string) => {
+  const notify = useCallback((text: string, action?: ToastMsg["action"]) => {
+    const msg: ToastMsg = { text, action };
     setToast(msg);
-    setTimeout(() => setToast((t) => (t === msg ? null : t)), 6000);
+    setTimeout(() => setToast((t) => (t === msg ? null : t)), action ? 10000 : 6000);
   }, []);
 
   // Deletes "Open in Telegram" helper replies from Saved Messages when they're due, while signed in.
@@ -482,6 +487,26 @@ export default function App() {
     [lib, notify],
   );
 
+  /** Moved by hand: offer to send the rest of the channel (or site) to the same topic from now on. */
+  const editWithOffer = useCallback(
+    (ids: number[], patch: UserFields) => {
+      edit(ids, patch);
+      const topic = patch.topic;
+      if (!lib || !topic) return;
+      const o = ruleOffer(lib.cards, ids, topic);
+      if (!o || offered.current.has(`${o.kind}:${o.key}`)) return;
+      offered.current.add(`${o.kind}:${o.key}`);
+      const name = topicName(topic);
+      notify(o.kind === "channel" ? T.rules.offerChannel(o.key, name, o.count) : T.rules.offerSite(o.key, name, o.count), {
+        label: T.rules.always,
+        run: () => void addRule(o.kind, o.key, topic).then(() => notify(T.rules.added)),
+      });
+    },
+    // addRule reads the latest settings through refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [edit, lib, notify],
+  );
+
   async function doExport(kind: "csv" | "md", cards: Card[]) {
     const path = await platform.saveTextFile(
       kind === "csv" ? "kipple.csv" : "kipple.md",
@@ -535,6 +560,9 @@ export default function App() {
 
   async function onSaveSettings(s: Settings, key: string | null) {
     await applySettings(s);
+    // A rule removed in Settings changes card topics: rebuild what's derived from them.
+    setTopicRules(s.topicRules);
+    setRev((r) => r + 1);
     if (key) {
       try {
         await setApiKey(key);
@@ -594,16 +622,18 @@ export default function App() {
   setAliases(aliases);
   const ownTopics = demo ? demoTopics : (settings.topics ?? []);
   setOwnTopics(ownTopics);
+  setTopicRules(demo ? demoRules : settings.topicRules);
 
   async function onAliases(a: Aliases) {
     await saveNames({ aliases: a });
   }
 
   /** Saves merges and the user's own topics: in settings, or only in memory in the demo. */
-  async function saveNames(p: { aliases?: Aliases; topics?: string[] }) {
+  async function saveNames(p: { aliases?: Aliases; topics?: string[]; topicRules?: TopicRules }) {
     if (demoRef.current) {
       if (p.aliases) setDemoAliases(p.aliases);
       if (p.topics) setDemoTopics(p.topics);
+      if (p.topicRules) setDemoRules(p.topicRules);
     } else {
       const s = { ...settingsRef.current, ...p };
       settingsRef.current = s;
@@ -616,7 +646,16 @@ export default function App() {
     }
     if (p.aliases) setAliases(p.aliases);
     if (p.topics) setOwnTopics(p.topics);
+    if (p.topicRules) setTopicRules(p.topicRules);
     setRev((r) => r + 1);
+  }
+
+  /** Everything from a channel or site goes to a topic (unless a card's topic was picked by hand); "" drops the rule. */
+  async function addRule(kind: "channel" | "site", key: string, topic: string) {
+    const r = rulesNow();
+    const field = kind === "channel" ? "channels" : "sites";
+    const { [key]: _old, ...rest } = r[field];
+    await saveNames({ topicRules: { ...r, [field]: topic ? { ...rest, [key]: topic } : rest } });
   }
 
   /** Every topic shown now: the ones on cards and the user's own empty ones. */
@@ -670,7 +709,7 @@ export default function App() {
       lib.subgroups = rest;
       void persist(lib);
     }
-    await saveNames({ topics: ownTopicsNow().filter((t) => topicName(t) !== name) });
+    await saveNames({ topics: ownTopicsNow().filter((t) => topicName(t) !== name), topicRules: withoutRulesTo(rulesNow(), name) });
   }
 
   /** Saves today's plan and the tasks set aside: in settings, or only in memory in the demo. */
@@ -691,6 +730,7 @@ export default function App() {
 
   const aliasesNow = () => (demoRef.current ? demoAliases : (settingsRef.current.aliases ?? NO_ALIASES));
   const ownTopicsNow = () => (demoRef.current ? demoTopics : (settingsRef.current.topics ?? []));
+  const rulesNow = () => (demoRef.current ? demoRules : (settingsRef.current.topicRules ?? NO_RULES));
 
   async function askSynonyms(kind: "topics" | "tags", counts: Map<string, number>) {
     if (!aiAllowed(settingsRef.current) || demoRef.current) return []; // nothing leaves without consent
@@ -789,7 +829,7 @@ export default function App() {
       >
         {settingsDialog}
         {consentDialog}
-        <Toast text={toast} onClose={() => setToast(null)} />
+        <Toast text={toast?.text ?? null} action={toast?.action} onClose={() => setToast(null)} />
       </Welcome>
     );
   }
@@ -813,7 +853,8 @@ export default function App() {
         onNameImage={aiAllowed(settings) && !demo ? nameOne : undefined}
         onOpenInTelegram={tgAccount && !demo ? openInTelegram : undefined}
         onStop={() => abortRef.current?.abort()}
-        onEdit={edit}
+        onEdit={editWithOffer}
+        onChannelRule={(channel, topic) => void addRule("channel", channel, topic)}
         aliases={aliases}
         onAliases={onAliases}
         askSynonyms={aiAllowed(settings) && !demo ? askSynonyms : undefined}
@@ -830,7 +871,7 @@ export default function App() {
       {showTelegram && platform.telegram && (
         <TelegramDialog tg={platform.telegram} cards={lib.cards} running={sendingTg} onStart={sendTelegram} onOpenSettings={() => (setShowTelegram(false), setShowSettings(true))} onClose={() => setShowTelegram(false)} />
       )}
-      <Toast text={toast} onClose={() => setToast(null)} />
+      <Toast text={toast?.text ?? null} action={toast?.action} onClose={() => setToast(null)} />
     </div>
   );
 }

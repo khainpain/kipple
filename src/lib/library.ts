@@ -1,5 +1,7 @@
 import type { Action, Card, EditEvent, Library, UserFields } from "./types";
 import { linkText } from "./embeds";
+import { hostChain } from "./siteMarks";
+import { builtinTopicOf } from "./siteTopics";
 
 /**
  * Merge a fresh import into the existing library: AI fields, link previews and user
@@ -80,8 +82,39 @@ export function effectiveTags(c: Card): string[] {
   return [...new Set((c.user?.tags ?? [...(c.ai?.tags ?? []), ...c.hashtags]).map(tagName))];
 }
 
+/**
+ * Topics without AI (settings.topicRules): every card from a channel, or with a link to a site
+ * (subdomains too), goes to a topic. Kept apart from the cards, so a rule can change or go.
+ */
+export interface TopicRules {
+  /** Channel name as on the card (forwardedFrom) → topic. */
+  channels: Record<string, string>;
+  /** Domain without www → topic. */
+  sites: Record<string, string>;
+}
+
+export const NO_RULES: TopicRules = { channels: {}, sites: {} };
+let rules: TopicRules = NO_RULES;
+
+/** Set once settings are loaded and after every rule change. */
+export function setTopicRules(r: TopicRules | undefined) {
+  rules = r ?? NO_RULES;
+}
+
+export function getTopicRules(): TopicRules {
+  return rules;
+}
+
+/** The topic the user's rules give a card: its channel first, then its link's site. */
+export function ruleTopicOf(c: Card): string | undefined {
+  if (c.forwardedFrom && own(rules.channels, c.forwardedFrom)) return rules.channels[c.forwardedFrom];
+  const site = hostChain(c.urls[0]).find((h) => own(rules.sites, h));
+  return site ? rules.sites[site] : undefined;
+}
+
+/** A topic picked by hand, then the user's rules, then the AI's, then the built-in list of sites. */
 export function effectiveTopic(c: Card): string | undefined {
-  const t = c.user?.topic ?? c.ai?.topic;
+  const t = c.user?.topic ?? ruleTopicOf(c) ?? c.ai?.topic ?? builtinTopicOf(c.urls[0]);
   return t ? topicName(t) : t;
 }
 
