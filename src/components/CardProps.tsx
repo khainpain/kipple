@@ -3,6 +3,7 @@ import type { Action } from "../lib/types";
 import { ACTIONS, actionLabel } from "../lib/types";
 import { T } from "../i18n";
 import { Icon } from "./Icon";
+import { ACTION_KEYS } from "./nav";
 
 /**
  * Compact editors for the card's own settings (status, tags, note), laid out as
@@ -93,6 +94,7 @@ export function StatusChip(props: { value?: Action; labelledBy?: string; onChang
               <span className={`status-dot action-${a}`} />
               <span className="label">{actionLabel(a)}</span>
               {a === props.value && <Icon name="check" size={14} />}
+              <kbd>{ACTION_KEYS[a]}</kbd>
             </button>
           ))}
         </div>

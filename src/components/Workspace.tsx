@@ -19,7 +19,6 @@ import { SortMenu } from "./SortMenu";
 import { ViewMenu } from "./ViewMenu";
 import { nextThemePref, setThemePref, THEME_ICONS, THEME_LABELS, useThemePref } from "../lib/theme";
 import { T, compareText, formatNumber } from "../i18n";
-import { BOARD_TITLE } from "../lib/telegram";
 import type { TelegramAccount } from "../platform/types";
 import { actionLabel } from "../lib/types";
 import { track } from "../lib/telemetry";
@@ -29,8 +28,10 @@ import {
   SMART_LISTS,
   SORTS,
   TYPES,
+  cardKey,
   loadPref,
   matchesScope,
+  matchesSource,
   matchesType,
   savePref,
   scopeTitle,
@@ -70,7 +71,6 @@ export function Workspace(props: {
   offerAi: boolean;
   /** Undefined in the demo, which can't take a real import. */
   onImport?: () => void;
-  onExport: (kind: "csv" | "md", cards: Card[]) => void;
   onSettings: () => void;
   /** Desktop only: opens "Send to Telegram". */
   onTelegram?: () => void;
@@ -106,6 +106,8 @@ export function Workspace(props: {
   const [type, setType] = useState<TypeKey | null>(null);
   const theme = useThemePref();
   const [tag, setTag] = useState<string | null>(null);
+  /** Cards forwarded from one channel or person, picked by clicking its name on a card. */
+  const [source, setSource] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>(() => loadPref("sort", SORTS.map((s) => s.key), "new"));
   // Default is the even grid (all cards the same size); a new pref key so earlier saved "masonry" doesn't stick.
@@ -132,7 +134,6 @@ export function Workspace(props: {
   const [openMode, setOpenMode] = useState<OpenMode>(() => loadPref("open", OPEN_MODES.map((m) => m.key), "center"));
   const [openId, setOpenId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [exportOpen, setExportOpen] = useState(false);
   const [tidy, setTidy] = useState<TidyKind | null>(null);
   /** The open "Three for today" dialog: the tasks it started with and where. */
   const [todayOpen, setTodayOpen] = useState<{ tasks: DailyTask[]; start: number; n: number } | null>(null);
@@ -213,7 +214,7 @@ export function Workspace(props: {
   const isDupes = shown.kind === "list" && shown.key === "duplicates";
   // A new section, filter, sort or view gives a fresh board whose cards rise in again. Typing a
   // search keeps the set, so cards already on screen don't replay the entrance on every letter.
-  const boardKey = `${JSON.stringify(shown)}|${sub}|${type}|${tag}|${sort}|${view}`;
+  const boardKey = `${JSON.stringify(shown)}|${sub}|${type}|${tag}|${source}|${sort}|${view}`;
   const seenRef = useRef({ key: boardKey, ids: new Set<number>() });
   if (seenRef.current.key !== boardKey) seenRef.current = { key: boardKey, ids: new Set<number>() };
   const seen = seenRef.current.ids;
@@ -315,10 +316,11 @@ export function Workspace(props: {
 
   const visible = useMemo(() => {
     let list = tag ? inType.filter((c) => effectiveTags(c).includes(tag)) : inType;
+    if (source) list = list.filter((c) => matchesSource(c, source));
     if (subIds) list = list.filter((c) => subIds.has(c.id));
     // Duplicates stay next to each other so the extras are easy to spot.
     return isDupes ? groupDuplicates(list, dupes) : sortCards(list, sort);
-  }, [inType, tag, sort, isDupes, dupes, subIds]);
+  }, [inType, tag, source, sort, isDupes, dupes, subIds]);
 
   const sections = useMemo((): OverviewSection[] => {
     if (!home) return [];
@@ -358,6 +360,7 @@ export function Workspace(props: {
     setDrawer(false);
     setScope(s);
     setTag(null);
+    setSource(null);
     setSub(null);
     setGroupError(null);
     setSelected(new Set());
@@ -377,6 +380,14 @@ export function Workspace(props: {
     });
   }
 
+  /** Shows every card from the channel the clicked card came from; from the overview, across all cards. */
+  function pickSource(name: string) {
+    if (scope.kind === "home") setScope({ kind: "list", key: "all" });
+    setSub(null);
+    setSelected(new Set());
+    setSource(name);
+  }
+
   function moveTo(c: Card, topic: string) {
     onEdit([c.id], { topic });
   }
@@ -390,20 +401,57 @@ export function Workspace(props: {
     onEdit([c.id], { action: isJunk ? (c.ai?.action && c.ai.action !== "junk" ? c.ai.action : "reference") : "junk" });
   }
 
-  // Keyboard: "/" focuses search, Esc closes the panel or clears the selection, ↑/↓ (or j/k) step through cards.
+  /** The last change made with a key on the open card, so Ctrl+Z can put it back. */
+  const keyUndo = useRef<{ id: number; patch: UserFields } | null>(null);
+
+  /** I, 1-4 and Delete on the open card (nav.ts cardKey). A status or junk moves on to the next card. */
+  function sortOpenCard(c: Card, k: NonNullable<ReturnType<typeof cardKey>>) {
+    if (k.kind === "pin") {
+      keyUndo.current = { id: c.id, patch: { pinned: isImportant(c) } };
+      onEdit([c.id], { pinned: !isImportant(c) });
+      return;
+    }
+    const was = effectiveAction(c);
+    // The same key again takes junk back out; another status is set as is.
+    const action = k.action === "junk" && was === "junk" ? (c.ai?.action && c.ai.action !== "junk" ? c.ai.action : "reference") : k.action;
+    if (action === was) return;
+    // The edit log drops undefined, so "had no status" comes back as the status the card showed.
+    keyUndo.current = { id: c.id, patch: { action: c.user?.action ?? was ?? "reference" } };
+    const next = openIdx >= 0 ? (visible[openIdx + 1] ?? visible[openIdx - 1]) : undefined;
+    onEdit([c.id], { action });
+    if (next) setOpenId(next.id);
+  }
+
+  // Keyboard: "/" focuses search, Esc closes the panel or clears the selection, ↑/↓ (or j/k) step through cards,
+  // I / 1-4 / Delete sort the open card and Ctrl+Z takes the last of those back.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      // "Three for today" and "Tidy up" have keys of their own.
+      if (todayOpen || tidy) return;
       const el = e.target as HTMLElement;
-      const typing = el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT";
+      const typing = el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable;
       if (e.key === "Escape") {
         if (typing) (el as HTMLInputElement).blur();
         else if (openId != null) setOpenId(null);
         else if (drawer) setDrawer(false);
         else if (selected.size) setSelected(new Set());
-        else if (exportOpen) setExportOpen(false);
         return;
       }
-      if (typing) return;
+      if (typing || e.defaultPrevented) return;
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.code === "KeyZ" && keyUndo.current) {
+        e.preventDefault();
+        const u = keyUndo.current;
+        keyUndo.current = null;
+        onEdit([u.id], u.patch);
+        setOpenId(u.id);
+        return;
+      }
+      const k = openCard ? cardKey(e) : null;
+      if (k && openCard) {
+        e.preventDefault();
+        sortOpenCard(openCard, k);
+        return;
+      }
       if (e.key === "/") {
         e.preventDefault();
         searchRef.current?.focus();
@@ -417,11 +465,10 @@ export function Workspace(props: {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [openId, openIdx, visible, selected, exportOpen, drawer]);
+  }, [openId, openIdx, openCard, visible, selected, drawer, todayOpen, tidy, rev]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const exportCards = selected.size ? visible.filter((c) => selected.has(c.id)) : visible;
   const heading = scopeTitle(home ? scope : shown);
-  const subtitle = [sub, type && TYPES.find((t) => t.key === type)?.label, tag && `#${tag}`].filter(Boolean).join(" · ");
+  const subtitle = [sub, type && TYPES.find((t) => t.key === type)?.label, source, tag && `#${tag}`].filter(Boolean).join(" · ");
 
   return (
     <div className={`workspace${showSide ? "" : " side-closed"}${openCard && openMode === "side" && !narrow ? " with-detail" : ""}${narrow ? " narrow" : ""}`}>
@@ -505,20 +552,8 @@ export function Workspace(props: {
                 <Icon name="import" />
               </button>
             )}
-            <div className="menu-wrap">
-              <button className="icon-btn" onClick={() => setExportOpen(!exportOpen)} title={T.toolbar.export}>
-                <Icon name="export" />
-              </button>
-              {exportOpen && (
-                <div className="menu" onMouseLeave={() => setExportOpen(false)}>
-                  <small>{selected.size ? T.toolbar.exportSelected(exportCards.length) : T.toolbar.exportAll(exportCards.length)}</small>
-                  <button onClick={() => (setExportOpen(false), props.onExport("md", exportCards))}>Markdown</button>
-                  <button onClick={() => (setExportOpen(false), props.onExport("csv", exportCards))}>CSV</button>
-                </div>
-              )}
-            </div>
             {props.onTelegram && (
-              <button className="icon-btn" onClick={props.onTelegram} title={T.toolbar.telegram(BOARD_TITLE)}>
+              <button className="icon-btn" onClick={props.onTelegram} title={T.toolbar.telegram}>
                 <Icon name="send" />
               </button>
             )}
@@ -547,6 +582,7 @@ export function Workspace(props: {
             onJunk={toggleJunk}
             onPin={togglePin}
             onMove={moveTo}
+            onSource={pickSource}
             onOpenLink={(u) => void platform.openUrl(u)}
           />
         ) : (
@@ -599,6 +635,11 @@ export function Workspace(props: {
                 </button>
               )}
               {groupError && <span className="quick-error">{groupError}</span>}
+              {source && (
+                <button className="pill active" onClick={() => setSource(null)} title={T.card.allFrom(source)}>
+                  {source} <Icon name="close" size={12} />
+                </button>
+              )}
               {tag && (
                 <button className="pill active" onClick={() => setTag(null)}>
                   #{tag} <Icon name="close" size={12} />
@@ -626,6 +667,7 @@ export function Workspace(props: {
           onPin={togglePin}
           topics={topicNames}
           onMove={moveTo}
+          onSource={pickSource}
           onOpenLink={(u) => void platform.openUrl(u)}
           empty={shown.kind === "topic" && !inScope.length && !query.trim() ? { title: T.topics.emptyTitle, hint: T.topics.emptyHint } : undefined}
         />

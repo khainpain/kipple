@@ -6,16 +6,16 @@ import "./App.css";
 import type { Card, Library, UserFields } from "./lib/types";
 import type { Skips, TodayState } from "./lib/today";
 import { effectiveTags, effectiveTopic, findTopic, getOwnTopics, makeEdit, matchesFilter, mergeAlias, NO_ALIASES, setAliases, setOwnTopics, topicName, type Aliases } from "./lib/library";
-import { aiAllowed, appendEdit, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadPendingReplies, loadSettings, loadTagSyncState, saveBoardState, saveLibrary, savePendingReplies, saveSettings, saveTagSyncState, wipeAll, type Settings } from "./lib/store";
+import { aiAllowed, appendEdit, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadPendingReplies, loadSettings, loadPinState, loadTagSyncState, saveBoardState, savePinState, saveLibrary, savePendingReplies, saveSettings, saveTagSyncState, wipeAll, type Settings } from "./lib/store";
 import { dueReplies, nextDue, replyText, scheduleReply, withoutReplies, type PendingReply } from "./lib/tgReplies";
 import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type SendOptions } from "./lib/telegram";
 import { NoPremiumError, syncTags, type TagMode } from "./lib/tgTags";
+import { applyToTelegram, type ApplyOptions, type ApplyProgress } from "./lib/tgApply";
 import { TelegramDialog } from "./components/TelegramDialog";
 import { importFolder, pickExportFolder } from "./lib/importer";
 import { fetchLinkMeta, needsPreview } from "./lib/linkmeta";
 import { AiStop, aiModelOf, type AiAuth, classifyCards, retagCount, nameImages, pendingForAi, pendingImages, suggestSynonyms, groupCards } from "./lib/ai";
 import { displayTitle } from "./components/CardView";
-import { toCsv, toMarkdown } from "./lib/exporters";
 import { deleteApiKey, getAiAuth, getApiKey, setApiKey } from "./lib/secrets";
 import { Workspace, type Job } from "./components/Workspace";
 import { SettingsDialog } from "./components/Settings";
@@ -47,6 +47,7 @@ export default function App() {
   const tgAccount = useTelegramAccount(!showTelegram && lib !== null);
   const [sendingTg, setSendingTg] = useState(false);
   const [syncingTags, setSyncingTags] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [job, setJob] = useState<Job>(null);
   /** The consent dialog is open; resolving it with the answer carries on with what asked. */
   const [consent, setConsent] = useState<((ok: boolean) => void) | null>(null);
@@ -482,17 +483,6 @@ export default function App() {
     [lib, notify],
   );
 
-  async function doExport(kind: "csv" | "md", cards: Card[]) {
-    const path = await platform.saveTextFile(
-      kind === "csv" ? "kipple.csv" : "kipple.md",
-      kind === "csv" ? { name: "CSV", ext: "csv" } : { name: "Markdown", ext: "md" },
-      kind === "csv" ? toCsv(cards) : toMarkdown(cards, lib?.chatName),
-    );
-    if (!path) return;
-    track("export_completed", kind);
-    notify(T.app.exported(cards.length, path));
-  }
-
   async function sendTelegram(opts: SendOptions) {
     const tg = platform.telegram;
     if (!lib || !tg) return;
@@ -543,6 +533,51 @@ export default function App() {
       if (e instanceof TelegramAuthError || e instanceof NoPremiumError) setShowTelegram(true);
     } finally {
       setSyncingTags(false);
+      setJob(null);
+    }
+  }
+
+  /** Junk deleted and important pinned in Saved Messages (src/lib/tgApply.ts); only from the dialog's button. */
+  async function applyTelegram(opts: ApplyOptions) {
+    const tg = platform.telegram;
+    // Another job (AI, loading) would be stopped by starting this one: leave it running.
+    if (!lib || !tg || demoRef.current || job) return;
+    setShowTelegram(false);
+    abortRef.current?.abort();
+    const ctl = new AbortController();
+    abortRef.current = ctl;
+    setApplying(true);
+    let last: ApplyProgress | null = null;
+    try {
+      const res = await applyToTelegram(lib.cards, await loadPinState(), opts, {
+        tg,
+        // Deleted cards are marked removed right away: if that can't be saved, stop before deleting more.
+        saveCards: async () => {
+          // The library may have been replaced meanwhile: carry the removals over to the current one.
+          const cur = libRef.current ?? lib;
+          if (cur !== lib) {
+            const gone = new Set(lib.cards.filter((c) => c.removed).map((c) => c.id));
+            for (const c of cur.cards) if (gone.has(c.id)) c.removed = true;
+          }
+          setRev((r) => r + 1);
+          await saveLibrary(cur);
+        },
+        savePins: savePinState,
+        signal: ctl.signal,
+        onProgress: (p) => {
+          last = p;
+          setJob({ label: p.waitSeconds ? T.app.jobApplyPause(p.waitSeconds) : T.app.jobApply, done: p.done, total: p.total });
+        },
+      });
+      notify(ctl.signal.aborted ? T.app.applyStopped(res.done, res.total) : T.app.applyDone(res.deleted, res.pinned, res.unpinned, res.skipped));
+    } catch (e) {
+      // Say what was already done in Telegram before the error: deletions can't be undone.
+      const p = last as ApplyProgress | null;
+      const done = p && (p.deleted || p.pinned || p.unpinned) ? T.app.applyDone(p.deleted, p.pinned, p.unpinned, 0) + " " : "";
+      notify(done + telegramErrorText(e));
+      if (e instanceof TelegramAuthError) setShowTelegram(true);
+    } finally {
+      setApplying(false);
       setJob(null);
     }
   }
@@ -826,7 +861,6 @@ export default function App() {
         needAi={demo ? 0 : needAi}
         offerAi={aiAllowed(settings) || !settings.aiAsked}
         onImport={demo ? undefined : doImport}
-        onExport={doExport}
         onSettings={() => setShowSettings(true)}
         onTelegram={platform.telegram && !demo ? () => setShowTelegram(true) : undefined}
         onLoadTelegram={tgAccount && !demo ? () => void syncTelegram(lib, false) : undefined}
@@ -849,7 +883,7 @@ export default function App() {
       {settingsDialog}
       {consentDialog}
       {showTelegram && platform.telegram && (
-        <TelegramDialog tg={platform.telegram} cards={lib.cards} running={sendingTg} onStart={sendTelegram} syncingTags={syncingTags} otherJob={!!job && !sendingTg && !syncingTags} onSyncTags={syncTagsToTelegram} onOpenSettings={() => (setShowTelegram(false), setShowSettings(true))} onClose={() => setShowTelegram(false)} />
+        <TelegramDialog tg={platform.telegram} cards={lib.cards} running={sendingTg} onStart={sendTelegram} syncingTags={syncingTags} otherJob={!!job && !sendingTg && !syncingTags && !applying} onSyncTags={syncTagsToTelegram} applying={applying} onApply={applyTelegram} onOpenSettings={() => (setShowTelegram(false), setShowSettings(true))} onClose={() => setShowTelegram(false)} />
       )}
       <Toast text={toast} onClose={() => setToast(null)} />
     </div>

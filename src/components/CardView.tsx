@@ -162,6 +162,8 @@ export function CardView(props: {
   /** Topics to offer in "Move to topic", and moving there ("" = no topic). */
   topics: string[];
   onMove: (topic: string) => void;
+  /** Click on the channel name: show every card from it. Without it the name is plain text. */
+  onSource?: (name: string) => void;
   onOpenLink: (url: string) => void;
   /** Play the entrance animation. Read once on mount, so later re-renders don't cut it short. */
   enter?: boolean;
@@ -186,6 +188,8 @@ export function CardView(props: {
   const title = displayTitle(card);
   const excerpt = view === "headlines" || !show("excerpt") ? "" : excerptOf(card);
   const site = siteOf(card);
+  // The channel it came from, always: two links to the same site from different channels mean different things.
+  const source = card.forwardedFrom && card.forwardedFrom !== site ? card.forwardedFrom : undefined;
   const fileMeta = [formatSize(card.media?.size), card.kind === "video" ? "" : formatDuration(card.media?.duration)].filter(Boolean).join(" · ");
 
   const cls = ["card", enter && "enter", `view-${view}`, `kind-${card.kind}`, props.selected && "selected", props.active && "active", action === "junk" && "junk", props.selecting && "selecting", moveAt && "menu-open", !show("cover") && "no-cover", view === "list" && props.look?.coverSide === "right" && "cover-right"]
@@ -240,7 +244,22 @@ export function CardView(props: {
                 {site && <SiteIcon url={card.urls[0]} favicon={card.link?.favicon} />}
                 {site && <span className="site">{site}</span>}
                 {!site && fileMeta && <span>{fileMeta}</span>}
-                {!site && !fileMeta && card.forwardedFrom && <span className="site">{card.forwardedFrom}</span>}
+                {source &&
+                  (props.onSource ? (
+                    <button
+                      type="button"
+                      className="source"
+                      title={T.card.allFrom(source)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        props.onSource!(source);
+                      }}
+                    >
+                      {source}
+                    </button>
+                  ) : (
+                    <span className="source">{source}</span>
+                  ))}
               </>
             )}
             {view === "headlines" &&

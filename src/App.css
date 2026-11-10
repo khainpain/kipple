@@ -1015,6 +1015,34 @@ code {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* The channel a message was forwarded from: always shown, a click shows every card from it. */
+.meta-row .source {
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+.meta-row .site + .source::before,
+.meta-row span + .source::before {
+  content: "·";
+  margin-right: 6px;
+}
+.meta-row button.source {
+  cursor: pointer;
+  border-radius: 3px;
+  transition: color var(--duration-micro) ease;
+}
+.meta-row button.source:hover,
+.meta-row button.source:focus-visible {
+  color: var(--ink);
+  outline: none;
+}
 .favicon {
   width: 14px;
   height: 14px;

@@ -2,7 +2,7 @@ import { T } from "../i18n";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { open, save } from "@tauri-apps/plugin-dialog";
+import { open } from "@tauri-apps/plugin-dialog";
 import { BaseDirectory, exists, mkdir, readFile, readTextFile, rename, writeTextFile } from "@tauri-apps/plugin-fs";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { openPath, openUrl } from "@tauri-apps/plugin-opener";
@@ -25,6 +25,8 @@ const telegram: TelegramApi = {
   savedPage: (offsetId, minId) => invoke("tg_saved_page", { offsetId, minId }),
   quoteSaved: (id, text) => invoke("tg_quote_saved", { id, text }),
   deleteSaved: (ids, owner) => invoke("tg_delete_saved", { ids, owner }),
+  deleteCards: (items, whole) => invoke("tg_delete_cards", { items, whole }),
+  pinSaved: (id, date, pin) => invoke("tg_pin_saved", { id, date, pin }),
   backupStep: () => invoke("tg_backup_step"),
   backupInfo: () => invoke("tg_backup_info"),
   openBackup: (dir) => openPath(dir),
@@ -79,12 +81,6 @@ export const platform: Platform = {
   readMedia: async (sourceDir, rel) => new Blob([await readFile(joinPath(sourceDir, rel))]),
   openUrl: (url) => openUrl(url),
   openFile: (sourceDir, rel) => openPath(joinPath(sourceDir, rel)),
-  async saveTextFile(defaultName, filter, content) {
-    const path = await save({ title: T.importer.saveTitle, defaultPath: defaultName, filters: [{ name: filter.name, extensions: [filter.ext] }] });
-    if (!path) return null;
-    await writeTextFile(path, content);
-    return path;
-  },
   httpFetch: tauriFetch as HttpFetch,
   telegram,
   appVersion: () => getVersion(),

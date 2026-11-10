@@ -13,7 +13,11 @@ export const changelog = [
       "A local backup of your Saved Messages that only grows (Settings → Data)",
       "Loading from Telegram and AI tagging start only when you press the button",
       "A new installer window: bigger, livelier, with Kipple tidying up your kipple",
+      "Every card shows the channel it came from; click it to see all cards from that channel",
+      "Sort the open card from the keyboard: I for important, 1–4 for status, Delete for junk, Ctrl+Z to undo",
+      "Voice messages and audio get their own filter",
       "Copy your tags to Telegram: as Saved Messages tags with Premium, or as hashtags in your own messages",
+      "Apply to Telegram: delete what you sent to Junk and pin the important ones in Saved Messages (replaces Markdown and CSV export)",
     ],
     ru: [
       "«Открыть в Telegram»: переход от карточки к её сообщению в Избранном",
@@ -21,7 +25,11 @@ export const changelog = [
       "Локальная резервная копия «Избранного», которая только пополняется (Настройки → Данные)",
       "Загрузка из Telegram и AI-теги запускаются только по твоей кнопке",
       "Новое окно установки: крупнее и живее, Киппл наводит порядок в хламе",
+      "На каждой карточке виден канал, откуда она пришла; клик показывает все карточки из него",
+      "Открытую карточку можно разобрать с клавиатуры: I — в важное, 1–4 — статус, Delete — в мусор, Ctrl+Z — отменить",
+      "Голосовые и аудио получили свой фильтр",
       "Теги можно перенести в Telegram: метками «Избранного» с Premium или хештегами в твоих сообщениях",
+      "«Применить в Telegram»: удалить то, что ты отправил в мусор, и закрепить важное в «Избранном» (вместо экспорта в Markdown и CSV)",
     ],
   },
   {

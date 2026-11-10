@@ -192,7 +192,7 @@ export function Detail(props: {
         <button
           className={`icon-btn${isImportant(card) ? " on" : ""}`}
           onClick={() => props.onEdit({ pinned: !isImportant(card) })}
-          title={isImportant(card) ? T.card.unpin : T.card.pin}
+          title={`${isImportant(card) ? T.card.unpin : T.card.pin} (I)`}
           aria-pressed={isImportant(card)}
         >
           <Icon name="star" />
