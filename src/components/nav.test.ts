@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PANEL_WIDTH, clampPanelWidth, sortCards } from "./nav";
+import { PANEL_WIDTH, cardKey, clampPanelWidth, matchesSource, matchesType, sortCards } from "./nav";
 import type { Card } from "../lib/types";
 
 const card = (id: number, text: string, priority?: 1 | 2 | 3): Card => ({
@@ -41,5 +41,42 @@ describe("clampPanelWidth", () => {
   });
   it("never goes below the panel minimum, even in a tiny window", () => {
     expect(clampPanelWidth(500, 500)).toBe(PANEL_WIDTH.min);
+  });
+});
+
+describe("cardKey", () => {
+  const key = (code: string, key = "", mods: Partial<{ ctrlKey: boolean; metaKey: boolean; altKey: boolean }> = {}) =>
+    cardKey({ code, key, ctrlKey: false, metaKey: false, altKey: false, ...mods });
+  it("reads physical keys, so the Russian layout works too", () => {
+    expect(key("KeyI", "ш")).toEqual({ kind: "pin" });
+    expect(key("Digit1", "1")).toEqual({ kind: "action", action: "read_later" });
+    expect(key("Numpad4", "4")).toEqual({ kind: "action", action: "todo" });
+    expect(key("Delete", "Delete")).toEqual({ kind: "action", action: "junk" });
+  });
+  it("leaves other keys and shortcuts alone", () => {
+    expect(key("Digit5", "5")).toBeNull();
+    expect(key("KeyJ", "j")).toBeNull();
+    expect(key("KeyI", "i", { ctrlKey: true })).toBeNull();
+    expect(key("Digit1", "1", { altKey: true })).toBeNull();
+  });
+});
+
+describe("matchesSource", () => {
+  const from = (name?: string): Card => ({ ...card(9, "x"), forwardedFrom: name });
+  it("matches the exact channel name, not a part of it", () => {
+    expect(matchesSource(from("IT"), "IT")).toBe(true);
+    expect(matchesSource(from("IT-Новости"), "IT")).toBe(false);
+    expect(matchesSource(from(undefined), "IT")).toBe(false);
+    expect(matchesSource(from(undefined), null)).toBe(true);
+  });
+});
+
+describe("matchesType", () => {
+  const of = (kind: Card["kind"]): Card => ({ ...card(9, "x"), kind });
+  it("puts voice messages and audio under Audio, not Files", () => {
+    expect(matchesType(of("voice"), "audio")).toBe(true);
+    expect(matchesType(of("audio"), "audio")).toBe(true);
+    expect(matchesType(of("audio"), "docs")).toBe(false);
+    expect(matchesType(of("document"), "docs")).toBe(true);
   });
 });

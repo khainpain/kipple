@@ -250,7 +250,8 @@ export const ru = {
     links: "Ссылки",
     photos: "Фото",
     videos: "Видео",
-    docs: "Файлы и аудио",
+    docs: "Файлы",
+    audio: "Аудио",
     notes: "Заметки",
     viewMasonry: "Плитка",
     viewGrid: "Сетка",
@@ -449,6 +450,7 @@ export const ru = {
   },
 
   card: {
+    allFrom: (name: string) => `Все карточки из «${name}»`,
     important: "Важное",
     pin: "В важное",
     unpin: "Убрать из важного",

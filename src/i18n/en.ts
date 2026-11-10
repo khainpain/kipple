@@ -244,7 +244,8 @@ export const en: Dict = {
     links: "Links",
     photos: "Photos",
     videos: "Videos",
-    docs: "Files and audio",
+    docs: "Files",
+    audio: "Audio",
     notes: "Notes",
     viewMasonry: "Masonry",
     viewGrid: "Grid",
@@ -441,6 +442,7 @@ export const en: Dict = {
   },
 
   card: {
+    allFrom: (name) => `All cards from ${name}`,
     important: "Important",
     pin: "Mark important",
     unpin: "Remove from important",
