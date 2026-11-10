@@ -1,9 +1,9 @@
 // What the built-in key may be used for, and how much. Folders starting with "_" under api/
 // are not functions themselves; Vercel bundles this into the functions that import it.
 //
-// Usage is counted in "units": roughly a millionth of a dollar at Haiku prices
-// (input token = 1, output token = 5, cache read = 0.1), times the model's weight.
-// So 1,000,000 units ≈ $1, and the limits below read as dollars per day.
+// Usage is counted in "units": millionths of a dollar at the models' list prices (PRICES),
+// with cache writes at 1.25× and cache reads at 0.1× the input price.
+// So 1,000,000 units = $1, and the limits below read as dollars per day.
 //
 // Counters live in Upstash Redis (Vercel → Storage → Upstash, which sets KV_REST_API_URL and
 // KV_REST_API_TOKEN, or UPSTASH_REDIS_REST_URL/_TOKEN). Without it they are kept in the
@@ -20,7 +20,7 @@ const num = (name: string, fallback: number) => {
 };
 
 export const LIMITS = {
-  /** One install per UTC day. Tagging 10,000 messages with Haiku is about 1.5–2.5M. */
+  /** One install per UTC day. Tagging 10,000 messages with Haiku is about 0.15–0.25M. */
   install: () => num("KIPPLE_INSTALL_DAILY_UNITS", 3_000_000),
   /** One IP address per UTC day, so making up new install ids doesn't help much. */
   ip: () => num("KIPPLE_IP_DAILY_UNITS", 6_000_000),
@@ -30,11 +30,11 @@ export const LIMITS = {
   ipPerMinute: () => num("KIPPLE_IP_REQUESTS_PER_MINUTE", 40),
 };
 
-/** The models of the Settings picker (src/lib/ai.ts AI_MODELS), with their price relative to Haiku. */
-export const MODEL_WEIGHT: Record<string, number> = {
-  "claude-haiku-5-5": 1,
-  "claude-sonnet-5-5": 3,
-  "claude-opus-5-5": 5,
+/** The models of the Settings picker (src/lib/ai.ts AI_MODELS) with their list prices, US dollars per million tokens. */
+export const PRICES: Record<string, { in: number; out: number }> = {
+  "claude-haiku-5-5": { in: 0.1, out: 0.5 },
+  "claude-sonnet-5-5": { in: 2, out: 10 },
+  "claude-opus-5-5": { in: 4, out: 20 },
 };
 
 const MAX_TOKENS = 16_000;
@@ -56,7 +56,7 @@ function appContent(content: unknown): boolean {
 
 /** Why the request isn't one the app would send, or null if it is. */
 export function allowedRequest(body: Record<string, unknown>): string | null {
-  if (typeof body.model !== "string" || !(body.model in MODEL_WEIGHT)) return "This model is not available with the built-in key.";
+  if (typeof body.model !== "string" || !(body.model in PRICES)) return "This model is not available with the built-in key.";
   // A negative or fractional max_tokens would make the reservation negative and lift the limits for everyone.
   if (!Number.isInteger(body.max_tokens) || (body.max_tokens as number) < 1 || (body.max_tokens as number) > MAX_TOKENS) return "max_tokens is out of range.";
   if (body.stream) return "Streaming is not supported.";
@@ -83,8 +83,9 @@ export interface Usage {
 }
 
 export function unitsOf(model: string, u: Usage): number {
-  const base = (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) * 1.25 + (u.cache_read_input_tokens ?? 0) * 0.1 + (u.output_tokens ?? 0) * 5;
-  return Math.ceil(base * (MODEL_WEIGHT[model] ?? 5));
+  const p = PRICES[model] ?? PRICES["claude-opus-5-5"];
+  const input = (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) * 1.25 + (u.cache_read_input_tokens ?? 0) * 0.1;
+  return Math.ceil(input * p.in + (u.output_tokens ?? 0) * p.out);
 }
 
 export function clientIp(request: Request): string {
