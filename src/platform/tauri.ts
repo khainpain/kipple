@@ -3,7 +3,7 @@ import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { appDataDir } from "@tauri-apps/api/path";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { open, save } from "@tauri-apps/plugin-dialog";
+import { open } from "@tauri-apps/plugin-dialog";
 import { BaseDirectory, exists, mkdir, readFile, readTextFile, rename, writeTextFile } from "@tauri-apps/plugin-fs";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
 import { openPath, openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -26,6 +26,8 @@ const telegram: TelegramApi = {
   savedPage: (offsetId, minId) => invoke("tg_saved_page", { offsetId, minId }),
   quoteSaved: (id, text) => invoke("tg_quote_saved", { id, text }),
   deleteSaved: (ids, owner) => invoke("tg_delete_saved", { ids, owner }),
+  deleteCards: (items, whole, owner) => invoke("tg_delete_cards", { items, whole, owner: owner ?? null }),
+  pinSaved: (id, date, pin) => invoke("tg_pin_saved", { id, date, pin }),
   backupStep: () => invoke("tg_backup_step"),
   backupInfo: () => invoke("tg_backup_info"),
   openBackup: (dir) => openPath(dir),
@@ -34,6 +36,9 @@ const telegram: TelegramApi = {
   ensureBoard: (prev, title, about) => invoke("tg_ensure_board", { channelId: prev?.channelId ?? null, accessHash: prev?.accessHash ?? null, title, about }),
   createTopic: (b, title, iconColor) => invoke("tg_create_topic", { channelId: b.channelId, accessHash: b.accessHash, title, iconColor: iconColor ?? null }),
   forward: (b, topicId, ids) => invoke("tg_forward", { channelId: b.channelId, accessHash: b.accessHash, topicId, ids }),
+  tagsSetup: (titles) => invoke("tg_tags_setup", { titles }),
+  tagsApply: (id, date, owner, add, remove, owned) => invoke("tg_tags_apply", { id, date, owner, add, remove, owned }),
+  tagsHashtags: (id, date, owner, hashtags) => invoke("tg_tags_hashtags", { id, date, owner, hashtags }),
   sendNote: (b, topicId, replyTo, text, boldLen) => invoke("tg_send_note", { channelId: b.channelId, accessHash: b.accessHash, topicId, replyTo, text, boldLen }),
 };
 
@@ -121,12 +126,6 @@ export const platform: Platform = {
     if (!RUNNABLE.test(path)) return openPath(path);
     await revealItemInDir(path);
     return "revealed";
-  },
-  async saveTextFile(defaultName, filter, content) {
-    const path = await save({ title: T.importer.saveTitle, defaultPath: defaultName, filters: [{ name: filter.name, extensions: [filter.ext] }] });
-    if (!path) return null;
-    await writeTextFile(path, content);
-    return path;
   },
   httpFetch: tauriFetch as HttpFetch,
   previewFetch: (url, accept) => invoke("preview_fetch", { url, accept: accept ?? null }),

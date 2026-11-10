@@ -21,6 +21,7 @@ export const en: Dict = {
     loading: "Loading…",
     close: "Close",
     cancel: "Cancel",
+    holdHint: (s) => `Press and hold for ${s} seconds to confirm`,
     save: "Save",
     open: "Open",
     stop: "Stop",
@@ -47,10 +48,26 @@ export const en: Dict = {
     aiFailed: (n) => `The AI couldn't tag ${cards(n)}; you can run it again.`,
     aiError: (e) => `AI error: ${e}`,
     imported: (total, added) => `Import done: ${cards(total)}, ${num(added)} new.`,
-    exported: (n, path) => `Saved ${cards(n)} to ${path}`,
     tgMissing: (n) => ` ${num(n)} message${s(n)} ${n === 1 ? "is" : "are"} no longer in Saved Messages and ${n === 1 ? "was" : "were"} skipped.`,
     tgStopped: (done, total) => `Stopped: sent ${num(done)} of ${num(total)}. Press "Send" again to continue.`,
     tgDone: (n, board) => `Done: ${cards(n)} in the "${board}" group.`,
+    jobTags: "Tags to Telegram",
+    jobTagsPause: (sec) => `Tags to Telegram, waiting ${sec} s`,
+    tagsDone: (n, skipped) =>
+      `Done: tags on ${num(n)} message${s(n)} in Saved Messages.` +
+      (skipped ? ` ${num(skipped)} skipped: forwarded, deleted or out of room for tags.` : ""),
+    tagsStopped: (done, total) => `Stopped: ${num(done)} of ${num(total)}. Press "Copy tags" again to continue.`,
+    tagsNoPremium: "Tags in Saved Messages need Telegram Premium. Choose hashtags instead.",
+    jobApply: "Applying to Telegram",
+    jobApplyPause: (s) => `Applying to Telegram, paused for ${s} s`,
+    applyDone: (deleted, pinned, unpinned, skipped) => {
+      const parts = [deleted ? `deleted ${cards(deleted)}` : "", pinned ? `pinned ${num(pinned)}` : "", unpinned ? `unpinned ${num(unpinned)}` : ""].filter(Boolean);
+      return (
+        (parts.length ? `Done: ${parts.join(", ")}.` : "Done: nothing changed in Telegram.") +
+        (skipped ? ` ${num(skipped)} skipped: the message is no longer in Saved Messages, or another one has its number now.` : "")
+      );
+    },
+    applyStopped: (done, total) => `Stopped: ${num(done)} of ${num(total)}. Press "Apply" again to carry on.`,
     wiped: "All data has been deleted from this computer.",
     busy: "Wait for the current task to finish, or stop it first.",
     statsNotice: "Kipple now sends anonymous usage stats: no id, no message text. You can turn them off in Settings.",
@@ -413,10 +430,7 @@ export const en: Dict = {
     runAi: (n) => `Tag ${num(n)}`,
     loadTelegram: "Load what's new in Saved Messages",
     import: "Import a new export: your edits and tags are kept",
-    export: "Export",
-    exportSelected: (n) => `Selected: ${num(n)}`,
-    exportAll: (n) => `All on screen: ${num(n)}`,
-    telegram: (board) => `Send to Telegram: sort into topics in the "${board}" group`,
+    telegram: "Apply to Telegram",
     settings: "Settings",
     selected: (n) => `${num(n)} selected`,
     selectAll: (n) => `Select all ${num(n)}`,
@@ -530,7 +544,20 @@ export const en: Dict = {
     replyHint: "tap the quote to jump to the message",
     replyNoOriginal: "This message is no longer in Saved Messages",
     replyNoChat: "A reply with a quote is in Saved Messages now: open Telegram, it's the latest one",
-    title: "Send to Telegram",
+    title: "Apply to Telegram",
+    applyIntro: "What you sorted out in Kipple goes to Saved Messages. Nothing changes until you press a button.",
+    cleanTitle: "Junk and important",
+    deleteJunk: (n) => `Delete from Telegram what you sent to Junk: ${num(n)}`,
+    deleteJunkHint:
+      "Only cards you sent to Junk yourself, not the AI's guesses. Each message is saved to the local backup first (Settings → Data). Deleting in Telegram can't be undone.",
+    pinImportant: (pin, unpin) => `Pin important ones in Saved Messages: ${num(pin)}` + (unpin ? `, unpin ${num(unpin)} no longer important` : ""),
+    pinImportantHint: "Kipple only unpins its own pins. Whatever you pinned in Telegram yourself stays.",
+    applyNothing: "Telegram already matches Kipple here.",
+    apply: "Apply",
+    applyHold: "Hold to apply",
+    applyHoldDone: "Applying",
+    applyRunning: "Applying…",
+    boardTitle: (board) => `The "${board}" group with topics`,
     intro: (board) =>
       `The app will create a private group "${board}" for you, with a topic per library section, and forward the original messages from Saved Messages there. Each one gets a short summary and hashtags underneath. You sign in to Telegram directly; the session key is kept only on this computer, in Windows Credential Manager.`,
     checking: "Checking sign-in…",
@@ -555,6 +582,19 @@ export const en: Dict = {
     untagged: (n, other) => ` ${cards(n)} without AI tags yet will go to the "${other}" topic; better press "Tag" first.`,
     sending: "Sending…",
     send: (n) => `Send ${num(n)}`,
+    tagsTitle: "Tags in Saved Messages",
+    tagsIntro: "Kipple's tags show up on the messages themselves in Telegram. Nothing changes until you press the button.",
+    tagsModeTags: "As Telegram tags",
+    tagsModeTagsHint: (max, per) =>
+      `Your ${num(max)} most used tags become Saved Messages tags, up to ${num(per)} per message. Tags you added yourself stay.`,
+    tagsNoPremium: "Tags in Saved Messages need Telegram Premium.",
+    tagsModeHashtags: "As hashtags in the text",
+    tagsModeHashtagsHint:
+      "Hashtags go at the end of messages you wrote yourself. Telegram doesn't allow editing forwarded ones, so those stay as they are. Each message is copied to the local backup before it changes.",
+    tagsPlan: (n) => `To update: ${num(n)} message${s(n)}.`,
+    tagsNothing: "All tags are in Telegram already.",
+    tagsStart: "Copy tags",
+    tagsRunning: "Copying…",
     boardAbout: (board) => `Sorted Saved Messages: topics, summaries and tags from ${board}.`,
     otherTopic: "Other",
     noteLabel: "Note",
@@ -584,15 +624,8 @@ export const en: Dict = {
     noMessages: "The file has no message list. You need result.json from a Telegram Desktop export in JSON format.",
     savedMessages: "Saved Messages",
     pickTitle: "Telegram export folder (with result.json)",
-    saveTitle: "Export cards",
     noFile: (rel) => `No file ${rel}`,
     fileGone: (rel) => `File ${rel} is unavailable: choose the export folder again.`,
-    downloads: (name) => `Downloads (${name})`,
-  },
-
-  exporter: {
-    noTopic: "No topic",
-    exported: (date, n) => `Exported ${date}, cards: ${num(n)}.`,
   },
 
   aiConsent: {

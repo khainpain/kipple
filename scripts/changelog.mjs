@@ -17,6 +17,8 @@ export const changelog = [
       "Sort the open card from the keyboard: I for important, 1–4 for status, Delete for junk, Ctrl+Z to undo",
       "Voice messages and audio get their own filter",
       "Many fixes: edits and AI titles no longer get lost, sensitive cards never go to the AI",
+      "Copy your tags to Telegram: as Saved Messages tags with Premium, or as hashtags in your own messages",
+      "Apply to Telegram: delete what you sent to Junk and pin the important ones in Saved Messages (replaces Markdown and CSV export)",
     ],
     ru: [
       "«Открыть в Telegram»: переход от карточки к её сообщению в Избранном",
@@ -28,6 +30,8 @@ export const changelog = [
       "Открытую карточку можно разобрать с клавиатуры: I — в важное, 1–4 — статус, Delete — в мусор, Ctrl+Z — отменить",
       "Голосовые и аудио получили свой фильтр",
       "Много исправлений: правки и AI-названия больше не теряются, чувствительные карточки никогда не уходят в AI",
+      "Теги можно перенести в Telegram: метками «Избранного» с Premium или хештегами в твоих сообщениях",
+      "«Применить в Telegram»: удалить то, что ты отправил в мусор, и закрепить важное в «Избранном» (вместо экспорта в Markdown и CSV)",
     ],
   },
   {
