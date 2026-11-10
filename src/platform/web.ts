@@ -106,14 +106,6 @@ export const platform: Platform = {
     if (url) window.open(url, "_blank", "noopener");
     else alert(T.importer.fileGone(joinPath(sourceDir, rel)));
   },
-  async saveTextFile(defaultName, _filter, content) {
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([content], { type: "text/plain;charset=utf-8" }));
-    a.download = defaultName;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
-    return T.importer.downloads(defaultName);
-  },
   // Browsers block reading other sites, so pages and pictures for previews go through
   // api/fetch.ts, a small function deployed next to this build on Vercel. It only gets the link.
   httpFetch: (url, init) => fetch(`/api/fetch?url=${encodeURIComponent(url)}`, { signal: init?.signal }),

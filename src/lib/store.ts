@@ -3,6 +3,7 @@ import type { EditEvent, Library } from "./types";
 import { annotateContext, applyEdits, type Aliases } from "./library";
 import { emptyBoardState, type BoardState } from "./telegram";
 import { emptyTagSyncState, type TagSyncState } from "./tgTags";
+import { emptyPinState, type PinState } from "./tgApply";
 import type { LangPref } from "../i18n";
 import { DEFAULT_AI_MODEL, type AiModel } from "./ai";
 import type { Skips, TodayState } from "./today";
@@ -15,6 +16,7 @@ const SETTINGS = "settings.json";
 const TELEGRAM = "telegram.json";
 const REPLIES = "telegram-replies.json";
 const TAGS = "telegram-tags.json";
+const PINS = "telegram-pins.json";
 
 export interface Settings {
   /** AI tagging on. Only counts together with aiConsentAt: see aiAllowed. */
@@ -126,6 +128,18 @@ export async function saveTagSyncState(s: TagSyncState) {
   await atomicWrite(TAGS, JSON.stringify(s));
 }
 
+/** Which Saved Messages Kipple pinned (src/lib/tgApply.ts). */
+export async function loadPinState(): Promise<PinState> {
+  if (!(await exists(PINS))) return emptyPinState();
+  // A broken file is an error, not an empty state: Kipple would forget its pins and never take them off.
+  const s = JSON.parse(await read(PINS)) as Partial<PinState> | null;
+  return { ...emptyPinState(), ...s };
+}
+
+export async function savePinState(s: PinState) {
+  await atomicWrite(PINS, JSON.stringify(s));
+}
+
 /** "Open in Telegram" helper replies still to delete from Saved Messages. */
 export async function loadPendingReplies(): Promise<PendingReply[]> {
   if (!(await exists(REPLIES))) return [];
@@ -146,4 +160,5 @@ export async function wipeAll() {
   await atomicWrite(TELEGRAM, "null");
   await atomicWrite(REPLIES, "[]");
   await atomicWrite(TAGS, "null");
+  await atomicWrite(PINS, "null");
 }

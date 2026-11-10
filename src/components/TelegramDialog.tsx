@@ -2,13 +2,18 @@ import { useEffect, useMemo, useState } from "react";
 import type { TelegramApi } from "../platform/types";
 import type { Card } from "../lib/types";
 import { BOARD_TITLE, buildPlan, otherTopic, telegramErrorText, type BoardState, type SendOptions } from "../lib/telegram";
-import { loadBoardState, loadTagSyncState } from "../lib/store";
+import { loadBoardState, loadPinState, loadTagSyncState } from "../lib/store";
+import { deletePlan, pinPlan, type ApplyOptions, type PinState } from "../lib/tgApply";
+import { HoldToConfirm } from "./Motion";
 import { hashtagPlan, MAX_TG_TAGS, tagPlan, TAGS_PER_MESSAGE, likelyUsable, type TagMode, type TagSyncState } from "../lib/tgTags";
 import { T } from "../i18n";
 
 type Step = "loading" | "noApi" | "phone" | "code" | "password" | "ready";
 
-/** Logs in to the user's Telegram account and starts sending the library to the "Kipple" group. */
+/**
+ * Signs in to the user's Telegram account and carries what was sorted out in Kipple to it:
+ * junk deleted and important pinned, tags, and the "Kipple" group with topics.
+ */
 export function TelegramDialog(props: {
   tg: TelegramApi;
   cards: Card[];
@@ -19,6 +24,9 @@ export function TelegramDialog(props: {
   /** Something else is running (AI tagging, loading): starting now would stop it. */
   otherJob: boolean;
   onSyncTags: (mode: TagMode) => void;
+  /** Junk is being deleted / important pinned right now. */
+  applying: boolean;
+  onApply: (opts: ApplyOptions) => void;
   /** Only for builds without a built-in Telegram key: the user's own key lives in Settings → Advanced. */
   onOpenSettings: () => void;
   onClose: () => void;
@@ -37,13 +45,16 @@ export function TelegramDialog(props: {
   const [premium, setPremium] = useState(false);
   const [tagState, setTagState] = useState<TagSyncState | null>(null);
   const [tagMode, setTagMode] = useState<TagMode | null>(null);
+  const [pinState, setPinState] = useState<PinState | null>(null);
+  const [apply, setApply] = useState<ApplyOptions>({ deleteJunk: true, pins: true });
 
   async function refresh() {
     setError(null);
     try {
-      const [s, b, t] = await Promise.all([tg.status(), loadBoardState(), loadTagSyncState()]);
+      const [s, b, t, p] = await Promise.all([tg.status(), loadBoardState(), loadTagSyncState(), loadPinState()]);
       setState(b);
       setTagState(t);
+      setPinState(p);
       setName(s.name ?? "");
       setPremium(!!s.premium);
       setStep(!s.hasApi ? "noApi" : s.authorized ? "ready" : "phone");
@@ -85,6 +96,13 @@ export function TelegramDialog(props: {
     return (mode === "tags" ? tagPlan(props.cards, tagState, likelyUsable(props.cards, tagState)) : hashtagPlan(props.cards, tagState)).length;
   }, [props.cards, tagState, mode]);
 
+  const junkCount = useMemo(() => deletePlan(props.cards).length, [props.cards]);
+  const pins = useMemo(() => (pinState ? pinPlan(props.cards, pinState) : []), [props.cards, pinState]);
+  const pinCount = pins.filter((p) => p.pin).length;
+  const toDelete = apply.deleteJunk && junkCount > 0;
+  const applyCount = (apply.deleteJunk ? junkCount : 0) + (apply.pins ? pins.length : 0);
+  const applyBlocked = busy || props.running || props.syncingTags || props.applying || props.otherJob || !applyCount;
+
   const L = T.telegram;
 
   return (
@@ -94,9 +112,7 @@ export function TelegramDialog(props: {
           ×
         </button>
         <h2>{L.title}</h2>
-        <p className="hint">
-          {L.intro(BOARD_TITLE)}
-        </p>
+        <p className="hint">{L.applyIntro}</p>
 
         {step === "loading" && <p className="hint">{L.checking}</p>}
 
@@ -185,29 +201,33 @@ export function TelegramDialog(props: {
                 {L.signOut}
               </a>
             </p>
+
+            <h3>{L.cleanTitle}</h3>
             <label className="check">
-              <input type="checkbox" checked={opts.includeJunk} onChange={(e) => setOpts({ ...opts, includeJunk: e.target.checked })} />
-              {L.includeJunk}
+              <input type="checkbox" disabled={!junkCount} checked={apply.deleteJunk && !!junkCount} onChange={(e) => setApply({ ...apply, deleteJunk: e.target.checked })} />
+              {L.deleteJunk(junkCount)}
             </label>
+            <p className="hint">{L.deleteJunkHint}</p>
             <label className="check">
-              <input type="checkbox" checked={opts.includeSensitive} onChange={(e) => setOpts({ ...opts, includeSensitive: e.target.checked })} />
-              {L.includeSensitive}
+              <input type="checkbox" disabled={!pins.length} checked={apply.pins && !!pins.length} onChange={(e) => setApply({ ...apply, pins: e.target.checked })} />
+              {L.pinImportant(pinCount, pins.length - pinCount)}
             </label>
             <p className="hint">
-              {plan.length
-                ? L.plan(plan.length, topicCount, minutes)
-                : L.allSent}
-              {sentCount > 0 && L.alreadySent(sentCount)}
-              {untagged > 0 && L.untagged(untagged, otherTopic(state ?? undefined))}
+              {L.pinImportantHint}
+              {!junkCount && !pins.length && <> {L.applyNothing}</>}
             </p>
             <div className="dialog-buttons">
               <span className="spacer" />
-              <button className="secondary" onClick={props.onClose}>
-                {T.common.close}
-              </button>
-              <button disabled={busy || props.running || !plan.length} onClick={() => props.onStart(opts)}>
-                {props.running ? L.sending : L.send(plan.length)}
-              </button>
+              {/* Deleting can't be undone in Telegram: hold to confirm. */}
+              {toDelete ? (
+                <HoldToConfirm disabled={applyBlocked} doneLabel={L.applyHoldDone} onHold={() => props.onApply(apply)}>
+                  {L.applyHold}
+                </HoldToConfirm>
+              ) : (
+                <button disabled={applyBlocked} onClick={() => props.onApply(apply)}>
+                  {props.applying ? L.applyRunning : L.apply}
+                </button>
+              )}
             </div>
 
             <h3 id="tg-tags-title">{L.tagsTitle}</h3>
@@ -229,8 +249,35 @@ export function TelegramDialog(props: {
             <p className="hint">{tagCount ? L.tagsPlan(tagCount) : L.tagsNothing}</p>
             <div className="dialog-buttons">
               <span className="spacer" />
-              <button disabled={busy || props.running || props.syncingTags || props.otherJob || !tagCount} onClick={() => props.onSyncTags(mode)}>
+              <button disabled={busy || props.running || props.syncingTags || props.applying || props.otherJob || !tagCount} onClick={() => props.onSyncTags(mode)}>
                 {props.syncingTags ? L.tagsRunning : L.tagsStart}
+              </button>
+            </div>
+
+            <h3>{L.boardTitle(BOARD_TITLE)}</h3>
+            <p className="hint">{L.intro(BOARD_TITLE)}</p>
+            <label className="check">
+              <input type="checkbox" checked={opts.includeJunk} onChange={(e) => setOpts({ ...opts, includeJunk: e.target.checked })} />
+              {L.includeJunk}
+            </label>
+            <label className="check">
+              <input type="checkbox" checked={opts.includeSensitive} onChange={(e) => setOpts({ ...opts, includeSensitive: e.target.checked })} />
+              {L.includeSensitive}
+            </label>
+            <p className="hint">
+              {plan.length
+                ? L.plan(plan.length, topicCount, minutes)
+                : L.allSent}
+              {sentCount > 0 && L.alreadySent(sentCount)}
+              {untagged > 0 && L.untagged(untagged, otherTopic(state ?? undefined))}
+            </p>
+            <div className="dialog-buttons">
+              <span className="spacer" />
+              <button className="secondary" onClick={props.onClose}>
+                {T.common.close}
+              </button>
+              <button disabled={busy || props.running || props.applying || !plan.length} onClick={() => props.onStart(opts)}>
+                {props.running ? L.sending : L.send(plan.length)}
               </button>
             </div>
           </>

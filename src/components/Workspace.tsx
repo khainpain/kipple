@@ -19,7 +19,6 @@ import { SortMenu } from "./SortMenu";
 import { ViewMenu } from "./ViewMenu";
 import { nextThemePref, setThemePref, THEME_ICONS, THEME_LABELS, useThemePref } from "../lib/theme";
 import { T, compareText, formatNumber } from "../i18n";
-import { BOARD_TITLE } from "../lib/telegram";
 import type { TelegramAccount } from "../platform/types";
 import { actionLabel } from "../lib/types";
 import { track } from "../lib/telemetry";
@@ -72,7 +71,6 @@ export function Workspace(props: {
   offerAi: boolean;
   /** Undefined in the demo, which can't take a real import. */
   onImport?: () => void;
-  onExport: (kind: "csv" | "md", cards: Card[]) => void;
   onSettings: () => void;
   /** Desktop only: opens "Send to Telegram". */
   onTelegram?: () => void;
@@ -136,7 +134,6 @@ export function Workspace(props: {
   const [openMode, setOpenMode] = useState<OpenMode>(() => loadPref("open", OPEN_MODES.map((m) => m.key), "center"));
   const [openId, setOpenId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [exportOpen, setExportOpen] = useState(false);
   const [tidy, setTidy] = useState<TidyKind | null>(null);
   /** The open "Three for today" dialog: the tasks it started with and where. */
   const [todayOpen, setTodayOpen] = useState<{ tasks: DailyTask[]; start: number; n: number } | null>(null);
@@ -438,7 +435,6 @@ export function Workspace(props: {
         else if (openId != null) setOpenId(null);
         else if (drawer) setDrawer(false);
         else if (selected.size) setSelected(new Set());
-        else if (exportOpen) setExportOpen(false);
         return;
       }
       if (typing || e.defaultPrevented) return;
@@ -469,9 +465,8 @@ export function Workspace(props: {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [openId, openIdx, openCard, visible, selected, exportOpen, drawer, todayOpen, tidy, rev]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [openId, openIdx, openCard, visible, selected, drawer, todayOpen, tidy, rev]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const exportCards = selected.size ? visible.filter((c) => selected.has(c.id)) : visible;
   const heading = scopeTitle(home ? scope : shown);
   const subtitle = [sub, type && TYPES.find((t) => t.key === type)?.label, source, tag && `#${tag}`].filter(Boolean).join(" · ");
 
@@ -557,20 +552,8 @@ export function Workspace(props: {
                 <Icon name="import" />
               </button>
             )}
-            <div className="menu-wrap">
-              <button className="icon-btn" onClick={() => setExportOpen(!exportOpen)} title={T.toolbar.export}>
-                <Icon name="export" />
-              </button>
-              {exportOpen && (
-                <div className="menu" onMouseLeave={() => setExportOpen(false)}>
-                  <small>{selected.size ? T.toolbar.exportSelected(exportCards.length) : T.toolbar.exportAll(exportCards.length)}</small>
-                  <button onClick={() => (setExportOpen(false), props.onExport("md", exportCards))}>Markdown</button>
-                  <button onClick={() => (setExportOpen(false), props.onExport("csv", exportCards))}>CSV</button>
-                </div>
-              )}
-            </div>
             {props.onTelegram && (
-              <button className="icon-btn" onClick={props.onTelegram} title={T.toolbar.telegram(BOARD_TITLE)}>
+              <button className="icon-btn" onClick={props.onTelegram} title={T.toolbar.telegram}>
                 <Icon name="send" />
               </button>
             )}

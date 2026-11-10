@@ -70,6 +70,8 @@ pub struct TgStatus {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Account {
+    /// Telegram user id.
+    id: i64,
     name: String,
     username: Option<String>,
     /// The small (160×160) profile photo as JPEG bytes, if the user has one.
@@ -336,7 +338,7 @@ pub async fn tg_account(state: tauri::State<'_, TgState>) -> Result<Option<Accou
         }
         _ => None,
     };
-    Ok(Some(Account { name, username: user.username.clone(), photo: photo.filter(|b| !b.is_empty()) }))
+    Ok(Some(Account { id: user.id, name, username: user.username.clone(), photo: photo.filter(|b| !b.is_empty()) }))
 }
 
 /// Saves the user's own api_id / api_hash (from my.telegram.org) and reconnects with them.
@@ -883,6 +885,91 @@ pub async fn tg_delete_saved(app: tauri::AppHandle, state: tauri::State<'_, TgSt
     let req = tl::functions::messages::DeleteMessages { revoke: true, id: ids };
     c.client.invoke(&req).await.map_err(err)?;
     Ok(())
+}
+
+// ---- Apply to Telegram: junk deleted, important pinned (src/lib/tgApply.ts) --------------
+
+/// A card's message: its id in Saved Messages and its date (unix seconds), checked before changing it.
+#[derive(Deserialize)]
+pub struct CardRef {
+    id: i32,
+    date: i32,
+}
+
+#[derive(Serialize)]
+pub struct CardStatus {
+    id: i32,
+    /// "deleted", "missing" (gone already) or "changed" (another message has this id).
+    status: &'static str,
+}
+
+/// For each card: "ok" when its message is in the signed-in account's Saved Messages with the
+/// card's date, else "missing" or "changed". `found`: id → (in Saved Messages, date).
+fn card_checks(items: &[CardRef], found: &HashMap<i32, (bool, i32)>) -> Vec<(i32, &'static str)> {
+    items
+        .iter()
+        .map(|it| match found.get(&it.id) {
+            None => (it.id, "missing"),
+            Some(&(true, date)) if date == it.date => (it.id, "ok"),
+            Some(_) => (it.id, "changed"),
+        })
+        .collect()
+}
+
+/// Deletes the messages of cards the user sent to junk (for everyone, i.e. on all devices).
+/// Only messages that pass card_checks go, and each is copied to the local backup first: if that
+/// fails, nothing is deleted.
+#[tauri::command]
+pub async fn tg_delete_cards(app: tauri::AppHandle, state: tauri::State<'_, TgState>, items: Vec<CardRef>) -> Result<Vec<CardStatus>, String> {
+    if items.is_empty() {
+        return Ok(vec![]);
+    }
+    if items.len() > 100 {
+        return Err("TOO_MANY".into());
+    }
+    let c = conn(&state).await?;
+    let me = signed_in_user(&c).await?.id;
+    let req = tl::functions::messages::GetMessages { id: items.iter().map(|it| tl::types::InputMessageId { id: it.id }.into()).collect() };
+    use tl::enums::messages::Messages as R;
+    let (messages, users, chats) = match c.client.invoke(&req).await.map_err(err)? {
+        R::Messages(m) => (m.messages, m.users, m.chats),
+        R::Slice(m) => (m.messages, m.users, m.chats),
+        R::ChannelMessages(m) => (m.messages, m.users, m.chats),
+        R::NotModified(_) => (vec![], vec![], vec![]),
+    };
+    let found: HashMap<i32, (bool, i32)> = messages
+        .iter()
+        .filter_map(|m| match m {
+            tl::enums::Message::Message(m) => Some((m.id, (matches!(&m.peer_id, tl::enums::Peer::User(p) if p.user_id == me), m.date))),
+            _ => None,
+        })
+        .collect();
+    let checks = card_checks(&items, &found);
+    let ok: Vec<i32> = checks.iter().filter(|(_, s)| *s == "ok").map(|(id, _)| *id).collect();
+    if !ok.is_empty() {
+        let keep: Vec<SavedMessage> = to_saved(&messages, &users, &chats).into_iter().filter(|m| ok.contains(&m.id)).collect();
+        append_backup(&backup_dir(&app)?, me, &keep, "before_delete")?;
+        let req = tl::functions::messages::DeleteMessages { revoke: true, id: ok.clone() };
+        c.client.invoke(&req).await.map_err(err)?;
+    }
+    Ok(checks.into_iter().map(|(id, s)| CardStatus { id, status: if s == "ok" { "deleted" } else { s } }).collect())
+}
+
+/// Pins (or unpins) a card's message in Saved Messages, without a notification:
+/// "ok", "missing" or "changed" (see own_saved_message).
+#[tauri::command]
+pub async fn tg_pin_saved(state: tauri::State<'_, TgState>, id: i32, date: i32, pin: bool) -> Result<&'static str, String> {
+    let c = conn(&state).await?;
+    let me = signed_in_user(&c).await?.id;
+    if let Err(status) = own_saved_message(&c, id, date, me).await? {
+        return Ok(status);
+    }
+    let req = tl::functions::messages::UpdatePinnedMessage { silent: true, unpin: !pin, pm_oneside: false, peer: tl::enums::InputPeer::PeerSelf, id };
+    match c.client.invoke(&req).await {
+        Ok(_) => Ok("ok"),
+        Err(e) if e.is("MESSAGE_ID_INVALID") => Ok("missing"),
+        Err(e) => Err(err(e)),
+    }
 }
 
 // ---- Loading Saved Messages straight from Telegram -------------------------------------
@@ -1787,6 +1874,14 @@ pub async fn tg_forget_media(app: tauri::AppHandle) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn deletes_only_the_cards_own_messages() {
+        let items = [CardRef { id: 1, date: 100 }, CardRef { id: 2, date: 200 }, CardRef { id: 3, date: 300 }, CardRef { id: 4, date: 400 }];
+        // id → (in the signed-in account's Saved Messages, date)
+        let found: HashMap<i32, (bool, i32)> = [(1, (true, 100)), (2, (true, 999)), (4, (false, 400))].into();
+        assert_eq!(card_checks(&items, &found), vec![(1, "ok"), (2, "changed"), (3, "missing"), (4, "changed")]);
+    }
 
     #[test]
     fn backup_only_appends() {

@@ -31,6 +31,8 @@ export interface TelegramStatus {
 
 /** The signed-in Telegram account, shown in the sidebar header. */
 export interface TelegramAccount {
+  /** Telegram user id. */
+  id: number;
   name: string;
   username?: string | null;
   /** Small profile photo, JPEG bytes. */
@@ -128,6 +130,15 @@ export interface TelegramApi {
    *  (and deletes nothing) when the signed-in account isn't `owner`. */
   deleteSaved(ids: number[], owner: number): Promise<void>;
   /**
+   * Deletes these messages of the user's cards from Saved Messages, on all devices (up to 100).
+   * Each is checked first: still there, in the signed-in account's Saved Messages, with this
+   * date; and copied to the local backup. "deleted", "missing" (gone already) or "changed"
+   * (another message has this id) per message; nothing is deleted if the backup fails.
+   */
+  deleteCards(items: Array<{ id: number; date: number }>): Promise<Array<{ id: number; status: "deleted" | "missing" | "changed" }>>;
+  /** Pins (or unpins) a Saved Message after the same check as deleteCards. Silent: no notification. */
+  pinSaved(id: number, date: number, pin: boolean): Promise<"ok" | "missing" | "changed">;
+  /**
    * Copies one page of Saved Messages that aren't in the local backup yet into it (the whole
    * history on the first run, then only newer messages). Call until `done`. The backup only grows.
    */
@@ -185,8 +196,6 @@ export interface Platform {
   readMedia(sourceDir: string, rel: string): Promise<Blob>;
   openUrl(url: string): Promise<void>;
   openFile(sourceDir: string, rel: string): Promise<void>;
-  /** Asks where to save (desktop) or downloads (web). Returns where it went, or null if cancelled. */
-  saveTextFile(defaultName: string, filter: { name: string; ext: string }, content: string): Promise<string | null>;
   httpFetch: HttpFetch;
   appVersion(): Promise<string>;
   checkUpdate(): Promise<AvailableUpdate | null>;
