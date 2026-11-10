@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { effectiveTopic, NO_ALIASES, NO_RULES, setAliases, setTopicRules } from "./library";
+import { effectiveTopic, getTopicRules, NO_ALIASES, NO_RULES, setAliases, setTopicRules, type TopicRules } from "./library";
 import { builtinTopicOf } from "./siteTopics";
-import { ruleOffer, withoutRulesTo } from "./topicRules";
+import { renameInRules, ruleOffer, withoutRulesTo } from "./topicRules";
 import { T } from "../i18n";
 import type { Card } from "./types";
 
@@ -94,5 +94,49 @@ describe("deleting a topic", () => {
   it("drops the rules that point at it", () => {
     const r = withoutRulesTo({ channels: { A: "Код", B: "Еда" }, sites: { "habr.com": "Код" } }, "Код");
     expect(r).toEqual({ channels: { B: "Еда" }, sites: {} });
+  });
+});
+
+describe("bad or old rule data", () => {
+  it("is cleaned up instead of breaking every card", () => {
+    setTopicRules({ channels: { A: "Код", B: 5 } } as unknown as TopicRules);
+    expect(getTopicRules()).toEqual({ channels: { A: "Код" }, sites: {} });
+    expect(effectiveTopic(card(1, { forwardedFrom: "B", urls: ["https://x.org"] }))).toBeUndefined();
+    setTopicRules("nonsense" as unknown as TopicRules);
+    expect(getTopicRules()).toEqual(NO_RULES);
+  });
+});
+
+describe("built-in topics switched off", () => {
+  it("stop giving the topic, in any interface language", () => {
+    setTopicRules({ channels: {}, sites: {}, off: ["dev"] });
+    expect(effectiveTopic(card(1, { urls: ["https://github.com/x"] }))).toBeUndefined();
+    expect(effectiveTopic(card(2, { urls: ["https://imdb.com/x"] }))).toBe(T.siteTopics.movies);
+  });
+
+  it("happen when a built-in topic is deleted", () => {
+    expect(withoutRulesTo(NO_RULES, T.siteTopics.dev)).toEqual({ channels: {}, sites: {}, off: ["dev"] });
+  });
+});
+
+describe("offer counts", () => {
+  it("count what the rule would really change: subdomains, not cards already there", () => {
+    const lib = [
+      card(1, { urls: ["https://vc.ru/1"], user: { topic: "Бизнес" } }),
+      card(2, { urls: ["https://m.vc.ru/2"] }),
+      card(3, { urls: ["https://vc.ru/3"], ai: ai("Бизнес") }),
+      card(4, { urls: ["https://vc.ru/4"], forwardedFrom: "Канал" }),
+    ];
+    // 2 (subdomain) and 4 (forwarded, but its channel has no rule) change; 3 is already in the topic.
+    expect(ruleOffer(lib, [1], "Бизнес")).toEqual({ kind: "site", key: "vc.ru", count: 2 });
+  });
+});
+
+describe("renaming a topic", () => {
+  it("renames it in the rules too", () => {
+    expect(renameInRules({ channels: { A: "Код" }, sites: { "vc.ru": "Код", "x.org": "Еда" } }, "Код", "Разработка")).toEqual({
+      channels: { A: "Разработка" },
+      sites: { "vc.ru": "Разработка", "x.org": "Еда" },
+    });
   });
 });

@@ -8,7 +8,7 @@ import { setThemePref, THEME_ICONS, THEME_LABELS, THEME_PREFS, useThemePref } fr
 import { Icon } from "./Icon";
 import { Select } from "./Select";
 import { AiConsentDialog } from "./AiConsent";
-import { NO_RULES, topicName } from "../lib/library";
+import { cleanRules, topicName, type TopicRules } from "../lib/library";
 import { Done, HoldToConfirm, Switch } from "./Motion";
 import "./Settings.css";
 import { LANGS, T, systemLang, type LangPref } from "../i18n";
@@ -18,6 +18,9 @@ import type { TelegramApi, TelegramStatus } from "../platform/types";
 
 export function SettingsDialog(props: {
   settings: Settings;
+  /** Topic rules as they are now; removing one saves at once, apart from the dialog's Save. */
+  rules: TopicRules;
+  onRemoveRule: (kind: "channel" | "site", key: string) => void;
   hasKey: boolean;
   version: string;
   onSave: (s: Settings, apiKey: string | null) => void;
@@ -54,15 +57,11 @@ export function SettingsDialog(props: {
 
   const model = aiModelOf(s.aiModel);
 
-  const rules = s.topicRules ?? NO_RULES;
+  const rules = cleanRules(props.rules);
   const ruleRows = [
     ...Object.entries(rules.channels).map(([key, topic]) => ({ field: "channels" as const, key, topic, label: T.rules.channel(key) })),
     ...Object.entries(rules.sites).map(([key, topic]) => ({ field: "sites" as const, key, topic, label: T.rules.site(key) })),
   ];
-  function removeRule(field: "channels" | "sites", key: string) {
-    const { [key]: _gone, ...rest } = rules[field];
-    setS({ ...s, topicRules: { ...rules, [field]: rest } });
-  }
 
   return (
     <>
@@ -232,7 +231,7 @@ export function SettingsDialog(props: {
                   <b>{r.label}</b>
                   <small>→ {topicName(r.topic)}</small>
                 </div>
-                <button className="icon-btn" aria-label={T.rules.remove(r.label)} title={T.rules.remove(r.label)} onClick={() => removeRule(r.field, r.key)}>
+                <button className="icon-btn" aria-label={T.rules.remove(r.label)} title={T.rules.remove(r.label)} onClick={() => props.onRemoveRule(r.field === "channels" ? "channel" : "site", r.key)}>
                   <Icon name="close" size={14} />
                 </button>
               </div>

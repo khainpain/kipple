@@ -5,8 +5,8 @@ import { useTelegramAccount } from "./useTelegramAccount";
 import "./App.css";
 import type { Card, Library, UserFields } from "./lib/types";
 import type { Skips, TodayState } from "./lib/today";
-import { effectiveTags, effectiveTopic, findTopic, getOwnTopics, makeEdit, matchesFilter, mergeAlias, NO_ALIASES, NO_RULES, setAliases, setOwnTopics, setTopicRules, topicName, type Aliases, type TopicRules } from "./lib/library";
-import { ruleOffer, withoutRulesTo } from "./lib/topicRules";
+import { cleanRules, effectiveTags, effectiveTopic, findTopic, getOwnTopics, makeEdit, matchesFilter, mergeAlias, NO_ALIASES, NO_RULES, setAliases, setOwnTopics, setTopicRules, topicName, type Aliases, type TopicRules } from "./lib/library";
+import { renameInRules, ruleOffer, withoutRulesTo } from "./lib/topicRules";
 import { aiAllowed, appendEdit, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadPendingReplies, loadSettings, saveBoardState, saveLibrary, savePendingReplies, saveSettings, wipeAll, type Settings } from "./lib/store";
 import { dueReplies, nextDue, replyText, scheduleReply, withoutReplies, type PendingReply } from "./lib/tgReplies";
 import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type SendOptions } from "./lib/telegram";
@@ -497,13 +497,16 @@ export default function App() {
       if (!o || offered.current.has(`${o.kind}:${o.key}`)) return;
       offered.current.add(`${o.kind}:${o.key}`);
       const name = topicName(topic);
+      const wasDemo = demoRef.current;
       notify(o.kind === "channel" ? T.rules.offerChannel(o.key, name, o.count) : T.rules.offerSite(o.key, name, o.count), {
         label: T.rules.always,
-        run: () => void addRule(o.kind, o.key, topic).then(() => notify(T.rules.added)),
+        run: () => {
+          // Left the demo (or went into it) since the offer: the rule would land in the wrong library.
+          if (demoRef.current !== wasDemo) return;
+          void addRuleRef.current(o.kind, o.key, topic).then((ok) => ok && notify(T.rules.added));
+        },
       });
     },
-    // addRule reads the latest settings through refs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [edit, lib, notify],
   );
 
@@ -558,11 +561,12 @@ export default function App() {
     setSettings(s);
   }
 
-  async function onSaveSettings(s: Settings, key: string | null) {
+  async function onSaveSettings(dialog: Settings, key: string | null) {
+    // The dialog holds a copy from when it opened; what changes elsewhere meanwhile (topics, merges,
+    // rules from a toast, today's plan) is taken as it is now, not overwritten by that copy.
+    const now = settingsRef.current;
+    const s: Settings = { ...dialog, aliases: now.aliases, topics: now.topics, topicRules: now.topicRules, today: now.today, taskSkips: now.taskSkips };
     await applySettings(s);
-    // A rule removed in Settings changes card topics: rebuild what's derived from them.
-    setTopicRules(s.topicRules);
-    setRev((r) => r + 1);
     if (key) {
       try {
         await setApiKey(key);
@@ -629,7 +633,9 @@ export default function App() {
   }
 
   /** Saves merges and the user's own topics: in settings, or only in memory in the demo. */
-  async function saveNames(p: { aliases?: Aliases; topics?: string[]; topicRules?: TopicRules }) {
+  /** Returns false when saving failed (the user has been told). */
+  async function saveNames(p: { aliases?: Aliases; topics?: string[]; topicRules?: TopicRules }): Promise<boolean> {
+    let ok = true;
     if (demoRef.current) {
       if (p.aliases) setDemoAliases(p.aliases);
       if (p.topics) setDemoTopics(p.topics);
@@ -642,21 +648,26 @@ export default function App() {
         await saveSettings(s);
       } catch (e) {
         notify(T.app.saveFailed(String(e)));
+        ok = false;
       }
     }
     if (p.aliases) setAliases(p.aliases);
     if (p.topics) setOwnTopics(p.topics);
     if (p.topicRules) setTopicRules(p.topicRules);
     setRev((r) => r + 1);
+    return ok;
   }
 
   /** Everything from a channel or site goes to a topic (unless a card's topic was picked by hand); "" drops the rule. */
-  async function addRule(kind: "channel" | "site", key: string, topic: string) {
+  async function addRule(kind: "channel" | "site", key: string, topic: string): Promise<boolean> {
     const r = rulesNow();
     const field = kind === "channel" ? "channels" : "sites";
     const { [key]: _old, ...rest } = r[field];
-    await saveNames({ topicRules: { ...r, [field]: topic ? { ...rest, [key]: topic } : rest } });
+    return saveNames({ topicRules: { ...r, [field]: topic ? { ...rest, [key]: topic } : rest } });
   }
+  // The offer toast outlives the render that made it; this always reaches the latest rules.
+  const addRuleRef = useRef(addRule);
+  addRuleRef.current = addRule;
 
   /** Every topic shown now: the ones on cards and the user's own empty ones. */
   function allTopics(): string[] {
@@ -695,7 +706,7 @@ export default function App() {
       lib.subgroups = rest[to] ? rest : { ...rest, [to]: groups };
       void persist(lib);
     }
-    await saveNames({ aliases: used ? { ...a, topics: mergeAlias(a.topics, [from], to) } : a, topics: [...own, to] });
+    await saveNames({ aliases: used ? { ...a, topics: mergeAlias(a.topics, [from], to) } : a, topics: [...own, to], topicRules: renameInRules(rulesNow(), from, to) });
     return to;
   }
 
@@ -730,7 +741,7 @@ export default function App() {
 
   const aliasesNow = () => (demoRef.current ? demoAliases : (settingsRef.current.aliases ?? NO_ALIASES));
   const ownTopicsNow = () => (demoRef.current ? demoTopics : (settingsRef.current.topics ?? []));
-  const rulesNow = () => (demoRef.current ? demoRules : (settingsRef.current.topicRules ?? NO_RULES));
+  const rulesNow = () => (demoRef.current ? demoRules : cleanRules(settingsRef.current.topicRules));
 
   async function askSynonyms(kind: "topics" | "tags", counts: Map<string, number>) {
     if (!aiAllowed(settingsRef.current) || demoRef.current) return []; // nothing leaves without consent
@@ -758,7 +769,7 @@ export default function App() {
   if (loading) return <div className="center">{T.common.loading}</div>;
 
   const needAi = lib ? pendingForAi(lib.cards).length + (settings.aiImages ? pendingImages(lib.cards).length : 0) : 0;
-  const settingsDialog = showSettings && <SettingsDialog settings={settings} hasKey={hasKey} version={version} onSave={onSaveSettings} onRetag={onRetag} retagCount={lib && !demo ? retagCount(lib.cards) : 0} onWipe={onWipe} onForgetKey={onForgetKey} onClose={() => setShowSettings(false)} />;
+  const settingsDialog = showSettings && <SettingsDialog settings={settings} rules={demo ? demoRules : (settings.topicRules ?? NO_RULES)} onRemoveRule={(kind, key) => void addRule(kind, key, "")} hasKey={hasKey} version={version} onSave={onSaveSettings} onRetag={onRetag} retagCount={lib && !demo ? retagCount(lib.cards) : 0} onWipe={onWipe} onForgetKey={onForgetKey} onClose={() => setShowSettings(false)} />;
 
   const consentDialog = consent && <AiConsentDialog hasKey={hasKey} onAllow={() => consent(true)} onDecline={() => consent(false)} />;
 

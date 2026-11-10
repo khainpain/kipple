@@ -392,6 +392,7 @@ export function Workspace(props: {
     if (scope.kind === "home") setScope({ kind: "list", key: "all" });
     setSub(null);
     setSelected(new Set());
+    setRuleAt(null);
     setSource(name);
   }
 

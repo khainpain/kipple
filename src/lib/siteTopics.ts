@@ -22,8 +22,22 @@ export type SiteTopic = keyof typeof SITE_TOPICS;
 
 const BY_DOMAIN = new Map<string, SiteTopic>(Object.entries(SITE_TOPICS).flatMap(([k, ds]) => ds.map((d) => [d, k as SiteTopic] as const)));
 
-/** The built-in topic for a link's site, in the interface language; subdomains count (ru.m.imdb.com). */
+const keys = new Map<string, SiteTopic | undefined>();
+
+/** Which built-in topic a link's site has; subdomains count (ru.m.imdb.com). Cached: it's read for every card. */
+export function builtinKeyOf(url: string | undefined): SiteTopic | undefined {
+  if (!url) return undefined;
+  if (!keys.has(url)) keys.set(url, hostChain(url).map((h) => BY_DOMAIN.get(h)).find(Boolean));
+  return keys.get(url);
+}
+
+/** The built-in topic for a link's site, in the interface language. */
 export function builtinTopicOf(url: string | undefined): string | undefined {
-  const key = hostChain(url).map((h) => BY_DOMAIN.get(h)).find(Boolean);
+  const key = builtinKeyOf(url);
   return key ? T.siteTopics[key] : undefined;
+}
+
+/** The built-in topic shown under this name now, if any. */
+export function builtinKeyNamed(name: string): SiteTopic | undefined {
+  return (Object.keys(SITE_TOPICS) as SiteTopic[]).find((k) => T.siteTopics[k] === name);
 }
