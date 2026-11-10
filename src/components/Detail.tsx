@@ -82,6 +82,17 @@ export function Detail(props: {
     }
   }
 
+  // The card changed elsewhere (moved from the board, new AI results): fields not touched here follow it.
+  const cardTitle = effectiveTitle(card);
+  const cardTopic = effectiveTopic(card) ?? "";
+  const cardNote = card.user?.note ?? "";
+  useEffect(() => {
+    const at = opened.current;
+    if (title === at.title && !("title" in saved.current) && cardTitle !== at.title) (setTitle(cardTitle), (at.title = cardTitle));
+    if (topic === at.topic && !("topic" in saved.current) && cardTopic !== at.topic) (setTopic(cardTopic), (at.topic = cardTopic));
+    if (note === at.note && !("note" in saved.current) && cardNote !== at.note) (setNote(cardNote), (at.note = cardNote));
+  }, [cardTitle, cardTopic, cardNote]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Text is saved on blur; a panel that goes away mid-edit (the phone turned, the next card
   // opened by keyboard) saves what was typed instead of dropping it.
   const saveRef = useRef(saveText);
