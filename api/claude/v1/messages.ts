@@ -60,10 +60,15 @@ export async function POST(request: Request): Promise<Response> {
   // From here on the reserved units are replaced with the real cost exactly once.
   let actual = 0;
   const settle = () => settleUsage(install, ip, reserved, actual, today).catch((e) => console.error("usage accounting failed", e));
-  const kind = requestKind(body.system);
   // Cost totals for the stats, sent alongside the quota settlement so the answer doesn't wait twice.
+  // Built inside the promise: a problem with the stats never fails a request that was already paid for.
   const totals = (ok: boolean, usage?: Usage) =>
-    redis(usageCommands({ model, kind, items: itemCount(kind, body), usage, ok, install })).catch((e) => console.error("usage totals failed", e));
+    Promise.resolve()
+      .then(() => {
+        const kind = requestKind(body.system);
+        return redis(usageCommands({ model, kind, items: itemCount(kind, body), usage, ok, install }));
+      })
+      .catch((e) => console.error("usage totals failed", e));
 
   const res = await fetch(ANTHROPIC_URL, {
     method: "POST",
