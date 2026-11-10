@@ -14,6 +14,7 @@ import { isImportant } from "../lib/smart";
 import { OPEN_MODES, PANEL_WIDTH, clampPanelWidth, hueOf, loadPanelWidth, savePref, type OpenMode } from "./nav";
 import { TopicMenu } from "./TopicMenu";
 import { NoteField, PropRow, StatusChip, TagsEditor } from "./CardProps";
+import { openCardFile } from "./openFile";
 
 /** Messages up to this long (and without media or links) are shown as the card's heading. */
 const SHORT_TEXT = 140;
@@ -65,16 +66,32 @@ export function Detail(props: {
 
   // What this panel last saved, so the save on unmount doesn't repeat one a blur just made.
   const saved = useRef<UserFields>({});
+  // What the fields held when the panel opened. Only a field the user changed here is saved:
+  // the card itself may change meanwhile (moved from the board, a topic deleted, new AI results),
+  // and the panel's stale copy must not write that back.
+  const opened = useRef({ title, topic, note });
   function saveText() {
     const patch: UserFields = {};
-    if (title !== effectiveTitle(card) && title.trim() !== saved.current.title) patch.title = title.trim();
-    if (topic !== (effectiveTopic(card) ?? "") && topic.trim() !== saved.current.topic) patch.topic = topic.trim();
-    if (note !== (card.user?.note ?? "") && note !== saved.current.note) patch.note = note;
+    const at = opened.current;
+    if ((title !== at.title || "title" in saved.current) && title !== effectiveTitle(card) && title.trim() !== saved.current.title) patch.title = title.trim();
+    if ((topic !== at.topic || "topic" in saved.current) && topic !== (effectiveTopic(card) ?? "") && topic.trim() !== saved.current.topic) patch.topic = topic.trim();
+    if ((note !== at.note || "note" in saved.current) && note !== (card.user?.note ?? "") && note !== saved.current.note) patch.note = note;
     if (Object.keys(patch).length) {
       Object.assign(saved.current, patch);
       props.onEdit(patch);
     }
   }
+
+  // The card changed elsewhere (moved from the board, new AI results): fields not touched here follow it.
+  const cardTitle = effectiveTitle(card);
+  const cardTopic = effectiveTopic(card) ?? "";
+  const cardNote = card.user?.note ?? "";
+  useEffect(() => {
+    const at = opened.current;
+    if (title === at.title && !("title" in saved.current) && cardTitle !== at.title) (setTitle(cardTitle), (at.title = cardTitle));
+    if (topic === at.topic && !("topic" in saved.current) && cardTopic !== at.topic) (setTopic(cardTopic), (at.topic = cardTopic));
+    if (note === at.note && !("note" in saved.current) && cardNote !== at.note) (setNote(cardNote), (at.note = cardNote));
+  }, [cardTitle, cardTopic, cardNote]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Text is saved on blur; a panel that goes away mid-edit (the phone turned, the next card
   // opened by keyboard) saves what was typed instead of dropping it.
@@ -198,7 +215,7 @@ export function Detail(props: {
           <Icon name="star" />
         </button>
         {card.media?.path && card.kind !== "photo" && (
-          <button className="icon-btn" onClick={() => platform.openFile(lib.sourceDir, card.media!.path!)} title={T.detail.openFile}>
+          <button className="icon-btn" onClick={() => openCardFile(lib.sourceDir, card.media!.path!)} title={T.detail.openFile}>
             <Icon name="file" />
           </button>
         )}
@@ -348,7 +365,10 @@ export function Detail(props: {
                 current={topic || undefined}
                 onPick={(t) => {
                   setTopic(t);
-                  if (t !== (effectiveTopic(card) ?? "")) props.onEdit({ topic: t });
+                  if (t !== (effectiveTopic(card) ?? "")) {
+                    saved.current.topic = t; // so closing the panel doesn't write it again over a later move
+                    props.onEdit({ topic: t });
+                  }
                 }}
                 onClose={() => {
                   setTopicAt(null);

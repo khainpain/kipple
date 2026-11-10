@@ -6,6 +6,7 @@ import { Icon } from "./Icon";
 import { formatDuration, formatSize } from "./CardView";
 import { T } from "../i18n";
 import { useNarrow } from "../lib/narrow";
+import { openCardFile } from "./openFile";
 
 const IMAGE = ["jpg", "jpeg", "png", "gif", "webp", "avif", "bmp", "svg"];
 const VIDEO = ["mp4", "webm", "mov", "m4v"];
@@ -93,7 +94,7 @@ export function Preview({ lib, card }: { lib: Library; card: Card }) {
   if (!m || !kind) return null;
 
   const src = m.path ? mediaUrl(lib, m.path) : undefined;
-  const open = () => m.path && platform.openFile(lib.sourceDir, m.path);
+  const open = () => m.path && openCardFile(lib.sourceDir, m.path);
   const meta = [m.fileName, formatSize(m.size), formatDuration(m.duration)].filter(Boolean).join(" · ");
   const fileRow = (hint?: string) => (
     <div className="preview-file">

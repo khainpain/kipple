@@ -1,6 +1,7 @@
 // Vercel function: the statistics totals, for the weekly report. Needs the KIPPLE_STATS_TOKEN
 // environment variable and `Authorization: Bearer <it>`; without the variable it is switched off.
 // ?days=28 (up to 120) daily totals, plus the weekly totals and downloads of the same period.
+import { createHash, timingSafeEqual } from "node:crypto";
 import { env } from "./_lib/quota.js";
 import { isoWeek } from "../src/lib/telemetryEvents.js";
 
@@ -27,9 +28,15 @@ async function hgetall(keys: string[]): Promise<Record<string, Record<string, nu
   return all;
 }
 
+/** Compares in constant time: both sides are hashed first, so they're the same length and the time says nothing about the token. */
+function sameSecret(given: string, expected: string): boolean {
+  const h = (s: string) => createHash("sha256").update(s).digest();
+  return timingSafeEqual(h(given), h(expected));
+}
+
 export async function GET(request: Request): Promise<Response> {
   const secret = env("KIPPLE_STATS_TOKEN");
-  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return new Response("not found", { status: 404 });
+  if (!secret || !sameSecret(request.headers.get("authorization") ?? "", `Bearer ${secret}`)) return new Response("not found", { status: 404 });
   const days = Math.min(120, Math.max(1, Number(new URL(request.url).searchParams.get("days")) || 28));
   const keys = new Set<string>();
   for (let i = 0; i < days; i++) {

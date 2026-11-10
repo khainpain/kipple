@@ -35,6 +35,152 @@
         {
           "path": "$APPDATA/telegram-backup"
         }
+      ],
+      "deny": [
+        {
+          "path": "$HOME/.ssh"
+        },
+        {
+          "path": "$HOME/.ssh/**"
+        },
+        {
+          "path": "$HOME/.gnupg"
+        },
+        {
+          "path": "$HOME/.gnupg/**"
+        },
+        {
+          "path": "$HOME/.aws/**"
+        },
+        {
+          "path": "$HOME/.azure/**"
+        },
+        {
+          "path": "$HOME/.kube/**"
+        },
+        {
+          "path": "$HOME/.docker/**"
+        },
+        {
+          "path": "$HOME/.config/gcloud/**"
+        },
+        {
+          "path": "$HOME/.git-credentials"
+        },
+        {
+          "path": "$HOME/.netrc"
+        },
+        {
+          "path": "$HOME/_netrc"
+        },
+        {
+          "path": "$HOME/.npmrc"
+        },
+        {
+          "path": "$HOME/.pgpass"
+        },
+        {
+          "path": "$DATA/discord/**"
+        },
+        {
+          "path": "$DATA/Signal/**"
+        },
+        {
+          "path": "$DATA/Thunderbird/**"
+        },
+        {
+          "path": "$DATA/FileZilla/**"
+        },
+        {
+          "path": "$DATA/Microsoft/Credentials/**"
+        },
+        {
+          "path": "$LOCALDATA/Microsoft/Credentials/**"
+        },
+        {
+          "path": "$DATA/Microsoft/Protect/**"
+        },
+        {
+          "path": "$DATA/Telegram Desktop/**"
+        },
+        {
+          "path": "$DATA/TelegramDesktop/**"
+        },
+        {
+          "path": "$LOCALDATA/Telegram Desktop/**"
+        },
+        {
+          "path": "$HOME/.local/share/TelegramDesktop/**"
+        },
+        {
+          "path": "$LOCALDATA/Google/Chrome/**"
+        },
+        {
+          "path": "$LOCALDATA/Chromium/**"
+        },
+        {
+          "path": "$LOCALDATA/Microsoft/Edge/**"
+        },
+        {
+          "path": "$LOCALDATA/Yandex/**"
+        },
+        {
+          "path": "$LOCALDATA/BraveSoftware/**"
+        },
+        {
+          "path": "$LOCALDATA/Vivaldi/**"
+        },
+        {
+          "path": "$LOCALDATA/Mozilla/**"
+        },
+        {
+          "path": "$DATA/Mozilla/**"
+        },
+        {
+          "path": "$DATA/Opera Software/**"
+        },
+        {
+          "path": "$DATA/Google/Chrome/**"
+        },
+        {
+          "path": "$DATA/Chromium/**"
+        },
+        {
+          "path": "$DATA/Microsoft Edge/**"
+        },
+        {
+          "path": "$DATA/Firefox/**"
+        },
+        {
+          "path": "$DATA/Yandex/**"
+        },
+        {
+          "path": "$DATA/BraveSoftware/**"
+        },
+        {
+          "path": "$DATA/Arc/**"
+        },
+        {
+          "path": "$CONFIG/google-chrome/**"
+        },
+        {
+          "path": "$CONFIG/chromium/**"
+        },
+        {
+          "path": "$CONFIG/microsoft-edge/**"
+        },
+        {
+          "path": "$CONFIG/BraveSoftware/**"
+        },
+        {
+          "path": "$CONFIG/yandex-browser/**"
+        },
+        {
+          "path": "$CONFIG/opera/**"
+        },
+        {
+          "path": "$HOME/.mozilla/**"
+        }
       ]
     },
     "dialog:default",
@@ -75,6 +221,155 @@
         }
       ]
     },
+    {
+      "identifier": "fs:scope",
+      "deny": [
+        {
+          "path": "$HOME/.ssh"
+        },
+        {
+          "path": "$HOME/.ssh/**"
+        },
+        {
+          "path": "$HOME/.gnupg"
+        },
+        {
+          "path": "$HOME/.gnupg/**"
+        },
+        {
+          "path": "$HOME/.aws/**"
+        },
+        {
+          "path": "$HOME/.azure/**"
+        },
+        {
+          "path": "$HOME/.kube/**"
+        },
+        {
+          "path": "$HOME/.docker/**"
+        },
+        {
+          "path": "$HOME/.config/gcloud/**"
+        },
+        {
+          "path": "$HOME/.git-credentials"
+        },
+        {
+          "path": "$HOME/.netrc"
+        },
+        {
+          "path": "$HOME/_netrc"
+        },
+        {
+          "path": "$HOME/.npmrc"
+        },
+        {
+          "path": "$HOME/.pgpass"
+        },
+        {
+          "path": "$DATA/discord/**"
+        },
+        {
+          "path": "$DATA/Signal/**"
+        },
+        {
+          "path": "$DATA/Thunderbird/**"
+        },
+        {
+          "path": "$DATA/FileZilla/**"
+        },
+        {
+          "path": "$DATA/Microsoft/Credentials/**"
+        },
+        {
+          "path": "$LOCALDATA/Microsoft/Credentials/**"
+        },
+        {
+          "path": "$DATA/Microsoft/Protect/**"
+        },
+        {
+          "path": "$DATA/Telegram Desktop/**"
+        },
+        {
+          "path": "$DATA/TelegramDesktop/**"
+        },
+        {
+          "path": "$LOCALDATA/Telegram Desktop/**"
+        },
+        {
+          "path": "$HOME/.local/share/TelegramDesktop/**"
+        },
+        {
+          "path": "$LOCALDATA/Google/Chrome/**"
+        },
+        {
+          "path": "$LOCALDATA/Chromium/**"
+        },
+        {
+          "path": "$LOCALDATA/Microsoft/Edge/**"
+        },
+        {
+          "path": "$LOCALDATA/Yandex/**"
+        },
+        {
+          "path": "$LOCALDATA/BraveSoftware/**"
+        },
+        {
+          "path": "$LOCALDATA/Vivaldi/**"
+        },
+        {
+          "path": "$LOCALDATA/Mozilla/**"
+        },
+        {
+          "path": "$DATA/Mozilla/**"
+        },
+        {
+          "path": "$DATA/Opera Software/**"
+        },
+        {
+          "path": "$DATA/Google/Chrome/**"
+        },
+        {
+          "path": "$DATA/Chromium/**"
+        },
+        {
+          "path": "$DATA/Microsoft Edge/**"
+        },
+        {
+          "path": "$DATA/Firefox/**"
+        },
+        {
+          "path": "$DATA/Yandex/**"
+        },
+        {
+          "path": "$DATA/BraveSoftware/**"
+        },
+        {
+          "path": "$DATA/Arc/**"
+        },
+        {
+          "path": "$CONFIG/google-chrome/**"
+        },
+        {
+          "path": "$CONFIG/chromium/**"
+        },
+        {
+          "path": "$CONFIG/microsoft-edge/**"
+        },
+        {
+          "path": "$CONFIG/BraveSoftware/**"
+        },
+        {
+          "path": "$CONFIG/yandex-browser/**"
+        },
+        {
+          "path": "$CONFIG/opera/**"
+        },
+        {
+          "path": "$HOME/.mozilla/**"
+        }
+      ]
+    },
     "fs:allow-appdata-read-recursive",
     "fs:allow-appdata-write-recursive",
     "fs:allow-appdata-meta-recursive",
@@ -86,10 +381,13 @@
       "identifier": "http:default",
       "allow": [
         {
-          "url": "https://*"
+          "url": "https://api.anthropic.com/*"
         },
         {
-          "url": "http://*"
+          "url": "https://telegram-saved-messages.vercel.app/*"
+        },
+        {
+          "url": "https://www.youtube.com/oembed*"
         }
       ]
     },

@@ -7,7 +7,7 @@
 // no tools, a capped max_tokens. Each install has a daily allowance, and all installs together
 // a global one, so a copied install id or a scripted client can't run up the bill.
 // The SDK in the app calls `${baseURL}/v1/messages`, hence this path.
-import { allowedRequest, checkQuota, clientIp, env, quotaError, reserveUnits, settleUsage, unitsOf, type Usage } from "../../_lib/quota.js";
+import { allowedRequest, checkQuota, clientIp, day, env, quotaError, reserveUnits, settleUsage, unitsOf, type Usage } from "../../_lib/quota.js";
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const MAX_BODY = 4_000_000; // Vercel takes 4.5 MB; six shrunk photos are well under 1 MB
@@ -45,9 +45,10 @@ export async function POST(request: Request): Promise<Response> {
   const ip = clientIp(request);
   const model = String(body.model);
   const reserved = reserveUnits(model, body.max_tokens as number, raw.length);
+  const today = day();
   let verdict;
   try {
-    verdict = await checkQuota(install, ip, reserved);
+    verdict = await checkQuota(install, ip, reserved, today);
   } catch (e) {
     // The counters are unreachable: refuse rather than run without limits.
     console.error("quota check failed", e);
@@ -56,7 +57,7 @@ export async function POST(request: Request): Promise<Response> {
   if (verdict) return quotaError(verdict, json);
   // From here on the reserved units are replaced with the real cost exactly once.
   let actual = 0;
-  const settle = () => settleUsage(install, ip, reserved, actual).catch((e) => console.error("usage accounting failed", e));
+  const settle = () => settleUsage(install, ip, reserved, actual, today).catch((e) => console.error("usage accounting failed", e));
 
   const res = await fetch(ANTHROPIC_URL, {
     method: "POST",

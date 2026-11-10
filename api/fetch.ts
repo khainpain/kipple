@@ -1,14 +1,30 @@
 // Vercel function for the browser build: fetches a page or picture for a link preview,
 // because browsers don't let a site read other sites. It gets only the link itself,
 // keeps nothing, and answers only pages of this same site. The desktop app doesn't use it.
+// Each request has 10 seconds in all (redirects and reading the body included), and one address
+// gets at most 120 requests a minute (api/_lib/limit.ts keeps a short hash, not the address).
 import { lookup, type LookupAddress } from "node:dns";
 import { request as httpRequest, type IncomingMessage } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { isIP } from "node:net";
+import { clientIp, env } from "./_lib/quota.js";
+import { withinLimit } from "./_lib/limit.js";
 
 const MAX_BYTES = 2_000_000;
-const ALLOWED_TYPE = /^(text\/html|application\/xhtml\+xml|application\/json|image\/)/i;
+// No SVG: it can carry script.
+const ALLOWED_TYPE = /^(text\/html|application\/xhtml\+xml|application\/json|image\/(png|jpe?g|gif|webp|avif|bmp|x-icon|vnd\.microsoft\.icon))\b/i;
 const UA = "Mozilla/5.0 (compatible; Kipple/0.1; link preview)";
+
+type Lookup = (host: string, opts: object, cb: (err: Error | null, address: string | LookupAddress[], family?: number) => void) => void;
+
+export interface FetchOptions {
+  /** Time for the whole request: connecting, redirects and reading the body. */
+  deadlineMs: number;
+  /** Requests one client may make per minute. */
+  perMinute: number;
+  /** DNS lookup for outgoing connections; tests swap it to reach a local server. */
+  lookup: Lookup;
+}
 
 function privateV4(ip: string): boolean {
   const [a, b, c] = ip.split(".").map(Number);
@@ -59,7 +75,7 @@ export function privateIp(ip: string): boolean {
  * time (not with a separate lookup first) means a name can't resolve to a public address for
  * the check and to a private one for the request.
  */
-function publicLookup(host: string, opts: object, cb: (err: Error | null, address: string | LookupAddress[], family?: number) => void) {
+function publicLookup(...[host, opts, cb]: Parameters<Lookup>) {
   lookup(host, { ...opts, all: true }, (err, addrs) => {
     if (err) return cb(err, []);
     if (!addrs.length || addrs.some((a) => privateIp(a.address))) return cb(new Error("private address"), []);
@@ -83,13 +99,14 @@ function publicUrl(raw: string): URL | null {
 }
 
 /** One GET without following redirects, connecting only to public addresses. */
-function get(url: URL): Promise<IncomingMessage> {
+function get(url: URL, lookup: Lookup, signal: AbortSignal): Promise<IncomingMessage> {
   return new Promise((resolve, reject) => {
     const req = (url.protocol === "https:" ? httpsRequest : httpRequest)(
       url,
       {
         method: "GET",
-        lookup: publicLookup as never,
+        lookup: lookup as never,
+        signal,
         timeout: 8000,
         headers: { "user-agent": UA, accept: "text/html,application/json,image/*;q=0.9,*/*;q=0.5", "accept-language": "en,ru;q=0.8", "accept-encoding": "identity" },
       },
@@ -103,18 +120,60 @@ function get(url: URL): Promise<IncomingMessage> {
 
 const text = (status: number, body: string) => new Response(body, { status, headers: { "content-type": "text/plain; charset=utf-8" } });
 
+const perMinute = () => {
+  const v = Number(env("KIPPLE_FETCH_PER_MINUTE"));
+  return Number.isFinite(v) && v > 0 ? v : 120;
+};
+
 export async function GET(request: Request): Promise<Response> {
-  // Browsers mark requests from other sites; refuse those so this isn't an open proxy for them.
+  return fetchLink(request, { deadlineMs: 10_000, perMinute: perMinute(), lookup: publicLookup });
+}
+
+/** The site the web app is served from; /app/ there is proxied to this project, so its host differs. */
+const OWN_HOSTS = ["getkipple.io", "www.getkipple.io"];
+
+/**
+ * Only the web app's own fetch() calls, which browsers mark same-origin. Another site's page is
+ * refused: it can't fake these headers, so it can't use a visitor's browser to fill the shared
+ * cache with pages later opened from this site's address. Safari before 16.4 sends no
+ * Sec-Fetch-Site; then the Origin or Referer has to be one of ours. A script or curl can send any
+ * header it likes: against those only the per-IP limit helps.
+ */
+export function fromOwnPage(request: Request): boolean {
   const site = request.headers.get("sec-fetch-site");
-  if (site && site !== "same-origin") return text(403, "forbidden");
+  if (site !== null) return site === "same-origin";
+  const from = request.headers.get("origin") ?? request.headers.get("referer");
+  if (!from) return false;
+  let host: string;
+  try {
+    host = new URL(from).host.toLowerCase();
+  } catch {
+    return false;
+  }
+  const own = new Set([new URL(request.url).host.toLowerCase(), ...OWN_HOSTS]);
+  return own.has(host);
+}
+
+export async function fetchLink(request: Request, opts: Partial<FetchOptions> & Pick<FetchOptions, "lookup">): Promise<Response> {
+  const { deadlineMs = 10_000, lookup: dns } = opts;
+  if (!fromOwnPage(request)) return text(403, "forbidden");
+
+  // An outage of the counter store doesn't take link previews down with it.
+  const allowed = await withinLimit("fetch", clientIp(request), opts.perMinute ?? perMinute(), 60).catch((e) => {
+    console.error("fetch limit unavailable", e);
+    return true;
+  });
+  if (!allowed) return new Response("slow down", { status: 429, headers: { "content-type": "text/plain; charset=utf-8", "retry-after": "60", "cache-control": "no-store" } });
 
   let target = publicUrl(new URL(request.url).searchParams.get("url") ?? "");
   if (!target) return text(400, "bad url");
 
+  const deadline = AbortSignal.timeout(deadlineMs);
+  const timedOut = () => text(504, "timeout");
   let res: IncomingMessage | undefined;
   for (let hop = 0; hop < 5; hop++) {
-    res = await get(target).catch(() => undefined);
-    if (!res) return text(502, "fetch failed");
+    res = await get(target, dns, deadline).catch(() => undefined);
+    if (!res) return deadline.aborted ? timedOut() : text(502, "fetch failed");
     const status = res.statusCode ?? 502;
     const loc = res.headers.location;
     if (status < 300 || status >= 400 || !loc) break;
@@ -136,6 +195,10 @@ export async function GET(request: Request): Promise<Response> {
     // Same link from any visitor → served from Vercel's cache for a week.
     "cache-control": ok ? "public, max-age=86400, s-maxage=604800" : "public, s-maxage=3600",
     "x-content-type-options": "nosniff",
+    // The app only reads these as data. Opened directly, a fetched page must not run as this site.
+    "content-security-policy": "sandbox; default-src 'none'",
+    "content-disposition": "attachment",
+    vary: "Sec-Fetch-Site, Origin, Referer",
   });
   if (status < 200 || status > 599) {
     res.destroy();
@@ -149,6 +212,8 @@ export async function GET(request: Request): Promise<Response> {
   // Read at most MAX_BYTES: enough for a page's <head> or a preview picture.
   const chunks: Uint8Array[] = [];
   let size = 0;
+  const stop = () => res.destroy(new Error("timeout"));
+  deadline.addEventListener("abort", stop, { once: true });
   try {
     for await (const chunk of res as AsyncIterable<Buffer>) {
       chunks.push(chunk);
@@ -160,7 +225,11 @@ export async function GET(request: Request): Promise<Response> {
       }
     }
   } catch {
-    if (!size) return text(502, "fetch failed");
+    // A cut-off answer is never passed on (and cached for a week) as if it were whole.
+    if (deadline.aborted) return timedOut();
+    return text(502, "fetch failed");
+  } finally {
+    deadline.removeEventListener("abort", stop);
   }
   const body = new Uint8Array(size);
   let off = 0;

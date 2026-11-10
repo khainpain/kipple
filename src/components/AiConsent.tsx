@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { T } from "../i18n";
 
 /**
@@ -6,6 +7,19 @@ import { T } from "../i18n";
  * without AI. Nothing is sent until the user presses Allow.
  */
 export function AiConsentDialog(props: { hasKey: boolean; onAllow: () => void; onDecline: () => void }) {
+  // Esc means "not now", and only for this prompt: Settings under it stays open.
+  const decline = useRef(props.onDecline);
+  decline.current = props.onDecline;
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      decline.current();
+    }
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, []);
   const L = T.aiConsent;
   return (
     <div className="modal-backdrop" onClick={(e) => (e.stopPropagation(), props.onDecline())}>

@@ -289,6 +289,8 @@ export function telegramErrorText(e: unknown): string {
     [/AUTH_TOKEN_(EXPIRED|INVALID|ALREADY_ACCEPTED)|QR_MIGRATE_LOOP/, L.errQrExpired],
     [/AUTH_KEY|SESSION_REVOKED/, L.errSession],
     [/CHANNELS_TOO_MUCH/, L.errTooMany],
+    [/^LOGOUT_LOCAL_ONLY$/, L.errLogoutLocal],
+    [/OTHER_ACCOUNT_LIBRARY/, L.errOtherAccount],
   ];
   for (const [re, text] of known) if (re.test(msg)) return text;
   return L.errOther(msg);

@@ -217,6 +217,7 @@ export function TodayDialog(props: {
     function onKey(e: KeyboardEvent) {
       const el = e.target as HTMLElement;
       if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") return;
+      if (el.closest?.(".topic-menu")) return; // an open topic menu handles its own keys (Esc closes just it)
       let handled = true;
       if (e.key === "Escape") props.onClose();
       else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") doUndo();

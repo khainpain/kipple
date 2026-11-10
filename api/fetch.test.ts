@@ -1,7 +1,8 @@
 import { createServer } from "node:http";
+import type { LookupAddress } from "node:dns";
 import type { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
-import { GET, privateIp } from "./fetch.js";
+import { fetchLink, fromOwnPage, GET, privateIp } from "./fetch.js";
 
 describe("privateIp", () => {
   it("catches private IPv4", () => {
@@ -29,4 +30,107 @@ describe("GET", () => {
   });
 
   it("refuses other sites", async () => expect((await ask("https://example.com", "cross-site")).status).toBe(403));
+});
+
+describe("fromOwnPage", () => {
+  const req = (headers: Record<string, string>) => new Request("https://kipple-api.test/api/fetch?url=x", { headers });
+
+  it("trusts Sec-Fetch-Site when the browser sends it", () => {
+    expect(fromOwnPage(req({ "sec-fetch-site": "same-origin" }))).toBe(true);
+    expect(fromOwnPage(req({ "sec-fetch-site": "cross-site", referer: "https://getkipple.io/app/" }))).toBe(false);
+    expect(fromOwnPage(req({ "sec-fetch-site": "none" }))).toBe(false);
+  });
+
+  it("falls back to Origin or Referer for old Safari, which sends no Sec-Fetch-Site", () => {
+    expect(fromOwnPage(req({ referer: "https://getkipple.io/app/" }))).toBe(true);
+    expect(fromOwnPage(req({ referer: "https://kipple-api.test/app/" }))).toBe(true);
+    expect(fromOwnPage(req({ origin: "https://www.getkipple.io" }))).toBe(true);
+    expect(fromOwnPage(req({ referer: "https://evil.example/getkipple.io" }))).toBe(false);
+    expect(fromOwnPage(req({ referer: "https://getkipple.io.evil.example/" }))).toBe(false);
+    expect(fromOwnPage(req({ origin: "null" }))).toBe(false);
+    expect(fromOwnPage(req({}))).toBe(false);
+    // A forwarded-host header is the client's word, not ours.
+    expect(fromOwnPage(req({ origin: "https://evil.example", "x-forwarded-host": "evil.example" }))).toBe(false);
+  });
+});
+
+describe("GET limits", () => {
+  const ask = (url: string, ip: string) =>
+    fetchLink(new Request(`https://kipple.test/api/fetch?url=${encodeURIComponent(url)}`, { headers: { "sec-fetch-site": "same-origin", "x-real-ip": ip } }), opts);
+  // Connects "slow.test" to a local test server; everything else is refused as in production.
+  let port = 0;
+  const opts = {
+    deadlineMs: 300,
+    lookup: (host: string, o: object, cb: (e: Error | null, a: string | LookupAddress[], f?: number) => void) =>
+      host === "slow.test" ? ((o as { all?: boolean }).all ? cb(null, [{ address: "127.0.0.1", family: 4 }]) : cb(null, "127.0.0.1", 4)) : cb(new Error("no"), []),
+  };
+
+  it("doesn't pass on (or let the CDN cache) an answer cut off mid-way", async () => {
+    const server = createServer((_q, r) => {
+      r.writeHead(200, { "content-type": "text/html", "content-length": "100000" });
+      r.write("<html><head><title>half");
+      setTimeout(() => r.socket?.destroy(), 30);
+    }).listen(0, "127.0.0.1");
+    await new Promise((r) => server.once("listening", r));
+    port = (server.address() as AddressInfo).port;
+    try {
+      const res = await ask(`http://slow.test:${port}/`, "192.0.2.70");
+      expect(res.status).toBe(502);
+      expect(res.headers.get("cache-control") ?? "").not.toMatch(/max-age/);
+    } finally {
+      server.close();
+    }
+  });
+
+  it("gives up on a server that never finishes its answer", async () => {
+    const server = createServer((_q, r) => {
+      r.writeHead(200, { "content-type": "text/html" });
+      r.write("<html><head>");
+      // …and nothing more, ever.
+    }).listen(0, "127.0.0.1");
+    await new Promise((r) => server.once("listening", r));
+    port = (server.address() as AddressInfo).port;
+    try {
+      const t = Date.now();
+      const r = await ask(`http://slow.test:${port}/`, "192.0.2.50");
+      expect(r.status).toBe(504);
+      expect(Date.now() - t).toBeLessThan(3000);
+    } finally {
+      server.closeAllConnections();
+      server.close();
+    }
+  });
+
+  it("gives up on a server that never answers at all", async () => {
+    const server = createServer(() => undefined).listen(0, "127.0.0.1");
+    await new Promise((r) => server.once("listening", r));
+    port = (server.address() as AddressInfo).port;
+    try {
+      expect((await ask(`http://slow.test:${port}/`, "192.0.2.51")).status).toBe(504);
+    } finally {
+      server.closeAllConnections();
+      server.close();
+    }
+  });
+
+  it("still serves a quick server", async () => {
+    const server = createServer((_q, r) => r.writeHead(200, { "content-type": "text/html" }).end("<title>ok</title>")).listen(0, "127.0.0.1");
+    await new Promise((r) => server.once("listening", r));
+    port = (server.address() as AddressInfo).port;
+    try {
+      const r = await ask(`http://slow.test:${port}/`, "192.0.2.52");
+      expect(r.status).toBe(200);
+      expect(await r.text()).toBe("<title>ok</title>");
+    } finally {
+      server.close();
+    }
+  });
+
+  it("refuses more than 120 requests a minute from one address", async () => {
+    const statuses: number[] = [];
+    for (let i = 0; i < 122; i++) statuses.push((await GET(new Request("https://kipple.test/api/fetch?url=nope", { headers: { "sec-fetch-site": "same-origin", "x-real-ip": "192.0.2.60" } }))).status);
+    expect(statuses.slice(0, 120).every((s) => s === 400)).toBe(true);
+    expect(statuses.slice(120)).toEqual([429, 429]);
+    expect((await GET(new Request("https://kipple.test/api/fetch?url=nope", { headers: { "sec-fetch-site": "same-origin", "x-real-ip": "192.0.2.61" } }))).status).toBe(400);
+  });
 });
