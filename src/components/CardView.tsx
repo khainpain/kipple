@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Card, Library } from "../lib/types";
+import { publicAssetUrl } from "../lib/assetUrl";
 import { actionLabel } from "../lib/types";
 import { T, formatNumber, locale } from "../i18n";
 import { mediaUrl } from "../lib/importer";
@@ -66,7 +67,7 @@ export function coverOf(lib: Library, card: Card): { src?: string; ratio?: numbe
   if (card.kind === "video" || card.kind === "animation") return { src: mediaUrl(lib, m?.thumb), ratio, missing: m?.missing ? T.card.videoMissing : undefined };
   if (card.kind === "link") {
     // Telegram's own copy first (already on disk), then the page's og:image, then known sites.
-    const src = mediaUrl(lib, card.preview?.path) ?? card.link?.image ?? instantImage(card.urls[0]);
+    const src = mediaUrl(lib, card.preview?.path) ?? publicAssetUrl(card.link?.image) ?? instantImage(card.urls[0]);
     if (src) return { src };
   }
   return {};

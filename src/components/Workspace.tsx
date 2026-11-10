@@ -425,10 +425,26 @@ export function Workspace(props: {
     if (next) setOpenId(next.id);
   }
 
+  // A selection the current section or filter hides would still be hit by the bulk buttons: keep
+  // only what's on screen. A search is the exception: picking cards across several searches is a
+  // way to gather them, so those stay selected (and counted) until the search is cleared.
+  const searchActive = query.trim() !== "";
+  useEffect(() => {
+    if (searchActive) return;
+    setSelected((prev) => {
+      if (!prev.size) return prev;
+      const shownIds = new Set(visible.map((c) => c.id));
+      const next = new Set([...prev].filter((id) => shownIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [visible, searchActive]);
+
   // Keyboard: "/" focuses search, Esc closes the panel or clears the selection, ↑/↓ (or j/k) step through cards,
   // I / 1-4 / Delete sort the open card and Ctrl+Z takes the last of those back.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      // A dialog (Settings, Telegram, Tidy…) is on top: the board behind it doesn't react.
+      if (e.defaultPrevented || document.querySelector(".modal-backdrop")) return;
       // "Three for today" and "Tidy up" have keys of their own.
       if (todayOpen || tidy) return;
       const el = e.target as HTMLElement;
@@ -732,7 +748,7 @@ export function Workspace(props: {
           topics={topics.map(([t]) => t)}
           mode={narrow ? "full" : openMode}
           narrow={narrow}
-          onNameImage={props.onNameImage && openCard.kind === "photo" && !props.job ? () => props.onNameImage!(openCard) : undefined}
+          onNameImage={props.onNameImage && openCard.kind === "photo" && !openCard.sensitive && !props.job ? () => props.onNameImage!(openCard) : undefined}
           onMode={setOpenMode}
           onClose={() => setOpenId(null)}
           onEdit={(p) => onEdit([openCard.id], p)}

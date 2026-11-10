@@ -152,6 +152,22 @@ describe("syncSaved", () => {
     expect(lib.cards).toHaveLength(10);
   });
 
+  it("retries a photo whose download failed, instead of marking it as having none", async () => {
+    const chat = fakeChat(6);
+    let fail = true;
+    const inner = chat.tg.savedPhotos;
+    chat.tg.savedPhotos = async (batch) => (await inner(batch)).map((p) => (p.id === 5 && fail ? { id: 5, path: "" } : p));
+    const lib = emptyTelegramLibrary();
+    const r1 = await syncSaved(lib, deps(chat.tg));
+    expect(lib.telegram!.noPhoto).toEqual([3]);
+    expect(pendingPhotos(lib)).toEqual([5]);
+    expect(r1.photos).toBe(1);
+    fail = false;
+    await syncSaved(lib, deps(chat.tg));
+    expect(lib.cards.find((c) => c.id === 5)!.media!.path).toBe("/data/telegram-media/5.jpg");
+    expect(pendingPhotos(lib)).toEqual([]);
+  });
+
   it("carries on after an interruption without losing the gap", async () => {
     const chat = fakeChat(10, { failAt: 3 });
     const lib = emptyTelegramLibrary();
@@ -194,6 +210,79 @@ describe("syncSaved", () => {
     const r = await syncSaved(emptyTelegramLibrary(), { ...deps(tg), sleep: async (ms) => void slept.push(ms) });
     expect(slept).toEqual([3500]);
     expect(r.added).toBe(2);
+  });
+});
+
+describe("albums across pages", () => {
+  it("merges an album split over two history pages into one card", async () => {
+    const date = 1_700_000_000;
+    const g = { groupedId: "777", date };
+    const pages: SavedPage[] = [
+      { messages: [msg(103, { ...g, media: { kind: "photo" } }), msg(102, { ...g, media: { kind: "photo" } })], nextOffset: 102, total: 4 },
+      { messages: [msg(101, { ...g, media: { kind: "photo" } }), msg(100, { ...g, text: "caption", media: { kind: "photo" } })], nextOffset: 100, total: 4 },
+      { messages: [], nextOffset: null, total: 4 },
+    ];
+    const tg: SyncDeps["tg"] = {
+      savedPage: async () => pages.shift()!,
+      savedPhotos: async (batch) => batch.map((id) => ({ id, path: `/m/${id}.jpg` })),
+    };
+    const lib = emptyTelegramLibrary();
+    const r = await syncSaved(lib, deps(tg));
+    expect(lib.cards).toHaveLength(1);
+    expect(r.added).toBe(1);
+    const c = lib.cards[0];
+    expect(c.text).toBe("caption");
+    expect([c.id, ...(c.albumIds ?? [])].sort((a, b) => a - b)).toEqual([100, 101, 102, 103]);
+    expect(c.album).toHaveLength(3);
+    expect(r.photos).toBe(4);
+  });
+
+  it("reads an album cut by a page boundary again with the next page: one card, photos in order", async () => {
+    const date = 1_700_000_000;
+    const all = [
+      msg(98, { text: "older note" }),
+      ...[100, 101, 102, 103].map((id) => msg(id, { groupedId: "9", date, media: { kind: "photo" }, text: id === 100 ? "caption" : "" })),
+      msg(104, { text: "newer note" }),
+    ];
+    const tg: SyncDeps["tg"] = {
+      async savedPage(offsetId, minId) {
+        const page = all.filter((m) => m.id > minId && (offsetId === 0 || m.id < offsetId)).sort((a, b) => b.id - a.id).slice(0, 5); // pages larger than an album, as in the app (100 vs at most 10)
+        return { messages: page, nextOffset: page.length ? Math.min(...page.map((m) => m.id)) : null, total: all.length };
+      },
+      savedPhotos: async (batch) => batch.map((id) => ({ id, path: `/m/${id}.jpg` })),
+    };
+    const lib = emptyTelegramLibrary();
+    await syncSaved(lib, deps(tg));
+    const album = lib.cards.filter((c) => c.kind === "photo");
+    expect(album).toHaveLength(1);
+    expect(album[0]).toMatchObject({ id: 100, text: "caption", albumIds: [101, 102, 103] });
+    expect(album[0].media?.path).toBe("/m/100.jpg");
+    expect(lib.cards.map((c) => c.id).sort((a, b) => a - b)).toEqual([98, 100, 104]);
+  });
+
+  it("merges album parts by groupedId even when the caption is not on the first message", () => {
+    const g = { groupedId: "5" };
+    const cards = messagesToCards([msg(11, { ...g, text: "late caption", media: { kind: "photo" } }), msg(10, { ...g, media: { kind: "photo" } })]);
+    expect(cards).toHaveLength(1);
+    expect(cards[0]).toMatchObject({ id: 10, text: "late caption", albumIds: [11] });
+  });
+});
+
+describe("account switch", () => {
+  it("refuses to mix another account's messages into the board, and changes nothing", async () => {
+    const chat = fakeChat(4);
+    const owner = { id: 1 };
+    const tg: SyncDeps["tg"] = {
+      ...chat.tg,
+      savedPage: async (o, m) => ({ ...(await chat.tg.savedPage(o, m)), owner: owner.id }),
+    };
+    const lib = emptyTelegramLibrary();
+    await syncSaved(lib, deps(tg));
+    expect(lib.telegram).toMatchObject({ top: 4, owner: 1, noPhoto: [3] });
+    const before = structuredClone(lib);
+    owner.id = 2;
+    await expect(syncSaved(lib, deps(tg))).rejects.toThrow("OTHER_ACCOUNT_LIBRARY");
+    expect(lib).toEqual(before);
   });
 });
 

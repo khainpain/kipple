@@ -4,6 +4,7 @@ import type { Card } from "../lib/types";
 import { BOARD_TITLE, buildPlan, otherTopic, telegramErrorText, type BoardState, type SendOptions } from "../lib/telegram";
 import { loadBoardState } from "../lib/store";
 import { T } from "../i18n";
+import { useEscape } from "./useEscape";
 
 type Step = "loading" | "noApi" | "phone" | "code" | "password" | "ready";
 
@@ -17,6 +18,7 @@ export function TelegramDialog(props: {
   onOpenSettings: () => void;
   onClose: () => void;
 }) {
+  useEscape(props.onClose);
   const { tg } = props;
   const [step, setStep] = useState<Step>("loading");
   const [state, setState] = useState<BoardState | null>(null);
@@ -163,7 +165,14 @@ export function TelegramDialog(props: {
           <>
             <p>
               {L.signedIn}{name ? <>: <b>{name}</b></> : ""}.{" "}
-              <a href="#" onClick={(e) => (e.preventDefault(), void run(async () => (await tg.logout(), await refresh())))}>
+              <a href="#" onClick={(e) => (e.preventDefault(), void run(async () => {
+                    // Signed out here even if Telegram didn't answer; the error (if any) still shows.
+                    try {
+                      await tg.logout();
+                    } finally {
+                      await refresh();
+                    }
+                  }))}>
                 {L.signOut}
               </a>
             </p>

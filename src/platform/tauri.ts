@@ -1,14 +1,15 @@
 import { T } from "../i18n";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
+import { appDataDir } from "@tauri-apps/api/path";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { BaseDirectory, exists, mkdir, readFile, readTextFile, rename, writeTextFile } from "@tauri-apps/plugin-fs";
 import { fetch as tauriFetch } from "@tauri-apps/plugin-http";
-import { openPath, openUrl } from "@tauri-apps/plugin-opener";
+import { openPath, openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check } from "@tauri-apps/plugin-updater";
-import { joinPath, type HttpFetch, type Platform, type TelegramApi } from "./types";
+import { joinPath, resolveInside, RUNNABLE, type HttpFetch, type Platform, type TelegramApi } from "./types";
 
 // Telegram over MTProto lives in src-tauri/src/telegram.rs; these are thin wrappers around its commands.
 const telegram: TelegramApi = {
@@ -43,6 +44,43 @@ async function ensureDir() {
   if (!(await exists("", base))) await mkdir("", { ...base, recursive: true });
 }
 
+/** Where Telegram photos are kept (data dir/telegram-media); known shortly after start. */
+let mediaRoot: string | undefined;
+let mediaRootAsked: Promise<string> | undefined;
+/** Asked on first use, not on import: tests import this module without Tauri around. */
+function mediaRootReady(): Promise<string> {
+  mediaRootAsked ??= appDataDir().then((d) => {
+    const data = d.replace(/[\\/]+$/, "");
+    mediaRoot = `${data}${data.includes("\\") ? "\\" : "/"}telegram-media`;
+    return mediaRoot;
+  }).catch((e: unknown) => {
+    mediaRootAsked = undefined; // asked again next time
+    throw e;
+  });
+  return mediaRootAsked;
+}
+
+/**
+ * A card's file as an absolute path, only when it lies inside the export folder or among the
+ * photos loaded from Telegram (telegram-media in the app's folder). Paths come from result.json,
+ * which could name any file on the computer (`..`, absolute paths); those are refused.
+ */
+async function cardFile(sourceDir: string, rel: string): Promise<string> {
+  const path = resolveInside([sourceDir, await mediaRootReady()], sourceDir, rel);
+  if (!path) throw new Error("PATH_OUTSIDE_EXPORT");
+  return path;
+}
+
+/** Same guard for pictures shown in the board. Before the media folder is known (the first moments
+ *  after start) the asset protocol's own scope is the only limit. */
+function mediaPath(sourceDir: string, rel: string): string | undefined {
+  if (!mediaRoot) {
+    mediaRootReady().catch(() => undefined);
+    return joinPath(sourceDir, rel);
+  }
+  return resolveInside([sourceDir, mediaRoot], sourceDir, rel) ?? undefined;
+}
+
 export const platform: Platform = {
   kind: "desktop",
   canFetchLinks: true,
@@ -72,10 +110,18 @@ export const platform: Platform = {
     if (typeof dir !== "string") return null;
     return { dir, readText: (rel) => readTextFile(joinPath(dir, rel)) };
   },
-  mediaUrl: (sourceDir, rel) => convertFileSrc(joinPath(sourceDir, rel)),
-  readMedia: async (sourceDir, rel) => new Blob([await readFile(joinPath(sourceDir, rel))]),
+  mediaUrl: (sourceDir, rel) => {
+    const path = mediaPath(sourceDir, rel);
+    return path ? convertFileSrc(path) : undefined;
+  },
+  readMedia: async (sourceDir, rel) => new Blob([await readFile(await cardFile(sourceDir, rel))]),
   openUrl: (url) => openUrl(url),
-  openFile: (sourceDir, rel) => openPath(joinPath(sourceDir, rel)),
+  async openFile(sourceDir, rel) {
+    const path = await cardFile(sourceDir, rel);
+    if (!RUNNABLE.test(path)) return openPath(path);
+    await revealItemInDir(path);
+    return "revealed";
+  },
   async saveTextFile(defaultName, filter, content) {
     const path = await save({ title: T.importer.saveTitle, defaultPath: defaultName, filters: [{ name: filter.name, extensions: [filter.ext] }] });
     if (!path) return null;
@@ -83,6 +129,7 @@ export const platform: Platform = {
     return path;
   },
   httpFetch: tauriFetch as HttpFetch,
+  previewFetch: (url, accept) => invoke("preview_fetch", { url, accept: accept ?? null }),
   telegram,
   appVersion: () => getVersion(),
   setWindowTheme: (theme) => getCurrentWindow().setTheme(theme),

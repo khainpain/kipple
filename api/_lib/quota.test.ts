@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { allowedRequest, unitsOf } from "./quota.js";
+import { allowedRequest, ipBucket, unitsOf } from "./quota.js";
 import { POST } from "../claude/v1/messages.js";
 import { groupsFormat, groupsSystemPrompt, imageSystemPrompt, outputFormat, synonymsFormat, synonymsSystemPrompt, systemPrompt } from "../../src/lib/prompts.js";
 
@@ -25,6 +25,26 @@ describe("allowedRequest", () => {
     for (const kind of ["topics", "tags"] as const) {
       expect(allowedRequest({ ...ok, system: synonymsSystemPrompt(kind), output_config: { effort: "low", format: JSON.parse(JSON.stringify(synonymsFormat())) } })).toBeNull();
     }
+  });
+  it("refuses a max_tokens that would make the reservation negative", () => {
+    for (const max_tokens of [-1e14, 0, 1.5, "100"]) expect(allowedRequest({ ...ok, max_tokens })).toMatch(/max_tokens/);
+  });
+  it("refuses fields the app never sends", () => {
+    expect(allowedRequest({ ...ok, thinking: { type: "enabled", budget_tokens: 15000 } })).toMatch(/own/);
+    expect(allowedRequest({ ...ok, temperature: 1 })).toMatch(/own/);
+    expect(allowedRequest({ ...ok, output_config: { effort: "max", format: FORMAT } })).toMatch(/own/);
+    const doc = { type: "document", source: { type: "url", url: "https://example.com/big.pdf" } };
+    expect(allowedRequest({ ...ok, messages: [{ role: "user", content: [doc] }] })).toMatch(/own/);
+    const img = { type: "image", source: { type: "url", url: "https://example.com/a.png" } };
+    expect(allowedRequest({ ...ok, messages: [{ role: "user", content: [img] }] })).toMatch(/own/);
+    const inline = { type: "image", source: { type: "base64", media_type: "image/jpeg", data: "AAAA" } };
+    expect(allowedRequest({ ...ok, messages: [{ role: "user", content: [inline, { type: "text", text: "ids" }] }] })).toBeNull();
+  });
+  it("counts IPv6 clients by their /64", () => {
+    expect(ipBucket("203.0.113.5")).toBe("203.0.113.5");
+    expect(ipBucket("2001:db8:1:2:aaaa::1")).toBe(ipBucket("2001:0db8:0001:0002:ffff:1:2:3"));
+    expect(ipBucket("2001:db8::1")).toBe("2001:db8:0:0::/64");
+    expect(ipBucket("::ffff:203.0.113.5")).toBe("203.0.113.5");
   });
   it("refuses a prompt sent with another prompt's answer format", () => {
     expect(allowedRequest({ ...ok, system: groupsSystemPrompt("ru") })).toMatch(/own/);

@@ -4,8 +4,11 @@
 // GitHub's answer is kept in the function's memory for 10 minutes, so its API is asked rarely; if
 // it can't be reached, the visitor lands on the releases page instead. The redirect itself is not
 // cached, so every click adds one to the day's download count, by where it came from (?src=, the
-// landing page passes its utm_source along). Only that count is kept: no IP, no cookie.
-import { redis } from "./_lib/quota.js";
+// landing page passes its utm_source along). Only that count is kept: no IP, no cookie. At most
+// 10 clicks a day from one address are counted (api/_lib/limit.ts keeps a short hash, not the
+// address); more still get the redirect.
+import { clientIp, redis } from "./_lib/quota.js";
+import { withinLimit } from "./_lib/limit.js";
 import { downloadCommands, downloadSource } from "./_lib/stats.js";
 
 const REPO = "khainpain/kipple";
@@ -38,11 +41,14 @@ async function latestInstaller(): Promise<string> {
   return target;
 }
 
+const DOWNLOADS_PER_IP_PER_DAY = 10;
+
+async function count(request: Request): Promise<void> {
+  if (!(await withinLimit("dl", clientIp(request), DOWNLOADS_PER_IP_PER_DAY, 86_400))) return;
+  await redis(downloadCommands(downloadSource(new URL(request.url).searchParams.get("src"))));
+}
+
 export async function GET(request: Request): Promise<Response> {
-  const src = downloadSource(new URL(request.url).searchParams.get("src"));
-  const [target] = await Promise.all([
-    latestInstaller(),
-    redis(downloadCommands(src)).catch((e) => console.error("download count failed", e)),
-  ]);
+  const [target] = await Promise.all([latestInstaller(), count(request).catch((e) => console.error("download count failed", e))]);
   return new Response(null, { status: 302, headers: { location: target, "cache-control": "no-store" } });
 }
