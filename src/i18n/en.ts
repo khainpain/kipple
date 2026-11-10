@@ -57,7 +57,7 @@ export const en: Dict = {
       `Web build for trying out the interface${version ? ` (${version})` : ""}. Data stays in this browser only, link previews aren't loaded, and photos show until the page is reloaded.`,
     webDemoBanner: "This is the Kipple demo: look around and try things, nothing is saved. Your own Saved Messages open in the Windows app.",
     /** Waitlist mode: the app isn't downloadable yet. */
-    webDemoBannerWaitlist: "This is the Kipple demo: look around and try things, nothing is saved. The Windows app for your own Saved Messages goes to the waitlist first.",
+    webDemoBannerWaitlist: "This is the Kipple demo: look around and try things, nothing is saved. People on the waitlist get the Windows app for their Saved Messages first.",
     /** The same on a phone, where the long one takes a third of the screen. */
     webDemoBannerShort: "A demo to try out: nothing is saved.",
     webDemoDownload: "Download for Windows",
