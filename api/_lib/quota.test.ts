@@ -58,8 +58,8 @@ describe("allowedRequest", () => {
 });
 
 it("weighs output and bigger models more", () => {
-  expect(unitsOf("claude-haiku-5-5", { input_tokens: 1000, output_tokens: 100 })).toBe(1500);
-  expect(unitsOf("claude-opus-5-5", { input_tokens: 1000, output_tokens: 100 })).toBe(7500);
+  expect(unitsOf("claude-haiku-5-5", { input_tokens: 1000, output_tokens: 100 })).toBe(150);
+  expect(unitsOf("claude-opus-5-5", { input_tokens: 1000, output_tokens: 100 })).toBe(6000);
 });
 
 describe("proxy", () => {
@@ -70,7 +70,7 @@ describe("proxy", () => {
 
   it("forwards an SDK request with the server key and stops at the daily allowance", async () => {
     vi.stubEnv("ANTHROPIC_API_KEY", "server-key");
-    vi.stubEnv("KIPPLE_INSTALL_DAILY_UNITS", "2000");
+    vi.stubEnv("KIPPLE_INSTALL_DAILY_UNITS", "200");
     const upstream = vi.fn(async (_url: string, init: RequestInit) => {
       expect((init.headers as Record<string, string>)["x-api-key"]).toBe("server-key");
       return new Response(
@@ -90,7 +90,7 @@ describe("proxy", () => {
       }) as unknown as typeof fetch,
     });
     const send = () => client.messages.create({ model: "claude-haiku-5-5", max_tokens: 1000, system: SYSTEM, output_config: { format: outputFormat() }, messages: [{ role: "user", content: "hi" }] });
-    await send(); // 2500 units: over the 2000 allowance after this one
+    await send(); // 250 units: over the 200 allowance after this one
     expect(upstream).toHaveBeenCalledTimes(1);
     const err = await send().catch((e) => e);
     expect(err).toBeInstanceOf(Anthropic.RateLimitError);
@@ -108,7 +108,7 @@ describe("proxy", () => {
 
   it("counts requests sent at the same time before they finish", async () => {
     vi.stubEnv("ANTHROPIC_API_KEY", "server-key");
-    vi.stubEnv("KIPPLE_INSTALL_DAILY_UNITS", "50000"); // less than one request's reservation
+    vi.stubEnv("KIPPLE_INSTALL_DAILY_UNITS", "5000"); // less than one request's reservation
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
     const upstream = vi.fn(async () => (await gate, answer()));
