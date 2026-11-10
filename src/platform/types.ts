@@ -25,10 +25,14 @@ export interface TelegramStatus {
   customApi: boolean;
   authorized: boolean;
   name?: string | null;
+  /** The account has Telegram Premium: needed for tags in Saved Messages. */
+  premium?: boolean;
 }
 
 /** The signed-in Telegram account, shown in the sidebar header. */
 export interface TelegramAccount {
+  /** Telegram user id. */
+  id: number;
   name: string;
   username?: string | null;
   /** Small profile photo, JPEG bytes. */
@@ -70,6 +74,16 @@ export interface SavedMessage {
     lastName?: string | null;
     phone?: string | null;
   } | null;
+}
+
+/**
+ * What happened to one message: "ok", "same" (nothing to change), "full" (no room for more tags),
+ * "missing" (the message is gone), "changed" (the id is another message now: another account),
+ * "forwarded" or "not_editable" (hashtags couldn't be added). `applied`: Kipple's tags on it now.
+ */
+export interface TagResult {
+  status: "ok" | "same" | "full" | "missing" | "changed" | "forwarded" | "not_editable";
+  applied: string[];
 }
 
 export interface SavedPage {
@@ -120,6 +134,21 @@ export interface TelegramApi {
    *  (and deletes nothing) when the signed-in account isn't `owner`. */
   deleteSaved(ids: number[], owner: number): Promise<void>;
   /**
+   * Deletes these messages of the user's cards from Saved Messages, on all devices (up to 100).
+   * Each is checked first: still there, in the signed-in account's Saved Messages, with this
+   * date; and copied to the local backup. "deleted", "missing" (gone already) or "changed"
+   * (another message has this id) per message; nothing is deleted if the backup fails.
+   * `whole` (one album): if any message is "changed", none is deleted and the rest are "kept".
+   * `owner`: the account the library was loaded from; with another one signed in, nothing is
+   * deleted and it throws OTHER_ACCOUNT_LIBRARY.
+   */
+  deleteCards(items: Array<{ id: number; date: number }>, whole: boolean, owner?: number): Promise<Array<{ id: number; status: "deleted" | "missing" | "changed" | "kept" }>>;
+  /**
+   * Pins (or unpins) a Saved Message after the same check as deleteCards. Silent: no notification.
+   * "same" when it's pinned (unpinned) already; "refused" when Telegram won't, e.g. too many pins.
+   */
+  pinSaved(id: number, date: number, pin: boolean): Promise<"ok" | "same" | "missing" | "changed" | "refused">;
+  /**
    * Copies one page of Saved Messages that aren't in the local backup yet into it (the whole
    * history on the first run, then only newer messages). Call until `done`. The backup only grows.
    */
@@ -137,6 +166,20 @@ export interface TelegramApi {
   createTopic(board: { channelId: number; accessHash: string }, title: string, iconColor?: number): Promise<number>;
   /** Returns the new message ids; empty when the originals no longer exist in Saved Messages. */
   forward(board: { channelId: number; accessHash: string }, topicId: number, ids: number[]): Promise<number[]>;
+  /**
+   * Gives each of these tags a Telegram tag in Saved Messages (an existing one with that name, or
+   * a free emoji named after it). Premium only: without it `tags` is empty. `owner` is the
+   * signed-in account, to pass to tagsApply / tagsHashtags.
+   */
+  tagsSetup(titles: string[]): Promise<{ premium: boolean; owner: number; tags: Array<{ title: string; reaction: string }> }>;
+  /**
+   * Puts Telegram tags (reactions from tagsSetup) on a Saved Message and takes `remove` off,
+   * keeping the user's own. `owned`: the tags Kipple put there before; any other tag already on
+   * the message is the user's and never counts as Kipple's in `applied`.
+   */
+  tagsApply(id: number, date: number, owner: number, add: string[], remove: string[], owned: string[]): Promise<TagResult>;
+  /** Adds hashtags to the end of the user's own Saved Message (backed up first). */
+  tagsHashtags(id: number, date: number, owner: number, hashtags: string[]): Promise<TagResult>;
   sendNote(board: { channelId: number; accessHash: string }, topicId: number, replyTo: number, text: string, boldLen: number): Promise<number>;
 }
 
@@ -172,8 +215,6 @@ export interface Platform {
   openUrl(url: string): Promise<void>;
   /** Opens a card's file in its app. A file that would run as a program is only shown in its folder ("revealed"). */
   openFile(sourceDir: string, rel: string): Promise<void | "revealed">;
-  /** Asks where to save (desktop) or downloads (web). Returns where it went, or null if cancelled. */
-  saveTextFile(defaultName: string, filter: { name: string; ext: string }, content: string): Promise<string | null>;
   httpFetch: HttpFetch;
   /**
    * Desktop only: fetches a link or its picture for a preview in Rust, refusing loopback/private/

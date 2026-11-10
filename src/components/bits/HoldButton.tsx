@@ -30,6 +30,8 @@ export interface HoldButtonProps {
   onHold?: () => void;
   onTap?: () => void;
   className?: string;
+  /** Screen reader hint; the default is English. */
+  hint?: ReactNode;
 }
 
 type Phase = 'idle' | 'holding' | 'done';
@@ -80,7 +82,8 @@ const HoldButton: React.FC<HoldButtonProps> = ({
   disabled = false,
   onHold,
   onTap,
-  className = ''
+  className = '',
+  hint
 }) => {
   const [phase, setPhase] = useState<Phase>('idle');
   const [input, setInput] = useState<Input>(null);
@@ -310,7 +313,7 @@ const HoldButton: React.FC<HoldButtonProps> = ({
         </span>
       </span>
       <span id={hintId} className="hold-button__sr">
-        Press and hold for {Math.round(holdTime / 100) / 10} seconds to confirm
+        {hint ?? <>Press and hold for {Math.round(holdTime / 100) / 10} seconds to confirm</>}
       </span>
     </button>
   );
