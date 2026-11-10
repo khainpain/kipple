@@ -43,6 +43,7 @@ describe("deletePlan", () => {
       card(4, JAN, { kind: "video", media: { inTelegram: true } }),
       card(5, JAN, { user: { action: "junk" }, media: {}, removed: true }),
       card(6, JAN, { user: { action: "junk" }, kind: "poll", media: {} }),
+      card(7, JAN, { user: { action: "junk" }, kind: "photo", media: { path: "C:/kipple/photos/7.jpg", inTelegram: true } }),
     ];
     expect(deleteWithFiles(cards)).toBe(2);
   });

@@ -32,19 +32,24 @@ export interface DeleteItem {
 }
 
 /** Cards the user sent to junk themselves. A guess by the rules or the AI is never deleted. */
+const userJunk = (c: Card) => !c.removed && c.user?.action === "junk";
+
 export function deletePlan(cards: Card[]): DeleteItem[] {
   return cards
-    .filter((c) => !c.removed && c.user?.action === "junk")
+    .filter(userJunk)
     .map((c) => ({ cardId: c.id, ids: [c.id, ...(c.albumIds ?? [])], date: unix(c) }));
 }
 
 /**
- * How many of those carry a photo, video or file. The backup keeps only text and a file's
- * description, so the files themselves are gone for good once Telegram deletes them.
+ * How many of those carry a photo, video or file that exists only in Telegram. The backup keeps
+ * the text and the file's name, not the file, so it's gone for good once Telegram deletes it.
+ * Photos Kipple downloaded (and files read from an export folder) stay on disk.
  */
 export function deleteWithFiles(cards: Card[]): number {
   const described = new Set<Card["kind"]>(["poll", "location", "contact"]);
-  return cards.filter((c) => !c.removed && c.user?.action === "junk" && !described.has(c.kind) && (c.media || c.album?.length)).length;
+  return cards.filter(
+    (c) => userJunk(c) && !described.has(c.kind) && [c.media, ...(c.album ?? [])].some((m) => m && !m.path),
+  ).length;
 }
 
 export interface PinItem {

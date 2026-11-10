@@ -551,7 +551,7 @@ export const en: Dict = {
     deleteJunkHint:
       "Only cards you sent to Junk yourself, not the AI's guesses. The text of each message is saved to the local backup first (Settings → Data). Deleting in Telegram can't be undone.",
     deleteJunkFiles: (n) =>
-      `With files, photos or videos: ${num(n)}. The backup keeps only the text and the file name, so the files themselves are gone for good.`,
+      `With files, photos or videos: ${num(n)}. Those files exist only in Telegram and the backup keeps just the text and the file name, so the files themselves are gone for good.`,
     pinImportant: (pin, unpin) => `Pin important ones in Saved Messages: ${num(pin)}` + (unpin ? `, unpin ${num(unpin)} no longer important` : ""),
     pinImportantHint: "Kipple only unpins its own pins. Whatever you pinned in Telegram yourself stays.",
     applyNothing: "Telegram already matches Kipple here.",
