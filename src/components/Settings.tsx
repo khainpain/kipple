@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { platform } from "@platform";
 import type { Settings } from "../lib/store";
+import { FEATURES } from "../lib/features";
 import { AI_MODELS, aiModelOf, builtinUsage, costEstimate } from "../lib/ai";
 import { getInstallId } from "../lib/secrets";
 import { pingPreview, telemetryEndpoint, telemetrySupported } from "../lib/telemetry";
@@ -45,7 +46,7 @@ export function SettingsDialog(props: {
   // How much of today's built-in allowance is used; only asked when AI is on and there is no own key
   // (in no-AI mode the app doesn't send anything to the Kipple server for AI).
   const [used, setUsed] = useState<number | null>(null);
-  const aiOn = props.settings.aiEnabled && !!props.settings.aiConsentAt;
+  const aiOn = FEATURES.ai && props.settings.aiEnabled && !!props.settings.aiConsentAt;
   useEffect(() => {
     if (props.hasKey || !aiOn) return;
     let live = true;
@@ -110,6 +111,8 @@ export function SettingsDialog(props: {
             </div>
           </div>
 
+          {FEATURES.ai && (
+            <>
           <h3 className="s2-sec">{L.secAi}</h3>
           <div className="s2-panel">
             <div className="s2-row">
@@ -213,6 +216,8 @@ export function SettingsDialog(props: {
               </div>
             )}
           </div>
+            </>
+          )}
 
           <h3 className="s2-sec">{T.rules.title}</h3>
           <div className="s2-panel">

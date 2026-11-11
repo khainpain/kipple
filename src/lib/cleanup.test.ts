@@ -315,7 +315,8 @@ describe("patchUser", () => {
 describe("the edit log", () => {
   it("reads a bulk decision back whole", () => {
     const events = [1, 2, 3].map((id) => makeEdit(id, { action: "junk" }));
-    expect(parseEdits(editLines(events) + editLines([makeEdit(1, { action: null })]))).toEqual([...events, makeEdit(1, { action: null })]);
+    const undo = makeEdit(1, { action: null }); // one timestamp: two calls can fall on different milliseconds
+    expect(parseEdits(editLines(events) + editLines([undo]))).toEqual([...events, undo]);
   });
 
   it("loses only the torn line after a crash mid-write, not the edit written next", () => {

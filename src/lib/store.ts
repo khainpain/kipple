@@ -5,6 +5,7 @@ import { emptyBoardState, type BoardState } from "./telegram";
 import type { LangPref } from "../i18n";
 import { DEFAULT_AI_MODEL, type AiModel } from "./ai";
 import type { Skips, TodayState } from "./today";
+import { FEATURES } from "./features";
 import { DEFAULT_REPLY_CLEANUP, validReplies, type PendingReply, type ReplyCleanup } from "./tgReplies";
 
 const { exists, read } = platform.data;
@@ -90,8 +91,8 @@ export async function appendEdits(events: EditEvent[]) {
   if (events.length) await append(EDITS, editLines(events));
 }
 
-/** Whether anything may go to the AI at all: turned on and agreed to. */
-export const aiAllowed = (s: Settings) => s.aiEnabled && !!s.aiConsentAt;
+/** Whether anything may go to the AI at all: not frozen (features.ts), turned on and agreed to. */
+export const aiAllowed = (s: Settings) => FEATURES.ai && s.aiEnabled && !!s.aiConsentAt;
 
 export async function loadSettings(): Promise<Settings> {
   if (!(await exists(SETTINGS))) return DEFAULT_SETTINGS;
