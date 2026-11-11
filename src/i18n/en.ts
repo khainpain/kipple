@@ -473,6 +473,7 @@ export const en: Dict = {
     exportSelected: (n) => `Selected: ${num(n)}`,
     exportAll: (n) => `All on screen: ${num(n)}`,
     telegram: (board) => `Send to Telegram: sort into topics in the "${board}" group`,
+    telegramAccount: "Telegram account",
     settings: "Settings",
     selected: (n) => `${num(n)} selected`,
     selectAll: (n) => `Select all ${num(n)}`,
@@ -587,6 +588,8 @@ export const en: Dict = {
     replyNoOriginal: "This message is no longer in Saved Messages",
     replyNoChat: "A reply with a quote is in Saved Messages now: open Telegram, it's the latest one",
     title: "Send to Telegram",
+    accountTitle: "Telegram account",
+    accountIntro: "You sign in to Telegram directly; the session key is kept only on this computer, in Windows Credential Manager.",
     intro: (board) =>
       `The app will create a private group "${board}" for you, with a topic per library section, and forward the original messages from Saved Messages there. Each one gets a short summary and hashtags underneath. You sign in to Telegram directly; the session key is kept only on this computer, in Windows Credential Manager.`,
     checking: "Checking sign-in…",

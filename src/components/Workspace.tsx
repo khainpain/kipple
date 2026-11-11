@@ -21,6 +21,7 @@ import { SortMenu } from "./SortMenu";
 import { ViewMenu } from "./ViewMenu";
 import { T, compareText, formatNumber } from "../i18n";
 import { BOARD_TITLE } from "../lib/telegram";
+import { FEATURES } from "../lib/features";
 import type { TelegramAccount } from "../platform/types";
 import { actionLabel } from "../lib/types";
 import { track } from "../lib/telemetry";
@@ -45,6 +46,7 @@ import {
   type TypeKey,
   type ViewKey,
   loadLook,
+  NO_LOOK,
   saveLook,
   type CardLook,
 } from "./nav";
@@ -122,7 +124,7 @@ export function Workspace(props: {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>(() => loadPref("sort", SORTS.map((s) => s.key), "new"));
   // Default is the even grid (all cards the same size); a new pref key so earlier saved "masonry" doesn't stick.
-  const [view, setView] = useState<ViewKey>(() => loadPref("layout", ["masonry", "grid", "list", "headlines"] as const, "grid"));
+  const [view, setView] = useState<ViewKey>(() => (FEATURES.views ? loadPref("layout", ["masonry", "grid", "list", "headlines"] as const, "grid") : "grid"));
   const [sideOpen, setSideOpen] = useState(() => loadPref("sidebar", ["open", "closed"] as const, "open") === "open");
   // On a phone the sidebar is a drawer over the board: closed at start, closed again after a pick,
   // and never saved, so the desktop's open/closed preference stays as it was.
@@ -142,7 +144,7 @@ export function Workspace(props: {
     else if (drawerWas.current) sideToggle.current?.focus({ preventScroll: true });
     drawerWas.current = drawer;
   }, [drawer]);
-  const [openMode, setOpenMode] = useState<OpenMode>(() => loadPref("open", OPEN_MODES.map((m) => m.key), "center"));
+  const [openMode, setOpenMode] = useState<OpenMode>(() => (FEATURES.openModes ? loadPref("open", OPEN_MODES.map((m) => m.key), "center") : "center"));
   const [openId, setOpenId] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [exportOpen, setExportOpen] = useState(false);
@@ -180,11 +182,17 @@ export function Workspace(props: {
   }, [scope.kind === "topic" ? scope.name : null, tag]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => savePref("sort", sort), [sort]);
-  useEffect(() => savePref("layout", view), [view]);
-  const [look, setLook] = useState<CardLook>(loadLook);
-  useEffect(() => saveLook(look), [look]);
+  useEffect(() => {
+    if (FEATURES.views) savePref("layout", view);
+  }, [view]);
+  const [look, setLook] = useState<CardLook>(() => (FEATURES.views ? loadLook() : NO_LOOK));
+  useEffect(() => {
+    if (FEATURES.views) saveLook(look);
+  }, [look]);
   useEffect(() => savePref("sidebar", sideOpen ? "open" : "closed"), [sideOpen]);
-  useEffect(() => savePref("open", openMode), [openMode]);
+  useEffect(() => {
+    if (FEATURES.openModes) savePref("open", openMode);
+  }, [openMode]);
 
   const index = useMemo(() => buildIndex(lib.cards), [lib, rev]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -254,7 +262,7 @@ export function Workspace(props: {
   const skipsRef = useRef(props.taskSkips);
   skipsRef.current = props.taskSkips;
   useEffect(() => {
-    if (plan !== props.today && plan.keys.length) props.onToday({ today: plan });
+    if (FEATURES.today && plan !== props.today && plan.keys.length) props.onToday({ today: plan });
   }, [plan]); // eslint-disable-line react-hooks/exhaustive-deps
   const todayTasks = useMemo(() => resolvePlan(plan, lib.cards, props.taskSkips, day), [plan, lib, rev, props.taskSkips, day]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -291,7 +299,7 @@ export function Workspace(props: {
     const all = new Map(candidates(lib.cards, skipsRef.current, day).map((t) => [t.key, t]));
     setTodayOpen({ tasks: fresh.keys.map((k) => all.get(k)!).filter(Boolean), start: 0, n: (todayOpen?.n ?? 0) + 1 });
   }
-  const tidyCount = useMemo(() => suggestMerges(names.topics).length + suggestMerges(names.tags).length, [names]);
+  const tidyCount = useMemo(() => suggestMerges(names.topics).length + (FEATURES.tags ? suggestMerges(names.tags).length : 0), [names]);
 
   // What the archive is made of (lib/cleanup.ts): the cleanup screen's piles and the number left in the sidebar.
   const piles = useMemo(() => breakdown(lib.cards), [lib, rev]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -360,8 +368,12 @@ export function Workspace(props: {
         cards: take("unsorted"),
       },
       { key: "important", icon: "star", title: T.nav.important, hint: o.important, count: listCounts.important, cards: take("important") },
-      { key: "read_later", icon: "clock", title: T.nav.readLater, hint: o.readLater, count: listCounts.read_later, cards: take("read_later") },
-      { key: "todo", icon: "check", title: T.nav.todo, hint: o.todo, count: listCounts.todo, cards: take("todo") },
+      ...(FEATURES.statuses
+        ? ([
+            { key: "read_later", icon: "clock", title: T.nav.readLater, hint: o.readLater, count: listCounts.read_later, cards: take("read_later") },
+            { key: "todo", icon: "check", title: T.nav.todo, hint: o.todo, count: listCounts.todo, cards: take("todo") },
+          ] as OverviewSection[])
+        : []),
       { key: "recent", icon: "sortNew", title: T.nav.recent, hint: o.recent, count: listCounts.recent, cards: take("recent") },
       {
         key: "duplicates",
@@ -441,6 +453,7 @@ export function Workspace(props: {
       onEdit([c.id], { pinned: !isImportant(c) });
       return;
     }
+    if (k.action !== "junk" && !FEATURES.statuses) return; // keys 1-4 set the frozen statuses
     const was = effectiveAction(c);
     // The same key again takes junk back out; another status is set as is.
     const action = k.action === "junk" && was === "junk" ? (c.ai?.action && c.ai.action !== "junk" ? c.ai.action : "reference") : k.action;
@@ -532,11 +545,11 @@ export function Workspace(props: {
           cleanupLeft={cleanupLeft}
           topics={topics}
           noTopic={noTopic}
-          tags={tags}
+          tags={FEATURES.tags ? tags : []}
           onScope={pickScope}
           onTag={(t) => (setTag(t), setDrawer(false))}
           tidyCount={tidyCount}
-          onTidy={() => (setDrawer(false), setTidy("tags"))}
+          onTidy={() => (setDrawer(false), setTidy(FEATURES.tags ? "tags" : "topics"))}
           onCreateTopic={async (name) => pickScope({ kind: "topic", name: await props.onCreateTopic(name) })}
           onRenameTopic={async (from, to) => {
             const name = await props.onRenameTopic(from, to);
@@ -614,7 +627,7 @@ export function Workspace(props: {
               )}
             </div>
             {props.onTelegram && (
-              <button className="icon-btn" onClick={props.onTelegram} title={T.toolbar.telegram(BOARD_TITLE)}>
+              <button className="icon-btn" onClick={props.onTelegram} title={FEATURES.forumSend ? T.toolbar.telegram(BOARD_TITLE) : T.toolbar.telegramAccount}>
                 <Icon name="send" />
               </button>
             )}
@@ -630,8 +643,8 @@ export function Workspace(props: {
             sections={sections}
             topics={topics}
             tidyCount={tidyCount}
-            onTidy={() => setTidy(suggestMerges(names.topics).length ? "topics" : "tags")}
-            today={plan.keys.length ? todayTasks : undefined}
+            onTidy={() => setTidy(suggestMerges(names.topics).length || !FEATURES.tags ? "topics" : "tags")}
+            today={FEATURES.today && plan.keys.length ? todayTasks : undefined}
             onToday={openToday}
             onTodayMore={candidates(lib.cards, props.taskSkips, day).some((t) => !plan.keys.includes(t.key)) ? moreToday : undefined}
             activeId={openId}
@@ -672,12 +685,16 @@ export function Workspace(props: {
                 <Icon name="folder" size={13} /> {T.move.bulk}
               </button>
               {bulkMoveAt && <TopicMenu anchor={bulkMoveAt} topics={topicNames} onPick={(t) => onEdit([...selected], { topic: t })} onClose={() => setBulkMoveAt(null)} />}
-              <button className="pill" onClick={() => onEdit([...selected], { action: "read_later" })}>
-                {actionLabel("read_later")}
-              </button>
-              <button className="pill" onClick={() => onEdit([...selected], { action: "idea" })}>
-                {actionLabel("idea")}
-              </button>
+              {FEATURES.statuses && (
+                <>
+                  <button className="pill" onClick={() => onEdit([...selected], { action: "read_later" })}>
+                    {actionLabel("read_later")}
+                  </button>
+                  <button className="pill" onClick={() => onEdit([...selected], { action: "idea" })}>
+                    {actionLabel("idea")}
+                  </button>
+                </>
+              )}
               <button className="pill" onClick={() => (onEdit([...selected], { action: "junk" }), setSelected(new Set()))}>
                 {T.toolbar.toJunk}
               </button>
@@ -721,7 +738,7 @@ export function Workspace(props: {
                   {source} <Icon name="close" size={12} />
                 </button>
               )}
-              {tag && (
+              {FEATURES.tags && tag && (
                 <button className="pill active" onClick={() => setTag(null)}>
                   #{tag} <Icon name="close" size={12} />
                 </button>
@@ -730,7 +747,7 @@ export function Workspace(props: {
           )}
           <div className="spacer" />
           <SortMenu value={sort} onChange={setSort} />
-          <ViewMenu view={view} onView={setView} look={look} onLook={setLook} />
+          {FEATURES.views && <ViewMenu view={view} onView={setView} look={look} onLook={setLook} />}
         </div>
 
         <Grid
@@ -759,7 +776,7 @@ export function Workspace(props: {
       {tidy && (
         <TidyDialog
           topics={names.topics}
-          tags={names.tags}
+          tags={FEATURES.tags ? names.tags : new Map()}
           aliases={props.aliases}
           initial={tidy}
           askAi={props.askSynonyms}
@@ -797,7 +814,7 @@ export function Workspace(props: {
           mode={narrow ? "full" : openMode}
           narrow={narrow}
           onNameImage={props.onNameImage && openCard.kind === "photo" && !openCard.sensitive && !props.job ? () => props.onNameImage!(openCard) : undefined}
-          onMode={setOpenMode}
+          onMode={FEATURES.openModes ? setOpenMode : undefined}
           onClose={() => setOpenId(null)}
           onEdit={(p) => onEdit([openCard.id], p)}
           onOpenInTelegram={props.onOpenInTelegram && !openCard.removed ? () => props.onOpenInTelegram!(openCard) : undefined}

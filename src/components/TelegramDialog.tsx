@@ -3,6 +3,7 @@ import type { TelegramApi } from "../platform/types";
 import type { Card } from "../lib/types";
 import { BOARD_TITLE, buildPlan, otherTopic, telegramErrorText, type BoardState, type SendOptions } from "../lib/telegram";
 import { loadBoardState } from "../lib/store";
+import { FEATURES } from "../lib/features";
 import { T } from "../i18n";
 import { useEscape } from "./useEscape";
 
@@ -77,10 +78,8 @@ export function TelegramDialog(props: {
         <button className="close" onClick={props.onClose} aria-label={T.common.close}>
           ×
         </button>
-        <h2>{L.title}</h2>
-        <p className="hint">
-          {L.intro(BOARD_TITLE)}
-        </p>
+        <h2>{FEATURES.forumSend ? L.title : L.accountTitle}</h2>
+        <p className="hint">{FEATURES.forumSend ? L.intro(BOARD_TITLE) : L.accountIntro}</p>
 
         {step === "loading" && <p className="hint">{L.checking}</p>}
 
@@ -176,6 +175,8 @@ export function TelegramDialog(props: {
                 {L.signOut}
               </a>
             </p>
+            {FEATURES.forumSend && (
+              <>
             <label className="check">
               <input type="checkbox" checked={opts.includeJunk} onChange={(e) => setOpts({ ...opts, includeJunk: e.target.checked })} />
               {L.includeJunk}
@@ -191,14 +192,18 @@ export function TelegramDialog(props: {
               {sentCount > 0 && L.alreadySent(sentCount)}
               {untagged > 0 && L.untagged(untagged, otherTopic(state ?? undefined))}
             </p>
+              </>
+            )}
             <div className="dialog-buttons">
               <span className="spacer" />
               <button className="secondary" onClick={props.onClose}>
                 {T.common.close}
               </button>
-              <button disabled={busy || props.running || !plan.length} onClick={() => props.onStart(opts)}>
-                {props.running ? L.sending : L.send(plan.length)}
-              </button>
+              {FEATURES.forumSend && (
+                <button disabled={busy || props.running || !plan.length} onClick={() => props.onStart(opts)}>
+                  {props.running ? L.sending : L.send(plan.length)}
+                </button>
+              )}
             </div>
           </>
         )}

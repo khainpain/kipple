@@ -6,6 +6,7 @@ import "./App.css";
 import type { Card, Library, UserPatch } from "./lib/types";
 import type { Skips, TodayState } from "./lib/today";
 import { effectiveTags, effectiveTopic, findTopic, getOwnTopics, makeEdit, matchesFilter, patchUser, restorePrevAi, mergeAlias, NO_ALIASES, setAliases, setOwnTopics, topicName, type Aliases } from "./lib/library";
+import { FEATURES } from "./lib/features";
 import { aiAllowed, appendEdits, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadPendingReplies, loadSettings, saveBoardState, saveLibrary, savePendingReplies, saveSettings, wipeAll, type Settings } from "./lib/store";
 import { dueReplies, nextDue, replyText, scheduleReply, withoutReplies, type PendingReply } from "./lib/tgReplies";
 import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type SendOptions } from "./lib/telegram";
@@ -389,7 +390,7 @@ export default function App() {
     if (!ctl) return;
     try {
       if (settingsRef.current.fetchLinks && platform.canFetchLinks) await enrichLinks(l, ctl.signal);
-      if (!ctl.signal.aborted && !demoRef.current && !aiAllowed(settingsRef.current) && pendingForAi(l.cards).length) {
+      if (FEATURES.ai && !ctl.signal.aborted && !demoRef.current && !aiAllowed(settingsRef.current) && pendingForAi(l.cards).length) {
         // Pressing the button without consent asks for it; "No AI" is remembered and hides the button.
         setJob(null);
         const ok = await askConsent();
@@ -478,6 +479,7 @@ export default function App() {
     } catch (e) {
       if (fresh) track("import_failed", "direct");
       notify(T.app.tgLoadFailed(telegramErrorText(e)));
+      if (e instanceof TelegramAuthError && !fresh) setShowTelegram(true); // the account dialog signs in again
       // Nothing came in on the first load: back to the start, where the export file still works.
       if (fresh && !l.cards.length) setLib(null);
     } finally {
@@ -872,7 +874,7 @@ export default function App() {
         tgAccount={tgAccount}
         job={job}
         needAi={demo ? 0 : needAi}
-        offerAi={aiAllowed(settings) || !settings.aiAsked}
+        offerAi={FEATURES.ai && (aiAllowed(settings) || !settings.aiAsked)}
         onImport={demo ? undefined : doImport}
         onExport={doExport}
         onSettings={() => setShowSettings(true)}
