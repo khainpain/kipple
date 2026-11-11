@@ -1,9 +1,10 @@
-import MiniSearch from "minisearch";
+import MiniSearch, { type Query } from "minisearch";
 import type { Card } from "./types";
 import { actionLabel } from "./types";
 import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic, getAliases } from "./library";
 import { isImportant } from "./smart";
 import { T } from "../i18n";
+import { fold, stem } from "./stem";
 
 /** Canonical name → the names merged into it, so searching an old name still finds the cards. */
 function reverse(map: Record<string, string>): Map<string, string[]> {
@@ -12,15 +13,27 @@ function reverse(map: Record<string, string>): Map<string, string[]> {
   return out;
 }
 
+const FIELDS = ["title", "text", "tags", "topic", "status", "site", "source"];
+const STEMMED = "~";
+
 export function buildIndex(cards: Card[]) {
   const aliases = getAliases();
   const tagSyn = reverse(aliases.tags);
   const topicSyn = reverse(aliases.topics);
+  const stems = new Map<string, string>(); // words repeat a lot across cards
   const ms = new MiniSearch<{ id: number; title: string; text: string; tags: string; topic: string; status: string; site: string; source: string }>({
-    fields: ["title", "text", "tags", "topic", "status", "site", "source"],
-    // Russian writes ё and е interchangeably: "елка" should find "ёлку".
-    processTerm: (term) => term.toLowerCase().replace(/ё/g, "е"),
-    searchOptions: { prefix: true, fuzzy: 0.2, boost: { title: 3, tags: 2, topic: 2 }, combineWith: "AND" },
+    // Every field is indexed twice: whole words, and stems in a twin field ("text~"). Kept apart,
+    // a typo-tolerant match on a word can't land on some other word's stem ("котом" on "котор").
+    fields: [...FIELDS, ...FIELDS.map((f) => f + STEMMED)],
+    extractField: (doc, field) => (doc as Record<string, unknown>)[field.replace(STEMMED, "")],
+    processTerm: (term, field) => {
+      const word = fold(term);
+      if (!field?.endsWith(STEMMED)) return word;
+      let s = stems.get(word);
+      if (s === undefined) stems.set(word, (s = stem(word)));
+      return s;
+    },
+    searchOptions: { processTerm: fold, prefix: true, fuzzy: 0.2, boost: { title: 3, tags: 2, topic: 2, [`title${STEMMED}`]: 3, [`tags${STEMMED}`]: 2, [`topic${STEMMED}`]: 2 }, combineWith: "AND" },
   });
   ms.addAll(
     cards.map((c) => {
@@ -40,5 +53,22 @@ export function buildIndex(cards: Card[]) {
       };
     }),
   );
-  return ms;
+  return { search: (q: string) => ms.search(wordForms(q)) };
+}
+
+/**
+ * Each query word matches as typed (prefix and typos allowed, so a half-typed word works)
+ * or by its exact stem ("кошка" finds "кошкой"). A prefix match on the stem would be too
+ * loose: half-typed "красив" stems to "крас" and would find "красный".
+ */
+function wordForms(q: string): Query {
+  return {
+    combineWith: "AND",
+    queries: MiniSearch.getDefault("tokenize")(q).flatMap((term: string) => {
+      const word = fold(term);
+      if (!word) return [];
+      const stemmed = { queries: [stem(word)], fields: FIELDS.map((f) => f + STEMMED), prefix: false, fuzzy: false };
+      return [{ combineWith: "OR", queries: [{ queries: [word], fields: FIELDS }, stemmed] }];
+    }),
+  };
 }

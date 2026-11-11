@@ -20,6 +20,7 @@ export const changelog = [
       "Many fixes: edits and AI titles no longer get lost, sensitive cards never go to the AI",
       "A calmer start: AI, Three for today, extra board views, extra statuses and tags are tucked away for now, and the old Send to Telegram group is gone",
       "Topics without AI: send everything from a channel or site to a topic, and links to well-known sites sort themselves",
+      "Search understands word forms in English and Russian: “study” also finds “studies”",
     ],
     ru: [
       "«Открыть в Telegram»: переход от карточки к её сообщению в Избранном",
@@ -34,6 +35,7 @@ export const changelog = [
       "Много исправлений: правки и AI-названия больше не теряются, чувствительные карточки никогда не уходят в AI",
       "Спокойный старт: AI, «Три на сегодня», лишние виды доски, статусы и теги пока убраны с глаз, а старой отправки в группу Telegram больше нет",
       "Темы без ИИ: всё из канала или с сайта попадает в нужную тему, а ссылки на известные сайты раскладываются сами",
+      "Поиск понимает формы слов по-русски и по-английски: «кошка» находит и «кошки», и «кошкой»",
     ],
   },
   {
