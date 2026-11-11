@@ -19,7 +19,6 @@ import { Sidebar } from "./Sidebar";
 import { Icon } from "./Icon";
 import { SortMenu } from "./SortMenu";
 import { ViewMenu } from "./ViewMenu";
-import { nextThemePref, setThemePref, THEME_ICONS, THEME_LABELS, useThemePref } from "../lib/theme";
 import { T, compareText, formatNumber } from "../i18n";
 import { BOARD_TITLE } from "../lib/telegram";
 import type { TelegramAccount } from "../platform/types";
@@ -113,7 +112,6 @@ export function Workspace(props: {
   const { lib, rev, onEdit } = props;
   const [scope, setScope] = useState<Scope>({ kind: props.firstCleanup ? "cleanup" : "home" });
   const [type, setType] = useState<TypeKey | null>(null);
-  const theme = useThemePref();
   const [tag, setTag] = useState<string | null>(null);
   /** Cards forwarded from one channel or person, picked by clicking its name on a card. */
   const [source, setSource] = useState<string | null>(null);
@@ -620,9 +618,6 @@ export function Workspace(props: {
                 <Icon name="send" />
               </button>
             )}
-            <button className="icon-btn" onClick={() => setThemePref(nextThemePref(theme))} title={T.theme.toggle(THEME_LABELS[theme])}>
-              <Icon name={THEME_ICONS[theme]} />
-            </button>
             <button className="icon-btn" onClick={props.onSettings} title={T.toolbar.settings}>
               <Icon name="settings" />
             </button>
