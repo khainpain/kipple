@@ -9,6 +9,7 @@ import { TopicMenu } from "./TopicMenu";
 import { TodayDialog } from "./TodayDialog";
 import { Cleanup, NEW_SESSION, pileTitle, type CleanupSession } from "./Cleanup";
 import { breakdown, type Pile } from "../lib/cleanup";
+import { learnTopics, suggestTopic, type TopicModel } from "../lib/suggest";
 import { candidates, localDate, makePlan, planFor, resolvePlan, withSkip, type DailyTask, type Skips, type TodayState } from "../lib/today";
 import { suggestMerges } from "../lib/tidy";
 import type { Aliases } from "../lib/library";
@@ -306,7 +307,13 @@ export function Workspace(props: {
   const tidyCount = useMemo(() => suggestMerges(names.topics).length + (FEATURES.tags ? suggestMerges(names.tags).length : 0), [names]);
 
   // What the archive is made of (lib/cleanup.ts): the cleanup screen's piles and the number left in the sidebar.
-  const piles = useMemo(() => breakdown(lib.cards), [lib, rev]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Look-alike piles only change which pile a card is in, not how many are left: worked out for the screen alone.
+  const piles = useMemo(() => breakdown(lib.cards, Date.now(), cleanup), [lib, rev, cleanup]); // eslint-disable-line react-hooks/exhaustive-deps
+  /** A topic for a card with none, learned from the person's own sorting; worked out only once a topic menu asks. */
+  const suggest = useMemo(() => {
+    let model: TopicModel | undefined;
+    return (c: Card) => (effectiveTopic(c) ? undefined : suggestTopic((model ??= learnTopics(lib.cards)), c));
+  }, [lib, rev]); // eslint-disable-line react-hooks/exhaustive-deps
   const cleanupLeft = useMemo(() => piles.piles.reduce((n, p) => n + p.cards.length, 0), [piles]);
   useEffect(() => {
     // After a load from Telegram this comes when everything is in: someone already busy on the board stays there.
@@ -785,6 +792,7 @@ export function Workspace(props: {
           onPin={togglePin}
           topics={topicNames}
           onMove={moveTo}
+          suggest={suggest}
           onSource={pickSource}
           onOpenLink={(u) => void platform.openUrl(u)}
           empty={shown.kind === "topic" && !inScope.length && !query.trim() ? { title: T.topics.emptyTitle, hint: T.topics.emptyHint } : undefined}
@@ -831,6 +839,7 @@ export function Workspace(props: {
           lib={lib}
           card={openCard}
           topics={topics.map(([t]) => t)}
+          suggest={suggest}
           mode={narrow ? "full" : openMode}
           narrow={narrow}
           onNameImage={props.onNameImage && openCard.kind === "photo" && !openCard.sensitive && !props.job ? () => props.onNameImage!(openCard) : undefined}

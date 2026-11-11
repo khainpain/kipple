@@ -2679,6 +2679,12 @@ button.ov-title:hover {
   gap: 6px;
   margin-left: auto;
 }
+.cl-to-that {
+  max-width: 16em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .cl-later {
   color: var(--muted);
   padding: 5px 6px;
@@ -3077,6 +3083,12 @@ kbd {
 }
 .topic-menu button.on {
   font-weight: 600;
+}
+.topic-menu-hint {
+  flex-shrink: 0;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12px;
 }
 .topic-menu button .icon {
   color: var(--muted);
