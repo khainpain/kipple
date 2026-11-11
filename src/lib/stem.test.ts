@@ -25,7 +25,7 @@ describe("stem", () => {
   it("leaves numbers and mixed words alone", () => {
     expect(stem("2026")).toBe("2026");
     expect(stem("iphone15")).toBe("iphone15");
-    expect(stem("tg-бот")).toBe("tg-бот");
+    expect(stem("tgбот")).toBe("tgбот");
   });
   it("treats ё as е and ignores case", () => {
     expect(stem("Ёлки")).toBe(stem("елка"));

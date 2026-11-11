@@ -57,4 +57,17 @@ describe("search", () => {
     const ix = buildIndex([{ ...card(1, []), text: "красивый вид" }, { ...card(2, []), text: "красный цвет" }]);
     expect(ix.search("красив").map((h) => h.id)).toEqual([1]);
   });
+  it("does not let a finished word reach unrelated words through its stem", () => {
+    const ix = buildIndex([
+      { ...card(1, []), text: "кот спит" },
+      { ...card(2, []), text: "который час, от дома" },
+      { ...card(3, []), text: "цены на нефть" },
+      { ...card(4, []), text: "build a tool" },
+      { ...card(5, []), text: "buying a car" },
+    ]);
+    expect(ix.search("кота").map((h) => h.id)).toEqual([1]);
+    expect(ix.search("котом").map((h) => h.id)).toEqual([1]);
+    expect(ix.search("нет").map((h) => h.id)).toEqual([]);
+    expect(ix.search("buying").map((h) => h.id)).toEqual([5]);
+  });
 });

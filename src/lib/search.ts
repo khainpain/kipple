@@ -13,21 +13,27 @@ function reverse(map: Record<string, string>): Map<string, string[]> {
   return out;
 }
 
+const FIELDS = ["title", "text", "tags", "topic", "status", "site", "source"];
+const STEMMED = "~";
+
 export function buildIndex(cards: Card[]) {
   const aliases = getAliases();
   const tagSyn = reverse(aliases.tags);
   const topicSyn = reverse(aliases.topics);
   const stems = new Map<string, string>(); // words repeat a lot across cards
   const ms = new MiniSearch<{ id: number; title: string; text: string; tags: string; topic: string; status: string; site: string; source: string }>({
-    fields: ["title", "text", "tags", "topic", "status", "site", "source"],
-    // Each word goes in whole and as its stem, so search can match either (see wordForms).
-    processTerm: (term) => {
+    // Every field is indexed twice: whole words, and stems in a twin field ("text~"). Kept apart,
+    // a typo-tolerant match on a word can't land on some other word's stem ("котом" on "котор").
+    fields: [...FIELDS, ...FIELDS.map((f) => f + STEMMED)],
+    extractField: (doc, field) => (doc as Record<string, unknown>)[field.replace(STEMMED, "")],
+    processTerm: (term, field) => {
       const word = fold(term);
+      if (!field?.endsWith(STEMMED)) return word;
       let s = stems.get(word);
       if (s === undefined) stems.set(word, (s = stem(word)));
-      return s === word ? word : [word, s];
+      return s;
     },
-    searchOptions: { processTerm: fold, prefix: true, fuzzy: 0.2, boost: { title: 3, tags: 2, topic: 2 }, combineWith: "AND" },
+    searchOptions: { processTerm: fold, prefix: true, fuzzy: 0.2, boost: { title: 3, tags: 2, topic: 2, [`title${STEMMED}`]: 3, [`tags${STEMMED}`]: 2, [`topic${STEMMED}`]: 2 }, combineWith: "AND" },
   });
   ms.addAll(
     cards.map((c) => {
@@ -61,8 +67,8 @@ function wordForms(q: string): Query {
     queries: MiniSearch.getDefault("tokenize")(q).flatMap((term: string) => {
       const word = fold(term);
       if (!word) return [];
-      const s = stem(word);
-      return [s === word ? word : { combineWith: "OR", queries: [word, { queries: [s], prefix: false, fuzzy: false }] }];
+      const stemmed = { queries: [stem(word)], fields: FIELDS.map((f) => f + STEMMED), prefix: false, fuzzy: false };
+      return [{ combineWith: "OR", queries: [{ queries: [word], fields: FIELDS }, stemmed] }];
     }),
   };
 }
