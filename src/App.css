@@ -2549,6 +2549,222 @@ button.ov-title:hover {
   color: var(--accent-ink);
 }
 
+/* Cleanup: the archive as piles, one decision per pile (components/Cleanup.tsx) */
+.cleanup {
+  padding: 4px 16px 32px;
+}
+.cl-top,
+.cl-piles,
+.cl-later-list {
+  max-width: 920px;
+}
+.cl-top {
+  padding-top: 12px;
+}
+.cl-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+}
+.cl-title .link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.cl-top h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.cl-top h2:focus {
+  outline: none;
+}
+.cl-top p {
+  margin: 4px 0 0;
+}
+.cl-safe {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.cl-safe .icon {
+  color: var(--ok);
+  margin-top: 2px;
+}
+.cl-piles {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cl-pile {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+.cl-main {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+.cl-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 30px;
+}
+.cl-head h3 {
+  margin: 0;
+  font-size: 14.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cl-head small {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.cl-main .hint {
+  margin: 0;
+}
+.cl-samples {
+  flex: 0 0 calc(100% - 42px);
+  margin-left: 42px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+.cl-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--hover);
+}
+.cl-line {
+  min-width: 48px;
+  max-width: 260px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cl-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.cl-later {
+  color: var(--muted);
+  padding: 5px 6px;
+}
+.cl-later-list {
+  margin-top: 20px;
+}
+.cl-later-list h3 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.cl-later-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cl-later-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  color: var(--muted);
+}
+.cl-later-list .label {
+  min-width: 0;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cl-later-list small {
+  font-variant-numeric: tabular-nums;
+}
+.cl-finale {
+  max-width: 520px;
+  margin-top: 20px;
+  padding: 20px;
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: center;
+}
+.cl-finale h2 {
+  margin: 4px 0 0;
+  font-size: 21px;
+}
+.cl-finale .hint {
+  margin: 0;
+}
+.cl-finale-btns {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding-top: 4px;
+}
+.cl-finale-btns button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* What the last decision did, with Undo: stays in view while the list scrolls. */
+.cl-note {
+  position: sticky;
+  bottom: 12px;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--bg);
+  box-shadow: var(--shadow-float);
+}
+/* Stays in the page while empty, so a screen reader hears the next message appear. */
+.cl-note:not(.on) {
+  opacity: 0;
+  pointer-events: none;
+}
+.cl-note .link-btn {
+  color: inherit;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
 /* Three for today: the dialog */
 .modal.today {
   width: min(680px, 92vw);

@@ -1,12 +1,14 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { platform } from "@platform";
-import type { Card, Library, UserFields } from "../lib/types";
+import type { Card, Library, UserFields, UserPatch } from "../lib/types";
 import { effectiveAction, effectiveTags, effectiveTopic, getOwnTopics, matchesFilter, tagName, topicName } from "../lib/library";
 import { countDuplicateGroups, findDuplicates, groupDuplicates, isImportant, isUnsorted } from "../lib/smart";
 import { Overview, type OverviewSection } from "./Overview";
 import { TidyDialog, type TidyKind } from "./TidyDialog";
 import { TopicMenu } from "./TopicMenu";
 import { TodayDialog } from "./TodayDialog";
+import { Cleanup, NEW_SESSION, pileTitle, type CleanupSession } from "./Cleanup";
+import { breakdown, type Pile } from "../lib/cleanup";
 import { candidates, localDate, makePlan, planFor, resolvePlan, withSkip, type DailyTask, type Skips, type TodayState } from "../lib/today";
 import { suggestMerges } from "../lib/tidy";
 import type { Aliases } from "../lib/library";
@@ -84,7 +86,12 @@ export function Workspace(props: {
   /** Signed in to Telegram: jump to the card's message in Saved Messages. */
   onOpenInTelegram?: (card: Card) => void;
   onStop: () => void;
-  onEdit: (ids: number[], patch: UserFields) => void;
+  /** A null in the patch takes the field away again (undo on the cleanup screen). */
+  onEdit: (ids: number[], patch: UserPatch) => void;
+  /** Opens the dialog that deletes junk in Telegram, after its own copy and confirmation. */
+  onApplyTelegram?: () => void;
+  /** This library was just loaded for the first time: start on the cleanup screen. */
+  firstCleanup?: boolean;
   /** Merged topics and tags, and saving a change to them. */
   aliases: Aliases;
   onAliases: (a: Aliases) => void;
@@ -102,12 +109,16 @@ export function Workspace(props: {
   onToday: (p: { today?: TodayState; skips?: Skips }) => void;
 }) {
   const { lib, rev, onEdit } = props;
-  const [scope, setScope] = useState<Scope>({ kind: "home" });
+  const [scope, setScope] = useState<Scope>({ kind: props.firstCleanup ? "cleanup" : "home" });
   const [type, setType] = useState<TypeKey | null>(null);
   const theme = useThemePref();
   const [tag, setTag] = useState<string | null>(null);
   /** Cards forwarded from one channel or person, picked by clicking its name on a card. */
   const [source, setSource] = useState<string | null>(null);
+  /** A pile from the cleanup screen opened on the board ("View"): only its cards show. */
+  const [pile, setPile] = useState<{ title: string; ids: Set<number> } | null>(null);
+  /** What the cleanup screen keeps while the workspace is open: piles set aside and what can be undone. */
+  const [cleanupSession, setCleanupSession] = useState<CleanupSession>(NEW_SESSION);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<SortKey>(() => loadPref("sort", SORTS.map((s) => s.key), "new"));
   // Default is the even grid (all cards the same size); a new pref key so earlier saved "masonry" doesn't stick.
@@ -208,13 +219,14 @@ export function Workspace(props: {
     return { topics: [...m.entries()].sort((a, b) => b[1] - a[1] || compareText(a[0], b[0])), noTopic: none };
   }, [base, rev]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Searching from the overview searches everything, shown as a board.
+  // Searching from the overview or the cleanup screen searches everything, shown as a board.
   const home = scope.kind === "home" && !query.trim();
-  const shown: Scope = scope.kind === "home" && !home ? { kind: "list", key: "all" } : scope;
+  const cleanup = scope.kind === "cleanup" && !query.trim();
+  const shown: Scope = (scope.kind === "home" || scope.kind === "cleanup") && !home && !cleanup ? { kind: "list", key: "all" } : scope;
   const isDupes = shown.kind === "list" && shown.key === "duplicates";
   // A new section, filter, sort or view gives a fresh board whose cards rise in again. Typing a
   // search keeps the set, so cards already on screen don't replay the entrance on every letter.
-  const boardKey = `${JSON.stringify(shown)}|${sub}|${type}|${tag}|${source}|${sort}|${view}`;
+  const boardKey = `${JSON.stringify(shown)}|${sub}|${type}|${tag}|${source}|${pile?.title}|${sort}|${view}`;
   const seenRef = useRef({ key: boardKey, ids: new Set<number>() });
   if (seenRef.current.key !== boardKey) seenRef.current = { key: boardKey, ids: new Set<number>() };
   const seen = seenRef.current.ids;
@@ -280,7 +292,15 @@ export function Workspace(props: {
   }
   const tidyCount = useMemo(() => suggestMerges(names.topics).length + suggestMerges(names.tags).length, [names]);
 
-  const inScope = useMemo(() => base.filter((c) => matchesScope(c, shown, dupes)), [base, JSON.stringify(shown), dupes]); // eslint-disable-line react-hooks/exhaustive-deps
+  // What the archive is made of (lib/cleanup.ts): the cleanup screen's piles and the number left in the sidebar.
+  const piles = useMemo(() => breakdown(lib.cards), [lib, rev]); // eslint-disable-line react-hooks/exhaustive-deps
+  const cleanupLeft = useMemo(() => piles.piles.reduce((n, p) => n + p.cards.length, 0), [piles]);
+  useEffect(() => {
+    // After a load from Telegram this comes when everything is in: someone already busy on the board stays there.
+    if (props.firstCleanup && scope.kind === "home" && !query.trim() && openId == null) pickScope({ kind: "cleanup" });
+  }, [props.firstCleanup]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const inScope = useMemo(() => base.filter((c) => matchesScope(c, shown, dupes) && (!pile || pile.ids.has(c.id))), [base, JSON.stringify(shown), dupes, pile]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const typeCounts = useMemo(() => Object.fromEntries(TYPES.map((t) => [t.key, inScope.filter((c) => matchesType(c, t.key)).length])) as Record<TypeKey, number>, [inScope]);
 
@@ -359,11 +379,20 @@ export function Workspace(props: {
   function pickScope(s: Scope) {
     setDrawer(false);
     setScope(s);
+    // The cleanup screen has keys of its own (Ctrl+Z); a card left open would answer them too.
+    if (s.kind === "cleanup") setOpenId(null);
     setTag(null);
     setSource(null);
+    setPile(null);
     setSub(null);
     setGroupError(null);
     setSelected(new Set());
+  }
+
+  /** "View" on the cleanup screen: the pile's cards on the board, where each can be decided on its own. */
+  function viewPile(p: Pile) {
+    pickScope({ kind: "list", key: p.kind === "junk" ? "junk" : "all" });
+    setPile({ title: pileTitle(p), ids: new Set(p.cards.map((c) => c.id)) });
   }
 
   function toggleSelect(c: Card, range: boolean) {
@@ -382,7 +411,7 @@ export function Workspace(props: {
 
   /** Shows every card from the channel the clicked card came from; from the overview, across all cards. */
   function pickSource(name: string) {
-    if (scope.kind === "home") setScope({ kind: "list", key: "all" });
+    if (scope.kind === "home" || scope.kind === "cleanup") setScope({ kind: "list", key: "all" });
     setSub(null);
     setSelected(new Set());
     setSource(name);
@@ -483,8 +512,8 @@ export function Workspace(props: {
     return () => window.removeEventListener("keydown", onKey);
   }, [openId, openIdx, openCard, visible, selected, drawer, todayOpen, tidy, rev]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const heading = scopeTitle(home ? scope : shown);
-  const subtitle = [sub, type && TYPES.find((t) => t.key === type)?.label, source, tag && `#${tag}`].filter(Boolean).join(" · ");
+  const heading = scopeTitle(home || cleanup ? scope : shown);
+  const subtitle = [pile?.title, sub, type && TYPES.find((t) => t.key === type)?.label, source, tag && `#${tag}`].filter(Boolean).join(" · ");
 
   return (
     <div className={`workspace${showSide ? "" : " side-closed"}${openCard && openMode === "side" && !narrow ? " with-detail" : ""}${narrow ? " narrow" : ""}`}>
@@ -497,6 +526,7 @@ export function Workspace(props: {
           scope={scope}
           tag={tag}
           listCounts={listCounts}
+          cleanupLeft={cleanupLeft}
           topics={topics}
           noTopic={noTopic}
           tags={tags}
@@ -525,7 +555,7 @@ export function Workspace(props: {
             <div className="heading" title={heading}>
               <h1>{heading}</h1>
               <span className="count">
-                {formatNumber(visible.length)}
+                {formatNumber(cleanup ? cleanupLeft : visible.length)}
                 {subtitle && <> · {subtitle}</>}
               </span>
             </div>
@@ -601,6 +631,19 @@ export function Workspace(props: {
             onSource={pickSource}
             onOpenLink={(u) => void platform.openUrl(u)}
           />
+        ) : cleanup ? (
+          <Cleanup
+            lib={lib}
+            breakdown={piles}
+            topics={topicNames}
+            session={cleanupSession}
+            onSession={setCleanupSession}
+            onEdit={onEdit}
+            onView={viewPile}
+            onSensitive={() => pickScope({ kind: "list", key: "sensitive" })}
+            onBoard={() => pickScope({ kind: "list", key: "all" })}
+            onApplyTelegram={props.onApplyTelegram}
+          />
         ) : (
         <>
         <div className="subbar">
@@ -632,6 +675,16 @@ export function Workspace(props: {
             </div>
           ) : (
             <div className="quick" ref={quickRef} onScroll={(e) => markEdges(e.currentTarget)}>
+              {pile && (
+                <>
+                  <button className="pill" onClick={() => pickScope({ kind: "cleanup" })}>
+                    <Icon name="left" size={13} /> {T.cleanup.backToCleanup}
+                  </button>
+                  <button className="pill active" onClick={() => setPile(null)} title={T.cleanup.showAll}>
+                    {pile.title} <Icon name="close" size={12} />
+                  </button>
+                </>
+              )}
               {TYPES.map((t) =>
                 typeCounts[t.key] ? (
                   <button key={t.key} className={`pill${type === t.key ? " active" : ""}`} onClick={() => setType(type === t.key ? null : t.key)}>
