@@ -28,9 +28,10 @@ CI (`.github/workflows/build.yml`) runs tests and both builds on every PR. Deskt
 
 1. Merge what goes in; main's CI is green.
 2. In `scripts/changelog.mjs`, turn the `"next"` entry into the new version (`ver: "0.1.N"`, `date: "YYYY-MM-DD"`), one user-facing line per change in `en` and `ru`. Merge that before the release: its `en` lines become the GitHub release notes and the landing's "What's new".
-3. Actions → release → Run workflow with `version` = `0.1.N` (empty means `0.1.<run number>`).
-4. The site updates itself. The landing page lives in the private repo `khainpain/kipple-site` (its own Vercel project); it reads `scripts/changelog.mjs` from `main` and highlights the newest released entry. Every version number on the landing (the pill, `v{ver}` under the download button, structured data) comes from one source: the latest GitHub release, read when the site is built. Nothing to edit by hand. The release workflow rebuilds the site at the end through the `VERCEL_DEPLOY_HOOK` secret. Without it, redeploy the site project on Vercel once the release is out, or the site keeps showing the previous version.
-5. Check the landing: the pill shows the new version and the new entry is highlighted.
+3. Update the help page in `khainpain/kipple-site` (`docs` in `copy.mjs`, both languages): add what is new or changed for users, fix renamed menus, keys and Settings paths, and drop `soon: true` from sections whose feature ships in this version. Leave out features hidden behind `src/lib/features.ts`. Merge that before the release too, so the site rebuild in step 5 picks it up.
+4. Actions → release → Run workflow with `version` = `0.1.N` (empty means `0.1.<run number>`).
+5. The site updates itself. The landing page lives in the private repo `khainpain/kipple-site` (its own Vercel project); it reads `scripts/changelog.mjs` from `main` and highlights the newest released entry. Every version number on the landing (the pill, `v{ver}` under the download button, structured data) comes from one source: the latest GitHub release, read when the site is built. Nothing to edit by hand. The release workflow rebuilds the site (landing and /docs/) at the end through the `VERCEL_DEPLOY_HOOK` secret. Without it, redeploy the site project on Vercel once the release is out, or the site keeps showing the previous version.
+6. Check the landing: the pill shows the new version and the new entry is highlighted, and getkipple.io/docs/ describes this version.
 
 ## Rules that are easy to break
 
