@@ -58,8 +58,9 @@ function features(c: Card): Map<string, number> {
   if (hit?.src === src) return hit.f;
   const out = new Map<string, number>();
   const add = (f: string, w = 1) => out.set(f, (out.get(f) ?? 0) + w);
-  for (const w of text.match(WORD) ?? []) {
-    if (w.length < 3 || /^\d+$/.test(w) || STOP.has(w.toLowerCase())) continue;
+  for (const raw of text.match(WORD) ?? []) {
+    const w = raw.toLowerCase();
+    if (w.length < 3 || /^\d+$/.test(w) || STOP.has(w)) continue;
     let s = stems.get(w);
     if (s === undefined) stems.set(w, (s = stem(w)));
     add(s);
