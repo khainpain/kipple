@@ -204,9 +204,9 @@ Agent 1 MUST complete first. Its output is input for all other agents.
 
 ## Integration with Other Skills
 
-- Run AFTER `/superpowers:systematic-debugging` (which finds the other 54 bug types)
-- Run BEFORE `/superpowers:verification-before-completion` (which verifies fixes work)
-- Feeds into `/superpowers:test-driven-development` — every bug found here should get a test
+- Run AFTER `/systematic-debugging` (which finds the other 54 bug types)
+- Run BEFORE `/verification-before-completion` (which verifies fixes work)
+- Feeds into `/test-driven-development` — every bug found here should get a test
 
 ---
 

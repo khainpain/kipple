@@ -3,10 +3,47 @@ import { platform } from "@platform";
 
 const fetch = platform.httpFetch;
 import type { Card, LinkMeta } from "./types";
+import type { PreviewResponse } from "../platform/types";
+import { publicAssetUrl } from "./assetUrl";
 import { instagramCode, wantsImage, youtubeId, youtubeThumb } from "./embeds";
 
 const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|0\.|\[?::1\]?$|.*\.local$)/i;
 const MAX_HTML = 600_000;
+
+/** The link (or a redirect) leads into the user's own network: never fetched. */
+export class PrivateHostError extends Error {
+  constructor(host: string) {
+    super(`private address: ${host}`);
+  }
+}
+
+type FetchInit = Parameters<typeof fetch>[1];
+
+/** previewFetch's answer as a Response; statuses that can't carry a body get none. */
+export function previewResponse(r: PreviewResponse): Response {
+  const bin = atob(r.body);
+  const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  const status = r.status >= 200 && r.status <= 599 ? r.status : 502;
+  const empty = status === 204 || status === 205 || status === 304;
+  return new Response(empty ? null : bytes, { status, headers: { "content-type": r.contentType, "x-final-url": r.url } });
+}
+
+/**
+ * Desktop: Rust's preview_fetch, which talks to sites directly and refuses every address (the
+ * first, each redirect, and the one it actually connects to) inside the user's network.
+ * Browser: /api/fetch already refuses private addresses, redirects included.
+ */
+async function get(url: string, init: FetchInit): Promise<{ res: Response; url: string }> {
+  if (platform.previewFetch) {
+    const accept = new Headers(init?.headers).get("accept") ?? undefined;
+    const r = await platform.previewFetch(url, accept).catch((e: unknown) => {
+      throw String(e).includes("PRIVATE_HOST") ? new PrivateHostError(new URL(url).hostname) : e;
+    });
+    return { res: previewResponse(r), url: r.url };
+  }
+  const res = await fetch(url, init);
+  return { res, url: finalUrl(res, url) };
+}
 
 function meta(doc: Document, ...names: string[]): string | undefined {
   for (const n of names) {
@@ -60,9 +97,9 @@ export function parseHtml(html: string, url: string): Omit<LinkMeta, "fetchedAt"
     url,
     title: meta(doc, "og:title", "twitter:title") ?? doc.title?.trim() ?? undefined,
     description: meta(doc, "og:description", "twitter:description", "description"),
-    image: absolute(image, url),
+    image: publicAssetUrl(absolute(image, url)),
     siteName: meta(doc, "og:site_name"),
-    favicon: absolute(icon, url),
+    favicon: publicAssetUrl(absolute(icon, url)),
     excerpt: excerpt || undefined,
   };
 }
@@ -89,7 +126,7 @@ async function youtube(url: string, id: string): Promise<Omit<LinkMeta, "fetched
  */
 async function inlineImage(src: string): Promise<string | undefined> {
   try {
-    const res = await fetch(src, { connectTimeout: 8000, headers: { "User-Agent": UA } });
+    const { res } = await get(src, { connectTimeout: 8000, headers: { "User-Agent": UA } });
     if (!res.ok || !(res.headers.get("content-type") ?? "").startsWith("image/")) return undefined;
     const bmp = await createImageBitmap(await res.blob());
     const scale = Math.min(1, 480 / bmp.width);
@@ -105,9 +142,9 @@ async function inlineImage(src: string): Promise<string | undefined> {
 }
 
 async function getHtml(url: string): Promise<{ html: string; url: string } | null> {
-  const res = await fetch(url, { connectTimeout: 8000, headers: { "User-Agent": UA, Accept: "text/html,*/*;q=0.5" } });
+  const { res, url: at } = await get(url, { connectTimeout: 8000, headers: { "User-Agent": UA, Accept: "text/html,*/*;q=0.5" } });
   if (!res.ok || !(res.headers.get("content-type") ?? "").includes("html")) return null;
-  return { html: (await res.text()).slice(0, MAX_HTML), url: finalUrl(res, url) };
+  return { html: (await res.text()).slice(0, MAX_HTML), url: at };
 }
 
 /** Post page first; if Instagram hides it behind a login, the public embed page still has the picture and caption. */
@@ -142,7 +179,7 @@ async function fetchMeta(url: string): Promise<Omit<LinkMeta, "fetchedAt">> {
     if (yt) return await youtube(url, yt);
     const ig = instagramCode(url);
     if (ig) return await instagram(url, ig);
-    const res = await fetch(url, {
+    const { res, url: at } = await get(url, {
       connectTimeout: 8000,
       headers: { "User-Agent": UA, Accept: "text/html,*/*;q=0.5" },
     });
@@ -150,8 +187,9 @@ async function fetchMeta(url: string): Promise<Omit<LinkMeta, "fetchedAt">> {
     if (!res.ok) return { url, error: `HTTP ${res.status}` };
     if (!type.includes("html")) return { url, title: decodeURIComponent(u.pathname.split("/").pop() || u.hostname), siteName: u.hostname };
     const html = (await res.text()).slice(0, MAX_HTML);
-    return parseHtml(html, finalUrl(res, url));
+    return parseHtml(html, at);
   } catch (e) {
+    if (e instanceof PrivateHostError) return { url, error: "private" }; // tried again later: networks change
     return { url, error: String(e).slice(0, 200) };
   }
 }
@@ -166,6 +204,8 @@ export function needsPreview(c: Card): boolean {
   if (c.kind !== "link" || !c.urls[0] || c.removed) return false;
   if (!c.link) return true;
   if (c.link.image || c.link.error === "skipped") return false;
+  // Passing problems (a home-network address, too many requests, a server error): again after a day.
+  if (c.link.error === "private" || /^HTTP (429|5\d\d)$/.test(c.link.error ?? "")) return Date.now() - Date.parse(c.link.fetchedAt || "0") > DAY;
   if ((c.link.v ?? 1) < PARSE_VERSION) return true;
   if (!wantsImage(c.urls[0])) return false;
   return Date.now() - Date.parse(c.link.fetchedAt || "0") > DAY;

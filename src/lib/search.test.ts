@@ -26,4 +26,9 @@ describe("search", () => {
     const word = T.actions.read_later.split(" ")[0];
     expect(ix.search(`ai ${word}`).map((h) => h.id)).toEqual([1]);
   });
+  it("treats ё and е as the same letter", () => {
+    const ix = buildIndex([{ ...card(1, []), text: "Купить ёлку" }, { ...card(2, []), text: "Её документы" }, card(3, [])]);
+    expect(ix.search("елка").map((h) => h.id)).toEqual([1]);
+    expect(ix.search("ее").map((h) => h.id)).toEqual([2]);
+  });
 });

@@ -4,7 +4,10 @@ import { T, locale } from "../i18n";
 import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic } from "./library";
 
 function csvCell(v: string): string {
-  return /[",\n;]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  // A cell starting with = + - @ is run as a formula by Excel; a leading ' keeps it text.
+  // A "- " list item can't be a formula, so it stays as it is.
+  if (/^([=+@\t\r]|-(?!\s))/.test(v)) v = "'" + v;
+  return /[",\n\r;]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
 }
 
 export function toCsv(cards: Card[]): string {
@@ -29,10 +32,18 @@ export function toCsv(cards: Card[]): string {
   return "﻿" + [head.join(","), ...rows].join("\r\n");
 }
 
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname || url;
+  } catch {
+    return url;
+  }
+}
+
 export function toMarkdown(cards: Card[], title = T.importer.savedMessages): string {
   const byTopic = new Map<string, Card[]>();
   for (const c of cards) {
-    const t = effectiveTopic(c) ?? T.exporter.noTopic;
+    const t = effectiveTopic(c) || T.exporter.noTopic;
     byTopic.set(t, [...(byTopic.get(t) ?? []), c]);
   }
   const parts = [`# ${title}`, "", T.exporter.exported(new Date().toLocaleString(locale()), cards.length), ""];
@@ -40,7 +51,7 @@ export function toMarkdown(cards: Card[], title = T.importer.savedMessages): str
     parts.push(`## ${topic}`, "");
     for (const c of list) {
       const head = effectiveTitle(c) || c.text.split("\n")[0].slice(0, 80) || c.kind;
-      const link = c.urls[0] ? ` — [${new URL(c.urls[0]).hostname}](${c.urls[0]})` : "";
+      const link = c.urls[0] ? ` — [${hostOf(c.urls[0])}](${c.urls[0]})` : "";
       const tags = effectiveTags(c).map((t) => `#${t.replace(/\s+/g, "_")}`).join(" ");
       parts.push(`- **${head}**${link} _(${c.date.slice(0, 10)})_`);
       if (c.ai?.summary) parts.push(`  ${c.ai.summary}`);

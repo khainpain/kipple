@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { allowedRequest, unitsOf } from "./quota.js";
+import { allowedRequest, ipBucket, unitsOf } from "./quota.js";
 import { POST } from "../claude/v1/messages.js";
 import { groupsFormat, groupsSystemPrompt, imageSystemPrompt, outputFormat, synonymsFormat, synonymsSystemPrompt, systemPrompt } from "../../src/lib/prompts.js";
 
@@ -26,6 +26,26 @@ describe("allowedRequest", () => {
       expect(allowedRequest({ ...ok, system: synonymsSystemPrompt(kind), output_config: { effort: "low", format: JSON.parse(JSON.stringify(synonymsFormat())) } })).toBeNull();
     }
   });
+  it("refuses a max_tokens that would make the reservation negative", () => {
+    for (const max_tokens of [-1e14, 0, 1.5, "100"]) expect(allowedRequest({ ...ok, max_tokens })).toMatch(/max_tokens/);
+  });
+  it("refuses fields the app never sends", () => {
+    expect(allowedRequest({ ...ok, thinking: { type: "enabled", budget_tokens: 15000 } })).toMatch(/own/);
+    expect(allowedRequest({ ...ok, temperature: 1 })).toMatch(/own/);
+    expect(allowedRequest({ ...ok, output_config: { effort: "max", format: FORMAT } })).toMatch(/own/);
+    const doc = { type: "document", source: { type: "url", url: "https://example.com/big.pdf" } };
+    expect(allowedRequest({ ...ok, messages: [{ role: "user", content: [doc] }] })).toMatch(/own/);
+    const img = { type: "image", source: { type: "url", url: "https://example.com/a.png" } };
+    expect(allowedRequest({ ...ok, messages: [{ role: "user", content: [img] }] })).toMatch(/own/);
+    const inline = { type: "image", source: { type: "base64", media_type: "image/jpeg", data: "AAAA" } };
+    expect(allowedRequest({ ...ok, messages: [{ role: "user", content: [inline, { type: "text", text: "ids" }] }] })).toBeNull();
+  });
+  it("counts IPv6 clients by their /64", () => {
+    expect(ipBucket("203.0.113.5")).toBe("203.0.113.5");
+    expect(ipBucket("2001:db8:1:2:aaaa::1")).toBe(ipBucket("2001:0db8:0001:0002:ffff:1:2:3"));
+    expect(ipBucket("2001:db8::1")).toBe("2001:db8:0:0::/64");
+    expect(ipBucket("::ffff:203.0.113.5")).toBe("203.0.113.5");
+  });
   it("refuses a prompt sent with another prompt's answer format", () => {
     expect(allowedRequest({ ...ok, system: groupsSystemPrompt("ru") })).toMatch(/own/);
   });
@@ -38,8 +58,8 @@ describe("allowedRequest", () => {
 });
 
 it("weighs output and bigger models more", () => {
-  expect(unitsOf("claude-haiku-5-5", { input_tokens: 1000, output_tokens: 100 })).toBe(1500);
-  expect(unitsOf("claude-opus-5-5", { input_tokens: 1000, output_tokens: 100 })).toBe(7500);
+  expect(unitsOf("claude-haiku-5-5", { input_tokens: 1000, output_tokens: 100 })).toBe(150);
+  expect(unitsOf("claude-opus-5-5", { input_tokens: 1000, output_tokens: 100 })).toBe(6000);
 });
 
 describe("proxy", () => {
@@ -50,7 +70,7 @@ describe("proxy", () => {
 
   it("forwards an SDK request with the server key and stops at the daily allowance", async () => {
     vi.stubEnv("ANTHROPIC_API_KEY", "server-key");
-    vi.stubEnv("KIPPLE_INSTALL_DAILY_UNITS", "2000");
+    vi.stubEnv("KIPPLE_INSTALL_DAILY_UNITS", "200");
     const upstream = vi.fn(async (_url: string, init: RequestInit) => {
       expect((init.headers as Record<string, string>)["x-api-key"]).toBe("server-key");
       return new Response(
@@ -70,7 +90,7 @@ describe("proxy", () => {
       }) as unknown as typeof fetch,
     });
     const send = () => client.messages.create({ model: "claude-haiku-5-5", max_tokens: 1000, system: SYSTEM, output_config: { format: outputFormat() }, messages: [{ role: "user", content: "hi" }] });
-    await send(); // 2500 units: over the 2000 allowance after this one
+    await send(); // 250 units: over the 200 allowance after this one
     expect(upstream).toHaveBeenCalledTimes(1);
     const err = await send().catch((e) => e);
     expect(err).toBeInstanceOf(Anthropic.RateLimitError);
@@ -88,7 +108,7 @@ describe("proxy", () => {
 
   it("counts requests sent at the same time before they finish", async () => {
     vi.stubEnv("ANTHROPIC_API_KEY", "server-key");
-    vi.stubEnv("KIPPLE_INSTALL_DAILY_UNITS", "50000"); // less than one request's reservation
+    vi.stubEnv("KIPPLE_INSTALL_DAILY_UNITS", "5000"); // less than one request's reservation
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
     const upstream = vi.fn(async () => (await gate, answer()));

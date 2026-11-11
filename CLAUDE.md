@@ -50,5 +50,6 @@ Project agents live in `.claude/agents/`, skills in `.claude/skills/` (most adap
 - Design and decisions: `architect`, skills `architecture-decision-records` (`docs/adr/`) and `council`.
 - Writing any feature or fix: skill `reuse-first` (from Ponytail).
 - Before a PR: skill `verification-loop`; for UI text: `i18n-sync`.
+- From Superpowers (obra/superpowers): `systematic-debugging` for any bug or failing test (root cause before a fix), `test-driven-development` (failing test first), `verification-before-completion` (run the checks before saying "done"), `requesting-code-review` before merge, `receiving-code-review` when acting on review comments, `dispatching-parallel-agents` for independent checks.
 - UI/UX: skills `make-interfaces-feel-better`, `design-system`, `click-path-audit`, `motion-foundations`, `frontend-a11y`, `ui-demo` (demo videos).
 - Public repo hygiene: `opensource-sanitizer` before releases, `opensource-packager` for contributor docs.

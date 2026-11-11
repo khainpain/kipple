@@ -60,6 +60,7 @@ const PATHS: Record<string, string> = {
   pencil: "M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4",
   copy: "M8 8h12v12H8zM4 16V4h12",
   monitor: "M3 4h18v12H3zM8 20h8M12 16v4",
+  broom: "M20 4l-7.5 7.5M10 9l5 5-3.5 3.5c-2 2-5 2.5-7.5 2.5 0-2.5.5-5.5 2.5-7.5z",
 };
 
 export type IconName = keyof typeof PATHS;

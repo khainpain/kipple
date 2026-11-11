@@ -7,6 +7,9 @@ import { effectiveTopic, getOwnTopics, tagName } from "./library";
 import { ItemSchema, groupsFormat, groupsSystemPrompt, imageSystemPrompt, outputFormat, synonymsFormat, synonymsSystemPrompt, systemPrompt, type AiLang } from "./prompts";
 import { T, lang as uiLang } from "../i18n";
 
+// No eval probe: the web build's CSP doesn't allow eval, and zod works the same without it.
+z.config({ jitless: true });
+
 export type { AiLang } from "./prompts";
 
 /** Models the user can pick in Settings. Haiku is the default: cheapest and good enough for tagging. */
@@ -157,7 +160,7 @@ async function classifyBatch(client: Anthropic, model: AiModel, batch: Card[], v
     model,
     max_tokens: 16000,
     system: systemPrompt(lang),
-    output_config: { effort: "low", format: outputFormat() },
+    output_config: { effort: "low", format: itemsFormat() },
     messages: [
       {
         role: "user",
@@ -172,6 +175,21 @@ async function classifyBatch(client: Anthropic, model: AiModel, batch: Card[], v
 const vocabText = (v: Vocabulary) =>
   (v.own.length ? `The person's own topics, made by hand: ${v.own.join(", ")}. When an item fits one of them, use it as the topic, exactly as written.\n` : "") +
   `Topic vocabulary: ${v.topics.join(", ") || "(empty so far)"}\nTag vocabulary: ${v.tags.join(", ") || "(empty so far)"}`;
+
+// Read answers item by item: one item out of range (priority 4, an unknown action) costs that card
+// only, not the whole batch of 40. The schema sent stays exactly the one in prompts.ts (the parse
+// function isn't part of the request), so the built-in key still accepts it.
+const LooseItem = ItemSchema.extend({ priority: z.number() });
+export function parseItems(content: string): { items: Array<z.infer<typeof ItemSchema>> } {
+  const raw = (JSON.parse(content) as { items?: unknown })?.items;
+  const items: Array<z.infer<typeof ItemSchema>> = [];
+  for (const it of Array.isArray(raw) ? raw : []) {
+    const r = LooseItem.safeParse(it);
+    if (r.success) items.push({ ...r.data, priority: Math.min(3, Math.max(1, Math.round(r.data.priority))) });
+  }
+  return { items };
+}
+export const itemsFormat = () => ({ ...outputFormat(), parse: parseItems });
 
 function toFields(it: z.infer<typeof ItemSchema>, at: string, lang: AiLang, model: AiModel): AiFields {
   return {
@@ -293,7 +311,7 @@ async function nameImageBatch(client: Anthropic, model: AiModel, batch: Array<{ 
     model,
     max_tokens: 4000,
     system: imageSystemPrompt(lang, uiLang()),
-    output_config: { effort: "low", format: outputFormat() },
+    output_config: { effort: "low", format: itemsFormat() },
     messages: [{ role: "user", content }],
   });
   if (res.stop_reason === "refusal") throw new Error(T.ai.refusedImages);
@@ -312,6 +330,8 @@ export async function nameImages(
   signal?: AbortSignal,
 ): Promise<AiProgress> {
   const client = makeClient(auth);
+  // Sensitive photos never leave the device, whichever button asked for them.
+  todo = todo.filter((c) => !c.sensitive);
   const progress: AiProgress = { done: 0, total: todo.length, failed: 0 };
   for (let i = 0; i < todo.length && !signal?.aborted; i += IMAGE_BATCH) {
     const slice = todo.slice(i, i + IMAGE_BATCH);
@@ -390,6 +410,8 @@ export const GROUP_LIMIT = 400;
  * not the messages themselves. Each card ends up in at most one group.
  */
 export async function groupCards(auth: AiAuth, model: AiModel, lang: AiLang, topic: string, cards: Card[], title: (c: Card) => string, tags: (c: Card) => string[]): Promise<Array<{ name: string; ids: number[] }>> {
+  // Sensitive cards never leave the device, even as a title.
+  cards = cards.filter((c) => !c.sensitive);
   const items = cards.slice(0, GROUP_LIMIT).map((c) => JSON.stringify({ id: c.id, title: title(c).slice(0, 100), summary: c.ai?.summary?.slice(0, 200), tags: tags(c).slice(0, 6) }));
   if (items.length < 4) return [];
   const client = makeClient(auth);

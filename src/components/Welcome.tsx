@@ -425,7 +425,16 @@ function SignInCard(props: { tg: TelegramApi; active: boolean; onSettings: () =>
               ) : (
                 <button onClick={props.onExport}>{L.toExport}</button>
               )}
-              <button className="link-btn w-small-link" onClick={() => void run(async () => (await tg.logout(), switchMode("qr")))}>
+              <button className="link-btn w-small-link" onClick={() =>
+                  void run(async () => {
+                    // Signed out here even if Telegram didn't answer; the error (if any) still shows.
+                    try {
+                      await tg.logout();
+                    } finally {
+                      switchMode("qr");
+                    }
+                  })
+                }>
                 {L.signOut}
               </button>
             </div>

@@ -712,6 +712,13 @@
   }
 }
 
+/* Phones: the 420px collage would push the page sideways. */
+@media (max-width: 480px) {
+  .w-collage {
+    display: none;
+  }
+}
+
 /* Anonymous statistics notice under the "stays on your computer" badge. */
 .w-stats {
   margin: 6px 0 0;

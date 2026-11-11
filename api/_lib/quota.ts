@@ -1,9 +1,9 @@
 // What the built-in key may be used for, and how much. Folders starting with "_" under api/
 // are not functions themselves; Vercel bundles this into the functions that import it.
 //
-// Usage is counted in "units": roughly a millionth of a dollar at Haiku prices
-// (input token = 1, output token = 5, cache read = 0.1), times the model's weight.
-// So 1,000,000 units ≈ $1, and the limits below read as dollars per day.
+// Usage is counted in "units": millionths of a dollar at the models' list prices (PRICES),
+// with cache writes at 1.25× and cache reads at 0.1× the input price.
+// So 1,000,000 units = $1, and the limits below read as dollars per day.
 //
 // Counters live in Upstash Redis (Vercel → Storage → Upstash, which sets KV_REST_API_URL and
 // KV_REST_API_TOKEN, or UPSTASH_REDIS_REST_URL/_TOKEN). Without it they are kept in the
@@ -20,7 +20,7 @@ const num = (name: string, fallback: number) => {
 };
 
 export const LIMITS = {
-  /** One install per UTC day. Tagging 10,000 messages with Haiku is about 1.5–2.5M. */
+  /** One install per UTC day. Tagging 10,000 messages with Haiku is about 0.15–0.25M. */
   install: () => num("KIPPLE_INSTALL_DAILY_UNITS", 3_000_000),
   /** One IP address per UTC day, so making up new install ids doesn't help much. */
   ip: () => num("KIPPLE_IP_DAILY_UNITS", 6_000_000),
@@ -30,11 +30,11 @@ export const LIMITS = {
   ipPerMinute: () => num("KIPPLE_IP_REQUESTS_PER_MINUTE", 40),
 };
 
-/** The models of the Settings picker (src/lib/ai.ts AI_MODELS), with their price relative to Haiku. */
-export const MODEL_WEIGHT: Record<string, number> = {
-  "claude-haiku-5-5": 1,
-  "claude-sonnet-5-5": 3,
-  "claude-opus-5-5": 5,
+/** The models of the Settings picker (src/lib/ai.ts AI_MODELS) with their list prices, US dollars per million tokens. */
+export const PRICES: Record<string, { in: number; out: number }> = {
+  "claude-haiku-5-5": { in: 0.1, out: 0.5 },
+  "claude-sonnet-5-5": { in: 2, out: 10 },
+  "claude-opus-5-5": { in: 4, out: 20 },
 };
 
 const MAX_TOKENS = 16_000;
@@ -45,18 +45,33 @@ const MAX_TOKENS = 16_000;
 let expected: Map<string, string> | null = null;
 const app = () => (expected ??= new Map(appRequests().map((r) => [r.system, JSON.stringify(r.format)])));
 
+const TOP_LEVEL = new Set(["model", "max_tokens", "system", "messages", "output_config"]);
+
+/** Text, or text and inline (base64) pictures: no URL sources the server never sees, no documents. */
+function appContent(content: unknown): boolean {
+  if (typeof content === "string") return true;
+  if (!Array.isArray(content)) return false;
+  return content.every((b: { type?: unknown; source?: { type?: unknown } }) => b?.type === "text" || (b?.type === "image" && b.source?.type === "base64"));
+}
+
 /** Why the request isn't one the app would send, or null if it is. */
 export function allowedRequest(body: Record<string, unknown>): string | null {
-  if (typeof body.model !== "string" || !(body.model in MODEL_WEIGHT)) return "This model is not available with the built-in key.";
-  if (typeof body.max_tokens !== "number" || body.max_tokens > MAX_TOKENS) return "max_tokens is too large.";
+  if (typeof body.model !== "string" || !(body.model in PRICES)) return "This model is not available with the built-in key.";
+  // A negative or fractional max_tokens would make the reservation negative and lift the limits for everyone.
+  if (!Number.isInteger(body.max_tokens) || (body.max_tokens as number) < 1 || (body.max_tokens as number) > MAX_TOKENS) return "max_tokens is out of range.";
   if (body.stream) return "Streaming is not supported.";
   for (const k of ["tools", "tool_choice", "mcp_servers", "container"]) if (k in body) return `${k} is not supported.`;
   const own = "Only the app's own requests are accepted.";
+  // Only the fields the app sends: no thinking, temperature, service tier and the like.
+  if (Object.keys(body).some((k) => !TOP_LEVEL.has(k))) return own;
   const format = typeof body.system === "string" ? app().get(body.system) : undefined;
   if (format === undefined) return own;
-  const oc = body.output_config as { format?: unknown } | undefined;
+  const oc = body.output_config as { format?: unknown; effort?: unknown } | undefined;
   if (!oc || typeof oc !== "object" || JSON.stringify(oc.format) !== format) return own;
-  if (!Array.isArray(body.messages) || body.messages.length !== 1 || (body.messages[0] as { role?: unknown })?.role !== "user") return own;
+  if (Object.keys(oc).some((k) => k !== "format" && k !== "effort") || (oc.effort !== undefined && oc.effort !== "low")) return own;
+  if (!Array.isArray(body.messages) || body.messages.length !== 1) return own;
+  const msg = body.messages[0] as { role?: unknown; content?: unknown };
+  if (msg?.role !== "user" || !appContent(msg.content)) return own;
   return null;
 }
 
@@ -68,8 +83,9 @@ export interface Usage {
 }
 
 export function unitsOf(model: string, u: Usage): number {
-  const base = (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) * 1.25 + (u.cache_read_input_tokens ?? 0) * 0.1 + (u.output_tokens ?? 0) * 5;
-  return Math.ceil(base * (MODEL_WEIGHT[model] ?? 5));
+  const p = PRICES[model] ?? PRICES["claude-opus-5-5"];
+  const input = (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) * 1.25 + (u.cache_read_input_tokens ?? 0) * 0.1;
+  return Math.ceil(input * p.in + (u.output_tokens ?? 0) * p.out);
 }
 
 export function clientIp(request: Request): string {
@@ -122,9 +138,22 @@ export async function redis(cmds: Cmd[]): Promise<(number | null)[]> {
   });
 }
 
-const day = () => new Date().toISOString().slice(0, 10);
-const keys = (install: string, ip: string) => {
-  const d = day();
+export const day = () => new Date().toISOString().slice(0, 10);
+
+/** IPv6 clients get a whole /64 (often more), so they're counted by that prefix, not by address. */
+export function ipBucket(ip: string): string {
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(ip);
+  if (mapped) return mapped[1];
+  if (!ip.includes(":")) return ip;
+  const [head, tail = ""] = ip.toLowerCase().split("%")[0].split("::");
+  const left = head ? head.split(":") : [];
+  const right = ip.includes("::") && tail ? tail.split(":") : [];
+  const groups = ip.includes("::") ? [...left, ...Array(Math.max(0, 8 - left.length - right.length)).fill("0"), ...right] : left;
+  return groups.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, "")).join(":") + "::/64";
+}
+
+const keys = (install: string, rawIp: string, d = day()) => {
+  const ip = ipBucket(rawIp);
   return { install: `kq:i:${d}:${install}`, ip: `kq:a:${d}:${ip}`, global: `kq:g:${d}`, minute: `kq:m:${Math.floor(Date.now() / 60_000)}:${ip}` };
 };
 
@@ -136,8 +165,9 @@ export type Verdict = "install" | "ip" | "global" | "minute";
  * limit. Throws when the counters can't be reached: the caller then refuses the request, so an
  * outage of the counter store doesn't lift the limits.
  */
-export async function checkQuota(install: string, ip: string, reserve: number): Promise<Verdict | null> {
-  const k = keys(install, ip);
+export async function checkQuota(install: string, ip: string, reserve: number, d = day()): Promise<Verdict | null> {
+  reserve = Math.max(0, reserve);
+  const k = keys(install, ip, d);
   const ttl = 172_800;
   const [i, , a, , g, , m] = await redis([
     ["INCRBY", k.install, reserve], ["EXPIRE", k.install, ttl],
@@ -152,16 +182,17 @@ export async function checkQuota(install: string, ip: string, reserve: number): 
     : before(a) >= LIMITS.ip() ? "ip"
     : (m ?? 0) > LIMITS.ipPerMinute() ? "minute"
     : null;
-  if (verdict) await settleUsage(install, ip, reserve, 0).catch((e) => console.error("quota refund failed", e));
+  if (verdict) await settleUsage(install, ip, reserve, 0, d).catch((e) => console.error("quota refund failed", e));
   return verdict;
 }
 
 /** Replaces the reserved units with what the request really cost (0 if it failed). */
-export async function settleUsage(install: string, ip: string, reserved: number, actual: number): Promise<void> {
-  const d = actual - reserved;
-  if (!d) return;
-  const k = keys(install, ip);
-  await redis([["INCRBY", k.install, d], ["INCRBY", k.ip, d], ["INCRBY", k.global, d]]);
+/** `d` is the day the units were reserved on, so a request running past midnight settles on the same day's counters. */
+export async function settleUsage(install: string, ip: string, reserved: number, actual: number, d = day()): Promise<void> {
+  const diff = actual - reserved;
+  if (!diff) return;
+  const k = keys(install, ip, d);
+  await redis([["INCRBY", k.install, diff], ["INCRBY", k.ip, diff], ["INCRBY", k.global, diff]]);
 }
 
 /** How much of today's allowance this install has used, for the Settings screen. */

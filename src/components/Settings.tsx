@@ -15,6 +15,7 @@ import { LANGS, T, systemLang, type LangPref } from "../i18n";
 import { telegramErrorText } from "../lib/telegram";
 import { REPLY_CLEANUPS, type ReplyCleanup } from "../lib/tgReplies";
 import type { TelegramApi, TelegramStatus } from "../platform/types";
+import { useEscape } from "./useEscape";
 
 export function SettingsDialog(props: {
   settings: Settings;
@@ -32,6 +33,7 @@ export function SettingsDialog(props: {
   onForgetKey: () => void;
   onClose: () => void;
 }) {
+  useEscape(props.onClose);
   const [s, setS] = useState(props.settings);
   const [key, setKey] = useState("");
   /** Ticking AI on without an earlier consent first shows the consent dialog. */

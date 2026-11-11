@@ -23,6 +23,11 @@ export const EVENTS = {
   item_edited: ["tag", "topic", "status", "other"],
   export_completed: ["md", "csv"],
   update_installed: [],
+  /** The cleanup screen: opened, a pile decided (which way), every pile decided or set aside, "Apply to Telegram" pressed. */
+  cleanup_opened: [],
+  cleanup_decided: ["keep", "topic", "junk", "keep_one", "later", "view"],
+  cleanup_finished: [],
+  cleanup_apply: [],
   /** Imported something and came back on another day within the first 7 days. Sent once. */
   activated: [],
 } as const satisfies Record<string, readonly string[]>;

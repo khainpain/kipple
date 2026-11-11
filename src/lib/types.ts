@@ -77,7 +77,12 @@ export interface UserFields {
   hidden?: boolean;
   pinned?: boolean;
   note?: string;
+  /** "Keep" on the cleanup screen: looked at and left as it is (src/lib/cleanup.ts). */
+  kept?: boolean;
 }
+
+/** A change to the user's fields; null takes a field away again (an undo of something the card didn't have). */
+export type UserPatch = { [K in keyof UserFields]?: UserFields[K] | null };
 
 export interface Card {
   /** Telegram message id inside Saved Messages; stable across exports. */
@@ -107,6 +112,8 @@ export interface Card {
   /** Text of a nearby message, for photos and files sent without a caption. Derived, not saved. */
   context?: string;
   ai?: AiFields;
+  /** The AI fields a re-tag took off, kept until it writes new ones (so a stopped run or a closed app loses nothing). */
+  aiPrev?: AiFields;
   user?: UserFields;
 }
 
@@ -135,6 +142,10 @@ export interface TelegramSync {
   passTop?: number;
   /** Photos Telegram no longer has (the message was deleted), so they aren't asked for again. */
   noPhoto?: number[];
+  /** The Telegram user id these ids belong to (message ids are per account). */
+  owner?: number;
+  /** Albums (groupedId → card id) at page edges, so an album cut by a page boundary stays one card. */
+  albums?: Record<string, number>;
 }
 
 /** A topic split into subgroups by the AI; cards added later aren't in any group until it's redone. */
@@ -147,5 +158,5 @@ export interface TopicGroups {
 export interface EditEvent {
   t: string;
   id: number;
-  patch: UserFields;
+  patch: UserPatch;
 }
