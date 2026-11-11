@@ -18,6 +18,7 @@ export const changelog = [
       "Voice messages and audio get their own filter",
       "Cleanup: after the first load Kipple sorts your archive into piles (obvious junk, duplicates, by channel, by site and more), one decision per pile; nothing changes in Telegram",
       "Many fixes: edits and AI titles no longer get lost, sensitive cards never go to the AI",
+      "A calmer start: AI, Three for today, extra board views, extra statuses and tags are tucked away for now, and the old Send to Telegram group is gone",
     ],
     ru: [
       "«Открыть в Telegram»: переход от карточки к её сообщению в Избранном",
@@ -30,6 +31,7 @@ export const changelog = [
       "Голосовые и аудио получили свой фильтр",
       "«Уборка»: после первой загрузки Kipple раскладывает архив на кучи (очевидный мусор, дубли, по каналам, по сайтам и другие), на каждую одно решение; в Telegram ничего не меняется",
       "Много исправлений: правки и AI-названия больше не теряются, чувствительные карточки никогда не уходят в AI",
+      "Спокойный старт: AI, «Три на сегодня», лишние виды доски, статусы и теги пока убраны с глаз, а старой отправки в группу Telegram больше нет",
     ],
   },
   {

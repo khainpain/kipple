@@ -484,6 +484,7 @@ export const ru = {
     exportSelected: (n: number) => `Выбранные: ${num(n)}`,
     exportAll: (n: number) => `Все на экране: ${num(n)}`,
     telegram: (board: string) => `Отправить в Telegram: разложить по темам в группе «${board}»`,
+    telegramAccount: "Аккаунт Telegram",
     settings: "Настройки",
     selected: (n: number) => `Выбрано ${num(n)}`,
     selectAll: (n: number) => `Выбрать все ${num(n)}`,
@@ -598,6 +599,8 @@ export const ru = {
     replyNoOriginal: "Этого сообщения уже нет в Избранном",
     replyNoChat: "Ответ с цитатой уже в Избранном: открой Telegram, он там последним",
     title: "Отправить в Telegram",
+    accountTitle: "Аккаунт Telegram",
+    accountIntro: "Вход идёт напрямую в Telegram, ключ сеанса хранится только на этом компьютере, в диспетчере учётных данных Windows.",
     intro: (board: string) =>
       `Приложение создаст у тебя закрытую группу «${board}» с темами по разделам библиотеки и перешлёт туда оригиналы сообщений из «Избранного». Под каждым будет короткое описание и хештеги. Вход идёт напрямую в Telegram, ключ сеанса хранится только на этом компьютере, в диспетчере учётных данных Windows.`,
     checking: "Проверяю вход…",

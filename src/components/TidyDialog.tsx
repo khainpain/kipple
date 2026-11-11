@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { mergeAlias, type Aliases } from "../lib/library";
 import { suggestMerges, type MergeSuggestion } from "../lib/tidy";
+import { FEATURES } from "../lib/features";
 import { T, formatNumber } from "../i18n";
 import { Icon } from "./Icon";
 import { useEscape } from "./useEscape";
@@ -25,7 +26,7 @@ export function TidyDialog(props: {
 }) {
   useEscape(props.onClose);
   const L = T.tidy;
-  const [kind, setKind] = useState<TidyKind>(props.initial ?? "tags");
+  const [kind, setKind] = useState<TidyKind>(FEATURES.tags ? (props.initial ?? "tags") : "topics");
   const [aiGroups, setAiGroups] = useState<Record<TidyKind, Array<{ into: string; from: string[] }>>>({ topics: [], tags: [] });
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,7 +99,7 @@ export function TidyDialog(props: {
         <p className="hint">{L.intro}</p>
 
         <div className="segmented labeled" role="radiogroup">
-          {(["topics", "tags"] as const).map((k) => (
+          {(FEATURES.tags ? (["topics", "tags"] as const) : (["topics"] as const)).map((k) => (
             <button key={k} role="radio" aria-checked={kind === k} className={kind === k ? "on" : ""} onClick={() => setKind(k)}>
               {k === "tags" ? T.sidebar.tags : T.sidebar.topics} <small>{formatNumber((k === "tags" ? props.tags : props.topics).size)}</small>
             </button>
