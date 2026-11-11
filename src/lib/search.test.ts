@@ -31,4 +31,23 @@ describe("search", () => {
     expect(ix.search("елка").map((h) => h.id)).toEqual([1]);
     expect(ix.search("ее").map((h) => h.id)).toEqual([2]);
   });
+  it("finds other forms of a Russian word", () => {
+    const ix = buildIndex([{ ...card(1, []), text: "Две кошки на окне" }, { ...card(2, []), text: "Гуляю с кошкой" }, { ...card(3, []), text: "Кошелёк" }]);
+    expect(ix.search("кошка").map((h) => h.id).sort()).toEqual([1, 2]);
+  });
+  it("finds other forms of an English word", () => {
+    const ix = buildIndex([{ ...card(1, []), text: "My study notes" }, { ...card(2, []), text: "Running shoes" }]);
+    expect(ix.search("studies").map((h) => h.id)).toEqual([1]);
+    expect(ix.search("run").map((h) => h.id)).toEqual([2]);
+  });
+  it("still finds a word while it is half typed", () => {
+    const ix = buildIndex([{ ...card(1, []), text: "читающий человек" }, card(2, [])]);
+    expect(ix.search("читающ").map((h) => h.id)).toEqual([1]);
+    expect(ix.search("читают").map((h) => h.id)).toEqual([1]);
+  });
+  it("keeps a short query narrow", () => {
+    const ix = buildIndex([{ ...card(1, []), text: "Новости про ии" }, { ...card(2, []), text: "Игра и история" }]);
+    expect(ix.search("ии").map((h) => h.id)).toEqual([1]);
+  });
 });
+

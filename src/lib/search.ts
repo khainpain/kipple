@@ -4,6 +4,7 @@ import { actionLabel } from "./types";
 import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic, getAliases } from "./library";
 import { isImportant } from "./smart";
 import { T } from "../i18n";
+import { stem } from "./stem";
 
 /** Canonical name → the names merged into it, so searching an old name still finds the cards. */
 function reverse(map: Record<string, string>): Map<string, string[]> {
@@ -16,11 +17,19 @@ export function buildIndex(cards: Card[]) {
   const aliases = getAliases();
   const tagSyn = reverse(aliases.tags);
   const topicSyn = reverse(aliases.topics);
+  const stems = new Map<string, string>(); // words repeat a lot across cards
   const ms = new MiniSearch<{ id: number; title: string; text: string; tags: string; topic: string; status: string; site: string; source: string }>({
     fields: ["title", "text", "tags", "topic", "status", "site", "source"],
+    // Each word goes in whole and as its stem: a query is stemmed, so "кошка" finds "кошкой",
+    // and a half-typed word ("читающ") still prefix-matches the whole one ("читающий").
     // Russian writes ё and е interchangeably: "елка" should find "ёлку".
-    processTerm: (term) => term.toLowerCase().replace(/ё/g, "е"),
-    searchOptions: { prefix: true, fuzzy: 0.2, boost: { title: 3, tags: 2, topic: 2 }, combineWith: "AND" },
+    processTerm: (term) => {
+      const word = term.toLowerCase().replace(/ё/g, "е");
+      let s = stems.get(word);
+      if (s === undefined) stems.set(word, (s = stem(word)));
+      return s === word ? word : [word, s];
+    },
+    searchOptions: { processTerm: stem, prefix: true, fuzzy: 0.2, boost: { title: 3, tags: 2, topic: 2 }, combineWith: "AND" },
   });
   ms.addAll(
     cards.map((c) => {
