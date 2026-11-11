@@ -94,8 +94,9 @@ export async function loadEdits(): Promise<EditEvent[]> {
   return out;
 }
 
-export async function appendEdit(ev: EditEvent) {
-  await append(EDITS, JSON.stringify(ev) + "\n");
+/** One write for the whole change, so a decision about a thousand cards is saved together or not at all. */
+export async function appendEdits(events: EditEvent[]) {
+  if (events.length) await append(EDITS, events.map((ev) => JSON.stringify(ev) + "\n").join(""));
 }
 
 /** Whether anything may go to the AI at all: turned on and agreed to. */

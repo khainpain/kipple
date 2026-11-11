@@ -77,7 +77,12 @@ export interface UserFields {
   hidden?: boolean;
   pinned?: boolean;
   note?: string;
+  /** "Keep" on the cleanup screen: looked at and left as it is (src/lib/cleanup.ts). */
+  kept?: boolean;
 }
+
+/** A change to the user's fields; null takes a field away again (an undo of something the card didn't have). */
+export type UserPatch = { [K in keyof UserFields]?: UserFields[K] | null };
 
 export interface Card {
   /** Telegram message id inside Saved Messages; stable across exports. */
@@ -153,5 +158,5 @@ export interface TopicGroups {
 export interface EditEvent {
   t: string;
   id: number;
-  patch: UserFields;
+  patch: UserPatch;
 }

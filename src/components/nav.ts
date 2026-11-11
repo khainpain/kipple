@@ -5,8 +5,8 @@ import { isImportant, isRecent, isUnsorted } from "../lib/smart";
 
 export type ListKey = "all" | "important" | "read_later" | "ideas" | "reference" | "todo" | "junk" | "sensitive" | "recent" | "unsorted" | "duplicates";
 
-/** What the sidebar points at: the overview, a smart list, one topic, or cards without a topic. */
-export type Scope = { kind: "home" } | { kind: "list"; key: ListKey } | { kind: "topic"; name: string } | { kind: "notopic" };
+/** What the sidebar points at: the overview, the cleanup screen, a smart list, one topic, or cards without a topic. */
+export type Scope = { kind: "home" } | { kind: "cleanup" } | { kind: "list"; key: ListKey } | { kind: "topic"; name: string } | { kind: "notopic" };
 
 export type TypeKey = "links" | "photos" | "videos" | "docs" | "audio" | "notes";
 export type SortKey = "new" | "old" | "title" | "title_desc" | "priority";
@@ -107,7 +107,7 @@ const MORE_LISTS: Partial<Record<ListKey, () => string>> = {
 
 /** `dupes` (from findDuplicates) is needed only for the duplicates list. */
 export function matchesScope(c: Card, s: Scope, dupes?: Map<number, string>): boolean {
-  if (s.kind === "home") return matchesFilter(c, "all");
+  if (s.kind === "home" || s.kind === "cleanup") return matchesFilter(c, "all");
   if (s.kind === "list") {
     switch (s.key) {
       case "todo":
@@ -146,6 +146,7 @@ export function scopeTitle(s: Scope): string {
   if (s.kind === "topic") return s.name;
   if (s.kind === "notopic") return T.nav.noTopic;
   if (s.kind === "home") return T.nav.home;
+  if (s.kind === "cleanup") return T.cleanup.title;
   return MORE_LISTS[s.key]?.() ?? SMART_LISTS.find((x) => x.key === s.key)?.label ?? "";
 }
 

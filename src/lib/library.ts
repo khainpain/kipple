@@ -1,4 +1,4 @@
-import type { Action, Card, EditEvent, Library, UserFields } from "./types";
+import type { Action, Card, EditEvent, Library, UserFields, UserPatch } from "./types";
 import { linkText } from "./embeds";
 
 /**
@@ -45,17 +45,23 @@ export function restorePrevAi(cards: Card[]): boolean {
   return restored;
 }
 
+/** The user's fields after a change; a null in the patch takes that field away. */
+export function patchUser(user: UserFields | undefined, patch: UserPatch): UserFields {
+  return Object.fromEntries(Object.entries({ ...user, ...patch }).filter(([, v]) => v !== null)) as UserFields;
+}
+
 export function applyEdits(cards: Card[], events: EditEvent[]): Card[] {
   const byId = new Map(cards.map((c) => [c.id, c]));
   for (const ev of events) {
     const c = byId.get(ev.id);
-    if (c) c.user = { ...c.user, ...ev.patch };
+    if (c) c.user = patchUser(c.user, ev.patch);
   }
   return cards;
 }
 
+/** A status set by hand, then the rule's junk guess (unless the user chose to keep the card), then the AI's. */
 export function effectiveAction(c: Card): Action | undefined {
-  return c.user?.action ?? (c.autoJunk ? "junk" : c.ai?.action);
+  return c.user?.action ?? (c.autoJunk && !c.user?.kept ? "junk" : c.ai?.action);
 }
 
 /**
@@ -159,7 +165,7 @@ export function matchesFilter(c: Card, f: FilterKey): boolean {
   }
 }
 
-export function makeEdit(id: number, patch: UserFields): EditEvent {
+export function makeEdit(id: number, patch: UserPatch): EditEvent {
   return { t: new Date().toISOString(), id, patch };
 }
 
