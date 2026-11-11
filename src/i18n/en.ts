@@ -348,8 +348,10 @@ export const en: Dict = {
   cleanup: {
     title: "Cleanup",
     summary: (total, since, sorted) => `${cards(total)}${since ? ` since ${since}` : ""}. Sorted: ${num(sorted)}.`,
-    safe: "Nothing here changes Telegram. “To junk” only marks cards inside Kipple, and every decision can be undone.",
-    sensitive: (n) => `${cards(n)} ${n === 1 ? "looks" : "look"} like passwords or keys. They stay out of the piles.`,
+    safe: "Nothing changes in Telegram, and every decision can be undone.",
+    sensitive: (n) => `${cards(n)} ${n === 1 ? "looks" : "look"} like passwords or keys and ${n === 1 ? "stays" : "stay"} out of the piles.`,
+    introTitle: "Kipple is hungry",
+    intro: "It has sorted your Saved Messages into piles. Decide each one, starting at the top.",
     pile: {
       junk: "Obvious junk",
       dupes: "Duplicates",
@@ -365,10 +367,9 @@ export const en: Dict = {
     },
     hint: {
       junk: "Empty messages, lone stickers, “test”, “ok”.",
-      dupes: "The same link, file or text saved more than once. The fullest copy stays; of identical ones, the earliest.",
-      old: "And in none of the piles above.",
+      dupes: "The fullest copy stays; of identical ones, the earliest.",
       notes: "Text you wrote yourself, with no links.",
-      rest: "What fits no pile. Junk these one card at a time, on the board.",
+      rest: "Junk these one card at a time, on the board.",
     },
     keep: "Keep",
     toTopic: "To a topic",

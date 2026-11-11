@@ -6,6 +6,7 @@ import { T, formatNumber } from "../i18n";
 import { coverOf, displayTitle } from "./CardView";
 import { Icon } from "./Icon";
 import { TopicMenu } from "./TopicMenu";
+import { loadPref, savePref } from "./nav";
 import mascot from "../../brand/kipple-mascot-light.svg";
 
 /** What the screen remembers while the workspace is open, so a look at the board doesn't lose it. */
@@ -63,6 +64,8 @@ export function Cleanup(props: {
   const [note, setNote] = useState({ text: "", undo: false });
   /** Where the focus goes once the list has changed: the pile now at this place or with this key, else the summary. */
   const [focusAt, setFocusAt] = useState<number | string | null>(null);
+  /** Nobody has decided anything on this screen yet: a few words on what it is, until the first decision. */
+  const [fresh, setFresh] = useState(() => loadPref("cleanupIntro", ["new", "seen"], "new") === "new");
   const decidedAt = useRef(-DECIDE_GAP_MS);
   const list = useRef<HTMLUListElement>(null);
   const summary = useRef<HTMLHeadingElement>(null);
@@ -89,6 +92,12 @@ export function Cleanup(props: {
     setFocusAt(null);
   }, [focusAt]);
 
+  function started() {
+    if (!fresh) return;
+    setFresh(false);
+    savePref("cleanupIntro", "seen");
+  }
+
   function act(pile: Pile, how: Decision, topic?: string) {
     // The next pile moves up under the pointer and takes the focus: a double click or a held Enter must not decide it too.
     if (performance.now() - decidedAt.current < DECIDE_GAP_MS) return;
@@ -96,6 +105,7 @@ export function Cleanup(props: {
     const n = edits.reduce((sum, e) => sum + e.ids.length, 0);
     if (!n) return;
     decidedAt.current = performance.now();
+    started();
     const back = restore(props.lib.cards, edits);
     for (const e of edits) props.onEdit(e.ids, e.patch);
     props.onSession({ ...session, undo: [...session.undo, { edits, back, key: pile.key }] });
@@ -116,6 +126,7 @@ export function Cleanup(props: {
   }
 
   function setAside(pile: Pile) {
+    started();
     props.onSession({ ...session, later: [...session.later, pile.key] });
     setNote({ text: "", undo: false });
     setFocusAt(active.indexOf(pile));
@@ -163,14 +174,6 @@ export function Cleanup(props: {
         <p className="cl-safe">
           <Icon name="lock" size={14} /> {c.safe}
         </p>
-        {b.sensitive > 0 && (
-          <p className="hint">
-            {c.sensitive(b.sensitive)}{" "}
-            <button className="link-btn" onClick={props.onSensitive}>
-              {c.view}
-            </button>
-          </p>
-        )}
       </header>
 
       {done && (
@@ -204,6 +207,16 @@ export function Cleanup(props: {
             </button>
           </div>
         </section>
+      )}
+
+      {fresh && !done && (
+        <div className="cl-intro">
+          <img src={mascot} alt="" className="today-mascot" />
+          <div>
+            <h3>{c.introTitle}</h3>
+            <p>{c.intro}</p>
+          </div>
+        </div>
       )}
 
       <ul className="cl-piles" ref={list}>
@@ -280,6 +293,15 @@ export function Cleanup(props: {
             menu.at.focus({ preventScroll: true });
           }}
         />
+      )}
+
+      {b.sensitive > 0 && (
+        <p className="hint cl-sensitive">
+          {c.sensitive(b.sensitive)}{" "}
+          <button className="link-btn" onClick={props.onSensitive}>
+            {c.view}
+          </button>
+        </p>
       )}
 
       {later.length > 0 && (
