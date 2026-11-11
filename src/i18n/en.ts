@@ -433,6 +433,7 @@ export const en: Dict = {
     create: (name) => `Create topic "${name}"`,
     clear: "Remove from topic",
     suggested: "likely",
+    suggestedLabel: (topic) => `${topic}: likely fits`,
   },
 
   /** Topics without AI: everything from a channel or site goes to a topic. */

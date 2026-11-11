@@ -62,7 +62,8 @@ function takeGroups(pool: Card[], kind: keyof typeof GROUP_KEY, nameOf: (c: Card
   return { piles: big.map(([name, cards]) => ({ key: `${GROUP_KEY[kind]}:${name}`, kind, name, cards })), rest: pool.filter((c) => !taken.has(c)) };
 }
 
-export function breakdown(cards: Card[], now = Date.now()): Breakdown {
+/** `likes`: also look for piles like the person's own topics, which takes longer; only the screen itself needs them. */
+export function breakdown(cards: Card[], now = Date.now(), likes = true): Breakdown {
   const sorted = { kept: 0, topics: 0, junk: 0 };
   let total = 0;
   let sensitive = 0;
@@ -105,10 +106,18 @@ export function breakdown(cards: Card[], now = Date.now()): Breakdown {
     pool = g.rest;
   }
   // After channels and sites, which a rule can then keep sorted: what looks like the person's own sorting.
-  const model = learnTopics(cards);
-  const like = takeGroups(pool, "like", (c) => suggestTopic(model, c), LIKE_MIN);
-  piles.push(...like.piles);
-  pool = like.rest;
+  // A whole pile moves in one click, so it asks more of the likeness than a hint in the topic menu (bulk).
+  if (likes) {
+    try {
+      const model = learnTopics(cards);
+      const like = takeGroups(pool, "like", (c) => suggestTopic(model, c, { bulk: true }), LIKE_MIN);
+      piles.push(...like.piles);
+      pool = like.rest;
+    } catch (e) {
+      // Suggestions are extra: without them the screen still shows every other pile.
+      console.warn("cleanup: topic suggestions failed", e instanceof Error ? e.message : e);
+    }
+  }
   for (const kind of TYPE_ORDER) take(kind, (c) => TYPE_PILE[c.kind] === kind && !c.text.trim());
   const cutoff = new Date(now);
   cutoff.setFullYear(cutoff.getFullYear() - OLD_YEARS);

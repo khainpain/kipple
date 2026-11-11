@@ -97,10 +97,12 @@ export function TopicMenu(props: {
         />
         <div className="topic-menu-list">
           {top && (
-            <button onClick={() => pick(top)}>
+            <button onClick={() => pick(top)} aria-label={T.move.suggestedLabel(top)}>
               <span className="topic-dot" style={{ "--h": hueOf(top) } as React.CSSProperties} />
               <span className="label">{top}</span>
-              <small className="topic-menu-hint">{T.move.suggested}</small>
+              <small className="topic-menu-hint" aria-hidden="true">
+                {T.move.suggested}
+              </small>
             </button>
           )}
           {list.filter((t) => t !== top).map((t) => (

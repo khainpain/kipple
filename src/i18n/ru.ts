@@ -380,7 +380,7 @@ export const ru = {
       dupes: "Останется самая полная копия, из одинаковых самая ранняя.",
       notes: "Твой текст без ссылок, не пересланный.",
       rest: "В мусор отсюда только по одной карточке, на доске.",
-      like: "Похожи на карточки, которые ты сам положил в эту тему.",
+      like: "Похожи на карточки, разложенные тобой в эту тему.",
     },
     keep: "Оставить",
     toTopic: "В тему",
@@ -445,6 +445,7 @@ export const ru = {
     clear: "Убрать из темы",
     /** Next to the topic Kipple guesses from the person's own sorting (suggest.ts). */
     suggested: "похоже",
+    suggestedLabel: (topic: string) => `${topic}: похоже, подходит`,
   },
 
   /** Topics without AI: everything from a channel or site goes to a topic. */

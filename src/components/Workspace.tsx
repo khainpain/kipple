@@ -307,7 +307,8 @@ export function Workspace(props: {
   const tidyCount = useMemo(() => suggestMerges(names.topics).length + (FEATURES.tags ? suggestMerges(names.tags).length : 0), [names]);
 
   // What the archive is made of (lib/cleanup.ts): the cleanup screen's piles and the number left in the sidebar.
-  const piles = useMemo(() => breakdown(lib.cards), [lib, rev]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Look-alike piles only change which pile a card is in, not how many are left: worked out for the screen alone.
+  const piles = useMemo(() => breakdown(lib.cards, Date.now(), cleanup), [lib, rev, cleanup]); // eslint-disable-line react-hooks/exhaustive-deps
   /** A topic for a card with none, learned from the person's own sorting; worked out only once a topic menu asks. */
   const suggest = useMemo(() => {
     let model: TopicModel | undefined;

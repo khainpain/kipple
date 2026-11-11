@@ -67,6 +67,40 @@ describe("suggestTopic", () => {
     expect(suggestTopic(learnTopics(cards), card(6, "Рецепт борща"))).toBeUndefined();
   });
 
+  it("doesn't let everyday words or links decide", () => {
+    const cards = [
+      ...library(),
+      sorted(30, "Что это за отчёт? Как его сдавать, это для клиента", "Работа"),
+      sorted(31, "Все материалы для встречи тут https://docs.example.com/plan", "Работа"),
+    ];
+    const m = learnTopics(cards);
+    for (const text of ["Что это за песня? Как называется?", "Это лучший фильм, как и все его фильмы", "Смотри https://docs.example.com/x"]) expect(suggestTopic(m, card(40, text))).toBeUndefined();
+  });
+
+  it("asks more of a card before moving it in bulk: two shared words or the same channel or site", () => {
+    const m = learnTopics(library());
+    expect(suggestTopic(m, card(41, "Рецепт борща"))).toBe("Еда");
+    expect(suggestTopic(m, card(41, "Рецепт борща"), { bulk: true })).toBeUndefined();
+    expect(suggestTopic(m, card(42, "Рецепт тыквенного супа"), { bulk: true })).toBe("Еда");
+  });
+
+  it("never suggests a topic for a card taken out of its topic by hand", () => {
+    const m = learnTopics(library());
+    expect(suggestTopic(m, card(16, "Рецепт пирога с тыквой", { user: { topic: "" } }))).toBeUndefined();
+  });
+
+  it("leaves sensitive cards out, both ways", () => {
+    const secret = (id: number, text: string, topic?: string) => card(id, text, { sensitive: true, ...(topic && { user: { topic } }) });
+    const cards = [secret(1, "Пароль от банка", "Банк"), secret(2, "Пароль от почты банка", "Банк"), card(3, "Погода"), card(4, "Лампочка")];
+    expect(suggestTopic(learnTopics(cards), card(5, "Пароль от банка новый"))).toBeUndefined();
+    expect(suggestTopic(learnTopics(library()), secret(6, "Рецепт пирога с тыквой"))).toBeUndefined();
+  });
+
+  it("copes with a card missing its fields", () => {
+    const m = learnTopics([...library(), { id: 30, date: "", kind: "text" } as unknown as Card]);
+    expect(suggestTopic(m, { id: 31, date: "", kind: "text" } as unknown as Card)).toBeUndefined();
+  });
+
   it("uses topic names after merges", () => {
     setAliases({ topics: { Food: "Еда" }, tags: {} });
     const cards = [sorted(1, "Рецепт шакшуки", "Food"), sorted(2, "Рецепт пасты", "Еда"), card(3, "Погода"), card(4, "Лампочка")];

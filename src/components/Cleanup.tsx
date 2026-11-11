@@ -253,14 +253,15 @@ export function Cleanup(props: {
                     {c.toJunk}
                   </button>
                 )}
-                {p.kind === "like" && p.name && (
-                  <button className="small-btn" onClick={() => act(p, "topic", p.name)}>
-                    {c.toThat(p.name)}
-                  </button>
-                )}
                 {p.kind !== "dupes" && (
                   <button className="secondary small-btn" onClick={() => act(p, "keep")}>
                     {c.keep}
+                  </button>
+                )}
+                {/* After "Keep": the focus lands on a pile's first button, and a bulk move shouldn't be one Enter away. */}
+                {p.kind === "like" && p.name && (
+                  <button className="small-btn cl-to-that" title={c.toThat(p.name)} onClick={() => act(p, "topic", p.name)}>
+                    {c.toThat(p.name)}
                   </button>
                 )}
                 {p.kind !== "dupes" && p.kind !== "junk" && (

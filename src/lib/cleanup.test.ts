@@ -197,7 +197,7 @@ describe("breakdown", () => {
     const cards = [
       food(1, "Рецепт шакшуки с фетой", "Еда"),
       food(2, "Рецепт пасты с томатами", "Еда"),
-      food(3, "Шакшука на завтрак"),
+      food(3, "Шакшука с фетой на завтрак"),
       food(4, "Рецепты пирогов с фетой"),
       food(5, "Паста с томатами, рецепт"),
       food(6, "Погода на выходные"),
@@ -208,6 +208,16 @@ describe("breakdown", () => {
     expect(b.piles.map((p) => p.key)).toEqual(["ch:Вкусно", "like:Еда", "notes"]);
     expect(ids(pileOf(cards, "like:Еда"))).toEqual([3, 4, 5]);
     expect(pileOf(cards, "like:Еда")).toMatchObject({ kind: "like", name: "Еда" });
+  });
+
+  it("never piles cards back into a topic they were taken out of", () => {
+    const cards = [
+      card(1, { kind: "text", text: "Рецепт шакшуки с фетой", user: { topic: "Еда" } }),
+      card(2, { kind: "text", text: "Рецепт пасты с томатами", user: { topic: "Еда" } }),
+      ...many(LIKE_MIN, 3, () => ({ kind: "text", text: "Шакшука с фетой и томатами", user: { topic: "" } })),
+      card(9, { kind: "text", text: "Погода" }),
+    ];
+    expect(breakdown(cards, NOW).piles.some((p) => p.kind === "like")).toBe(false);
   });
 
   it("makes no look-alike pile from fewer than LIKE_MIN cards", () => {
