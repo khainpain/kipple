@@ -93,3 +93,8 @@ jobs:
           HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
         run: |
           if [ -n "$HOOK" ]; then curl -fsS -X POST "$HOOK" >/dev/null && echo "Website rebuild started"; else echo "No VERCEL_DEPLOY_HOOK secret, skipping"; fi
+      # A reminder on the run's page: the help page is written by hand (CLAUDE.md, "Releasing a version").
+      - name: Help page reminder
+        shell: bash
+        run: |
+          echo "::notice title=Help page::Check that getkipple.io/docs/ describes v$VERSION: new features, renamed menus, sections marked Coming soon that ship now (kipple-site, docs in copy.mjs)."
