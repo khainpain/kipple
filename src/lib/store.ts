@@ -1,12 +1,13 @@
 import { platform } from "@platform";
 import type { EditEvent, Library } from "./types";
-import { annotateContext, applyEdits, editLines, parseEdits, restorePrevAi, type Aliases } from "./library";
+import { annotateContext, applyEdits, editLines, parseEdits, restorePrevAi, type Aliases, type TopicRules } from "./library";
 import { emptyBoardState, type BoardState } from "./telegram";
 import { emptyTagSyncState, type TagSyncState } from "./tgTags";
 import { emptyPinState, type PinState } from "./tgApply";
 import type { LangPref } from "../i18n";
 import { DEFAULT_AI_MODEL, type AiModel } from "./ai";
 import type { Skips, TodayState } from "./today";
+import { FEATURES } from "./features";
 import { DEFAULT_REPLY_CLEANUP, validReplies, type PendingReply, type ReplyCleanup } from "./tgReplies";
 
 const { exists, read } = platform.data;
@@ -55,6 +56,8 @@ export interface Settings {
   aliases?: Aliases;
   /** Topics the user made by hand: shown even when empty, offered to the AI first. */
   topics?: string[];
+  /** Topics without AI: everything from a channel or site goes to a topic (see TopicRules in library.ts). */
+  topicRules?: TopicRules;
   /** Anonymous usage statistics (src/lib/telemetry.ts); on unless turned off. */
   telemetry: boolean;
   /** Today's "Three for today" plan (src/lib/today.ts). */
@@ -92,8 +95,8 @@ export async function appendEdits(events: EditEvent[]) {
   if (events.length) await append(EDITS, editLines(events));
 }
 
-/** Whether anything may go to the AI at all: turned on and agreed to. */
-export const aiAllowed = (s: Settings) => s.aiEnabled && !!s.aiConsentAt;
+/** Whether anything may go to the AI at all: not frozen (features.ts), turned on and agreed to. */
+export const aiAllowed = (s: Settings) => FEATURES.ai && s.aiEnabled && !!s.aiConsentAt;
 
 export async function loadSettings(): Promise<Settings> {
   if (!(await exists(SETTINGS))) return DEFAULT_SETTINGS;

@@ -202,12 +202,22 @@ export function HoldToConfirm(props: { children: ReactNode; doneLabel: ReactNode
  * SwipeToast: ink background, bg-coloured text, swiped away sideways. The caller decides how long
  * it stays (`text` back to null closes it with the animation).
  */
-export function Toast(props: { text: string | null; onClose: () => void }) {
+/** A notice, with an optional button that does something about it. */
+export interface ToastMsg {
+  text: string;
+  action?: { label: string; run: () => void };
+}
+
+export function Toast(props: { text: string | null; action?: ToastMsg["action"]; onClose: () => void }) {
   const calm = useCalm();
   const [shown, setShown] = useState(props.text);
+  const [action, setAction] = useState(props.action);
   useEffect(() => {
-    if (props.text) setShown(props.text);
-  }, [props.text]);
+    if (props.text) {
+      setShown(props.text);
+      setAction(props.action);
+    }
+  }, [props.text, props.action]);
   if (!shown) return null;
   return (
     <div className="k-toast">
@@ -215,6 +225,8 @@ export function Toast(props: { text: string | null; onClose: () => void }) {
         key={shown}
         open={!!props.text}
         title={shown}
+        actionLabel={action?.label}
+        onAction={action?.run}
         inline
         background="var(--ink)"
         color="var(--bg)"

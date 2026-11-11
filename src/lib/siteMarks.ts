@@ -116,18 +116,22 @@ export const SITE_DOMAINS: Record<string, string> = {
   "aliexpress.ru": "aliexpress",
 };
 
-/** The built-in mark for a link's site, matching subdomains too (m.youtube.com, ru.wikipedia.org). */
-export function siteMarkOf(url: string | undefined): SiteMark | undefined {
-  if (!url) return undefined;
+/** A link's host and every parent domain, longest first (m.youtube.com, youtube.com); empty for a bad URL. */
+export function hostChain(url: string | undefined): string[] {
+  if (!url) return [];
   let host: string;
   try {
     host = new URL(url).hostname.toLowerCase();
   } catch {
-    return undefined;
+    return [];
   }
-  for (let h = host; h.includes("."); h = h.slice(h.indexOf(".") + 1)) {
-    const slug = SITE_DOMAINS[h];
-    if (slug) return SITE_MARKS[slug];
-  }
-  return undefined;
+  const out: string[] = [];
+  for (let h = host; h.includes("."); h = h.slice(h.indexOf(".") + 1)) out.push(h);
+  return out;
+}
+
+/** The built-in mark for a link's site, matching subdomains too (m.youtube.com, ru.wikipedia.org). */
+export function siteMarkOf(url: string | undefined): SiteMark | undefined {
+  const slug = hostChain(url).map((h) => SITE_DOMAINS[h]).find(Boolean);
+  return slug ? SITE_MARKS[slug] : undefined;
 }

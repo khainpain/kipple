@@ -71,7 +71,7 @@ export function setThemePref(next: ThemePref) {
   listeners.forEach((l) => l());
 }
 
-/** Light → dark → system, for the toolbar's quick toggle. */
+/** Light → dark → system, for the quick toggle on the Welcome screen. */
 export function nextThemePref(p: ThemePref): ThemePref {
   return p === "light" ? "dark" : p === "dark" ? "system" : "light";
 }

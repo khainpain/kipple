@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import type { Card, Library, UserPatch } from "../lib/types";
 import { decide, restore, takeBack, type Breakdown, type Decision, type Done, type Pile, type PileKind } from "../lib/cleanup";
+import { getTopicRules } from "../lib/library";
 import { track } from "../lib/telemetry";
 import { T, formatNumber } from "../i18n";
 import { coverOf, displayTitle } from "./CardView";
 import { Icon } from "./Icon";
 import { TopicMenu } from "./TopicMenu";
+import { loadPref, savePref } from "./nav";
 import mascot from "../../brand/kipple-mascot-light.svg";
 
 /** What the screen remembers while the workspace is open, so a look at the board doesn't lose it. */
@@ -17,13 +19,13 @@ export interface CleanupSession {
 }
 export const NEW_SESSION: CleanupSession = { later: [], undo: [] };
 
-const ICONS: Record<PileKind, string> = { junk: "trash", dupes: "copy", channel: "send", site: "globe", photos: "photo", videos: "video", files: "file", audio: "music", old: "clock", notes: "text", rest: "inbox" };
+const ICONS: Record<PileKind, string> = { junk: "trash", dupes: "copy", channel: "send", site: "globe", like: "folder", photos: "photo", videos: "video", files: "file", audio: "music", old: "clock", notes: "text", rest: "inbox" };
 const SAMPLES = 4;
 /** Two decisions closer together than this are one press that ran on. */
 const DECIDE_GAP_MS = 400;
 
 export function pileTitle(p: Pile): string {
-  return p.kind === "channel" || p.kind === "site" ? T.cleanup.pile[p.kind](p.name ?? "") : T.cleanup.pile[p.kind];
+  return p.kind === "channel" || p.kind === "site" || p.kind === "like" ? T.cleanup.pile[p.kind](p.name ?? "") : T.cleanup.pile[p.kind];
 }
 
 /**
@@ -49,6 +51,8 @@ export function Cleanup(props: {
   session: CleanupSession;
   onSession: (s: CleanupSession) => void;
   onEdit: (ids: number[], patch: UserPatch) => void;
+  /** Everything new from this channel or site goes to the topic too (library.ts TopicRules). */
+  onRule: (kind: "channel" | "site", key: string, topic: string) => void;
   /** Opens the pile on the board. */
   onView: (pile: Pile) => void;
   onSensitive: () => void;
@@ -60,9 +64,11 @@ export function Cleanup(props: {
   /** "To a topic" is open for this pile; the pile itself is looked up again when a topic is picked. */
   const [menu, setMenu] = useState<{ key: string; at: HTMLElement } | null>(null);
   /** What just happened, and whether it is a decision that Undo takes back. */
-  const [note, setNote] = useState({ text: "", undo: false });
+  const [note, setNote] = useState<{ text: string; undo: boolean; rule?: { kind: "channel" | "site"; key: string; topic: string } }>({ text: "", undo: false });
   /** Where the focus goes once the list has changed: the pile now at this place or with this key, else the summary. */
   const [focusAt, setFocusAt] = useState<number | string | null>(null);
+  /** Nobody has decided anything on this screen yet: a few words on what it is, until the first decision. */
+  const [fresh, setFresh] = useState(() => loadPref("cleanupIntro", ["new", "seen"], "new") === "new");
   const decidedAt = useRef(-DECIDE_GAP_MS);
   const list = useRef<HTMLUListElement>(null);
   const summary = useRef<HTMLHeadingElement>(null);
@@ -89,6 +95,12 @@ export function Cleanup(props: {
     setFocusAt(null);
   }, [focusAt]);
 
+  function started() {
+    if (!fresh) return;
+    setFresh(false);
+    savePref("cleanupIntro", "seen");
+  }
+
   function act(pile: Pile, how: Decision, topic?: string) {
     // The next pile moves up under the pointer and takes the focus: a double click or a held Enter must not decide it too.
     if (performance.now() - decidedAt.current < DECIDE_GAP_MS) return;
@@ -96,11 +108,16 @@ export function Cleanup(props: {
     const n = edits.reduce((sum, e) => sum + e.ids.length, 0);
     if (!n) return;
     decidedAt.current = performance.now();
+    started();
     const back = restore(props.lib.cards, edits);
     for (const e of edits) props.onEdit(e.ids, e.patch);
     props.onSession({ ...session, undo: [...session.undo, { edits, back, key: pile.key }] });
     const c = T.cleanup;
-    setNote({ text: how === "keep" ? c.kept(n) : how === "topic" ? c.moved(n, topic!.trim()) : how === "junk" ? c.junked(n) : c.extras(n), undo: true });
+    // A whole channel or site went to a topic: offer the same for what comes from there later.
+    const kind = pile.kind === "channel" || pile.kind === "site" ? pile.kind : undefined;
+    const rules = getTopicRules();
+    const rule = how === "topic" && kind && pile.name && !Object.prototype.hasOwnProperty.call(kind === "channel" ? rules.channels : rules.sites, pile.name) ? { kind, key: pile.name, topic: topic!.trim() } : undefined;
+    setNote({ text: how === "keep" ? c.kept(n) : how === "topic" ? c.moved(n, topic!.trim()) : how === "junk" ? c.junked(n) : c.extras(n), undo: true, rule });
     setFocusAt(active.findIndex((p) => p.key === pile.key));
     track("cleanup_decided", how === "keepOne" ? "keep_one" : how);
   }
@@ -116,6 +133,7 @@ export function Cleanup(props: {
   }
 
   function setAside(pile: Pile) {
+    started();
     props.onSession({ ...session, later: [...session.later, pile.key] });
     setNote({ text: "", undo: false });
     setFocusAt(active.indexOf(pile));
@@ -163,14 +181,6 @@ export function Cleanup(props: {
         <p className="cl-safe">
           <Icon name="lock" size={14} /> {c.safe}
         </p>
-        {b.sensitive > 0 && (
-          <p className="hint">
-            {c.sensitive(b.sensitive)}{" "}
-            <button className="link-btn" onClick={props.onSensitive}>
-              {c.view}
-            </button>
-          </p>
-        )}
       </header>
 
       {done && (
@@ -206,6 +216,16 @@ export function Cleanup(props: {
         </section>
       )}
 
+      {fresh && !done && (
+        <div className="cl-intro">
+          <img src={mascot} alt="" className="today-mascot" />
+          <div>
+            <h3>{c.introTitle}</h3>
+            <p>{c.intro}</p>
+          </div>
+        </div>
+      )}
+
       <ul className="cl-piles" ref={list}>
         {active.map((p) => {
           const title = pileTitle(p);
@@ -238,13 +258,19 @@ export function Cleanup(props: {
                     {c.keep}
                   </button>
                 )}
+                {/* After "Keep": the focus lands on a pile's first button, and a bulk move shouldn't be one Enter away. */}
+                {p.kind === "like" && p.name && (
+                  <button className="small-btn cl-to-that" title={c.toThat(p.name)} onClick={() => act(p, "topic", p.name)}>
+                    {c.toThat(p.name)}
+                  </button>
+                )}
                 {p.kind !== "dupes" && p.kind !== "junk" && (
                   <button className="secondary small-btn" aria-expanded={menu?.key === p.key} onClick={(e) => setMenu(menu?.key === p.key ? null : { key: p.key, at: e.currentTarget })}>
                     {c.toTopic}
                   </button>
                 )}
-                {/* A mixed remainder is decided card by card on the board, not thrown out in one go. */}
-                {p.kind !== "dupes" && p.kind !== "junk" && p.kind !== "rest" && (
+                {/* A mixed remainder is decided card by card on the board, and a look-alike pile is wanted, not junk. */}
+                {p.kind !== "dupes" && p.kind !== "junk" && p.kind !== "rest" && p.kind !== "like" && (
                   <button className="secondary small-btn" onClick={() => act(p, "junk")}>
                     {c.toJunk}
                   </button>
@@ -282,6 +308,15 @@ export function Cleanup(props: {
         />
       )}
 
+      {b.sensitive > 0 && (
+        <p className="hint cl-sensitive">
+          {c.sensitive(b.sensitive)}{" "}
+          <button className="link-btn" onClick={props.onSensitive}>
+            {c.view}
+          </button>
+        </p>
+      )}
+
       {later.length > 0 && (
         <section className="cl-later-list" aria-labelledby="cl-later">
           <h3 id="cl-later">{c.laterTitle(later.length)}</h3>
@@ -305,6 +340,11 @@ export function Cleanup(props: {
         {note.undo && session.undo.length > 0 && (
           <button className="link-btn" onClick={undo}>
             {c.undo} <kbd>Ctrl+Z</kbd>
+          </button>
+        )}
+        {note.rule && (
+          <button className="link-btn" onClick={() => (props.onRule(note.rule!.kind, note.rule!.key, note.rule!.topic), setNote({ text: T.rules.added, undo: false }))}>
+            {T.rules.alsoNew}
           </button>
         )}
       </div>

@@ -372,13 +372,17 @@ export const ru = {
   cleanup: {
     title: "Уборка",
     summary: (total: number, since: number | undefined, sorted: number) => `${cards(total)}${since ? ` с ${since} года` : ""}. Разобрано: ${num(sorted)}.`,
-    safe: "В Telegram здесь ничего не меняется. «В мусор» только помечает карточки внутри Kipple, и любое решение можно отменить.",
-    sensitive: (n: number) => `${cards(n)} ${plural(n, "похожа", "похожи", "похожи")} на пароли и ключи. В кучи они не попадают.`,
+    safe: "В Telegram ничего не меняется, любое решение можно отменить.",
+    sensitive: (n: number) => `${cards(n)} ${plural(n, "похожа", "похожи", "похожи")} на пароли и ключи, в кучах их нет.`,
+    /** Shown until the first decision on this screen. */
+    introTitle: "Kipple голоден",
+    intro: "Он разложил твоё «Избранное» по кучам. Реши по каждой, начни сверху.",
     pile: {
       junk: "Очевидный мусор",
       dupes: "Дубли",
       channel: (name: string) => `Из «${name}»`,
       site: (name: string) => `Ссылки на ${name}`,
+      like: (topic: string) => `Похоже на «${topic}»`,
       photos: "Фото без подписи",
       videos: "Видео без подписи",
       files: "Файлы без подписи",
@@ -390,13 +394,15 @@ export const ru = {
     /** One line under the pile's name, where the name doesn't say it all. */
     hint: {
       junk: "Пустые сообщения, одиночные стикеры, «тест», «ок».",
-      dupes: "Одна и та же ссылка, файл или текст сохранены несколько раз. Останется самая полная копия, а из одинаковых самая ранняя.",
-      old: "И не попало ни в одну кучу выше.",
+      dupes: "Останется самая полная копия, из одинаковых самая ранняя.",
       notes: "Твой текст без ссылок, не пересланный.",
-      rest: "Что не подошло ни в одну кучу. В мусор отсюда только по одной карточке, на доске.",
+      rest: "В мусор отсюда только по одной карточке, на доске.",
+      like: "Похожи на карточки, разложенные тобой в эту тему.",
     },
     keep: "Оставить",
     toTopic: "В тему",
+    /** The look-alike pile goes to the topic it looks like in one click. */
+    toThat: (topic: string) => `В «${topic}»`,
     toJunk: "В мусор",
     keepOne: "Оставить по одному",
     view: "Посмотреть",
@@ -454,8 +460,41 @@ export const ru = {
     filter: "Найти или создать тему",
     create: (name: string) => `Создать тему «${name}»`,
     clear: "Убрать из темы",
+    /** Next to the topic Kipple guesses from the person's own sorting (suggest.ts). */
+    suggested: "похоже",
+    suggestedLabel: (topic: string) => `${topic}: похоже, подходит`,
   },
 
+  /** Topics without AI: everything from a channel or site goes to a topic. */
+  rules: {
+    offerChannel: (channel: string, topic: string, n: number) => `Отправлять в «${topic}» всё из «${channel}»? Сейчас это ещё ${cards(n)}.`,
+    offerSite: (site: string, topic: string, n: number) => `Отправлять в «${topic}» всё с ${site}? Сейчас это ещё ${cards(n)}.`,
+    always: "Да, всегда",
+    alsoNew: "И новые оттуда тоже",
+    added: "Готово. Правила можно поменять в Настройках.",
+    channelPick: "Тема для канала",
+    channelIs: (topic: string) => `Тема: ${topic}`,
+    channelHint: "Всё из этого канала будет попадать в одну тему, и новые карточки тоже",
+    title: "Темы без ИИ",
+    desc: "Всё из канала или с сайта попадает в свою тему. Тема, выбранная вручную, важнее правила. Ссылки на известные сайты (GitHub, IMDb, Spotify и другие) получают тему сами, если её не задали вы или ИИ.",
+    empty: "Правил пока нет. Поставьте тему карточке из канала, и Kipple предложит правило.",
+    channel: (name: string) => `Канал «${name}»`,
+    site: (domain: string) => `Сайт ${domain}`,
+    remove: (what: string) => `Удалить правило: ${what}`,
+  },
+  /** Topics for well-known sites (src/lib/siteTopics.ts), given with no AI. */
+  siteTopics: {
+    dev: "Разработка",
+    design: "Дизайн",
+    science: "Наука",
+    movies: "Кино",
+    books: "Книги",
+    music: "Музыка",
+    shopping: "Покупки",
+    travel: "Путешествия",
+    recipes: "Рецепты",
+    learning: "Учёба",
+  },
   topics: {
     add: "Новая тема",
     namePlaceholder: "Название темы",

@@ -1,5 +1,8 @@
 import type { Action, Card, EditEvent, Library, UserFields, UserPatch } from "./types";
 import { linkText } from "./embeds";
+import { hostChain } from "./siteMarks";
+import { builtinKeyOf, type SiteTopic } from "./siteTopics";
+import { T } from "../i18n/index.js";
 
 /**
  * Merge a fresh import into the existing library: AI fields, link previews and user
@@ -122,8 +125,60 @@ export function effectiveTags(c: Card): string[] {
   return [...new Set((c.user?.tags ?? [...(c.ai?.tags ?? []), ...c.hashtags]).map(tagName))];
 }
 
+/**
+ * Topics without AI (settings.topicRules): every card from a channel, or with a link to a site
+ * (subdomains too), goes to a topic. Kept apart from the cards, so a rule can change or go.
+ */
+export interface TopicRules {
+  /** Channel name as on the card (forwardedFrom) → topic. */
+  channels: Record<string, string>;
+  /** Domain without www → topic. */
+  sites: Record<string, string>;
+  /** Built-in site topics (siteTopics.ts) the user deleted, so they don't come back. */
+  off?: SiteTopic[];
+}
+
+export const NO_RULES: TopicRules = { channels: {}, sites: {} };
+let rules: TopicRules = NO_RULES;
+
+const isMap = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
+const strings = (v: unknown): Record<string, string> => (isMap(v) ? Object.fromEntries(Object.entries(v).filter(([, t]) => typeof t === "string")) : {}) as Record<string, string>;
+
+/** Rules as saved, with anything malformed (a hand-edited settings.json) left out instead of breaking every card. */
+export function cleanRules(r: unknown): TopicRules {
+  if (!isMap(r)) return NO_RULES;
+  const off = Array.isArray(r.off) ? r.off.filter((k): k is SiteTopic => typeof k === "string") : [];
+  return { channels: strings(r.channels), sites: strings(r.sites), ...(off.length && { off }) };
+}
+
+/** Set once settings are loaded and after every rule change. */
+export function setTopicRules(r: TopicRules | undefined) {
+  rules = cleanRules(r);
+  anySites = Object.keys(rules.sites).length > 0;
+}
+let anySites = false;
+
+export function getTopicRules(): TopicRules {
+  return rules;
+}
+
+/** The topic the user's rules give a card: its channel first, then its link's site. */
+export function ruleTopicOf(c: Card): string | undefined {
+  if (c.forwardedFrom && own(rules.channels, c.forwardedFrom)) return rules.channels[c.forwardedFrom];
+  if (!anySites || !c.urls[0]) return undefined;
+  for (const h of hostChain(c.urls[0])) if (own(rules.sites, h)) return rules.sites[h];
+  return undefined;
+}
+
+/** The built-in topic for the card's link, unless the user deleted that topic. */
+function builtinTopic(c: Card): string | undefined {
+  const key = builtinKeyOf(c.urls[0]);
+  return key && !rules.off?.includes(key) ? T.siteTopics[key] : undefined;
+}
+
+/** A topic picked by hand, then the user's rules, then the AI's, then the built-in list of sites. */
 export function effectiveTopic(c: Card): string | undefined {
-  const t = c.user?.topic ?? c.ai?.topic;
+  const t = c.user?.topic ?? ruleTopicOf(c) ?? c.ai?.topic ?? builtinTopic(c);
   return t ? topicName(t) : t;
 }
 

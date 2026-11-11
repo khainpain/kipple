@@ -6,6 +6,7 @@ import { loadBoardState, loadPinState, loadTagSyncState } from "../lib/store";
 import { deletePlan, deleteWithFiles, pinPlan, type ApplyOptions, type PinState } from "../lib/tgApply";
 import { HoldToConfirm } from "./Motion";
 import { hashtagPlan, MAX_TG_TAGS, tagPlan, TAGS_PER_MESSAGE, likelyUsable, type TagMode, type TagSyncState } from "../lib/tgTags";
+import { FEATURES } from "../lib/features";
 import { T } from "../i18n";
 import { useEscape } from "./useEscape";
 
@@ -243,6 +244,8 @@ export function TelegramDialog(props: {
               )}
             </div>
 
+            {FEATURES.tags && (
+              <>
             <h3 id="tg-tags-title">{L.tagsTitle}</h3>
             <p className="hint">{L.tagsIntro}</p>
             <fieldset className="tg-tag-mode" aria-labelledby="tg-tags-title">
@@ -266,7 +269,11 @@ export function TelegramDialog(props: {
                 {props.syncingTags ? L.tagsRunning : L.tagsStart}
               </button>
             </div>
+              </>
+            )}
 
+            {FEATURES.forumSend && (
+              <>
             <h3>{L.boardTitle(BOARD_TITLE)}</h3>
             <p className="hint">{L.intro(BOARD_TITLE)}</p>
             <label className="check">
@@ -284,14 +291,18 @@ export function TelegramDialog(props: {
               {sentCount > 0 && L.alreadySent(sentCount)}
               {untagged > 0 && L.untagged(untagged, otherTopic(state ?? undefined))}
             </p>
+              </>
+            )}
             <div className="dialog-buttons">
               <span className="spacer" />
               <button className="secondary" onClick={props.onClose}>
                 {T.common.close}
               </button>
-              <button disabled={busy || props.running || props.applying || !plan.length} onClick={() => props.onStart(opts)}>
-                {props.running ? L.sending : L.send(plan.length)}
-              </button>
+              {FEATURES.forumSend && (
+                <button disabled={busy || props.running || props.applying || !plan.length} onClick={() => props.onStart(opts)}>
+                  {props.running ? L.sending : L.send(plan.length)}
+                </button>
+              )}
             </div>
           </>
         )}

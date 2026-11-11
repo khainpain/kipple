@@ -2,6 +2,7 @@ import { ACTIONS, type Action, type Card } from "../lib/types";
 import { T, compareText, locale } from "../i18n";
 import { effectiveAction, effectiveTitle, effectiveTopic, matchesFilter } from "../lib/library";
 import { isImportant, isRecent, isUnsorted } from "../lib/smart";
+import { FEATURES } from "../lib/features";
 
 export type ListKey = "all" | "important" | "read_later" | "ideas" | "reference" | "todo" | "junk" | "sensitive" | "recent" | "unsorted" | "duplicates";
 
@@ -23,10 +24,14 @@ export const OPEN_MODES: Array<{ key: OpenMode; label: string; icon: string }> =
 export const SMART_LISTS: Array<{ key: ListKey; label: string; icon: string }> = [
   { key: "all", get label() { return T.nav.all; }, icon: "all" },
   { key: "important", get label() { return T.nav.important; }, icon: "star" },
-  { key: "read_later", get label() { return T.nav.readLater; }, icon: "clock" },
-  { key: "ideas", get label() { return T.nav.ideas; }, icon: "bulb" },
-  { key: "reference", get label() { return T.nav.reference; }, icon: "bookmark" },
-  { key: "todo", get label() { return T.nav.todo; }, icon: "check" },
+  ...(FEATURES.statuses
+    ? [
+        { key: "read_later" as const, get label() { return T.nav.readLater; }, icon: "clock" },
+        { key: "ideas" as const, get label() { return T.nav.ideas; }, icon: "bulb" },
+        { key: "reference" as const, get label() { return T.nav.reference; }, icon: "bookmark" },
+        { key: "todo" as const, get label() { return T.nav.todo; }, icon: "check" },
+      ]
+    : []),
 ];
 
 export const TYPES: Array<{ key: TypeKey; label: string; icon: string }> = [
@@ -58,6 +63,9 @@ export const VIEW_FIELDS: Record<ViewKey, CardField[]> = {
 
 /** How cards look: hidden fields per view and which side the list cover sits on. */
 export type CardLook = { hidden: Record<ViewKey, CardField[]>; coverSide: "left" | "right" };
+
+/** Every field shown, cover on the left: the look while the views menu is frozen. */
+export const NO_LOOK: CardLook = { hidden: { grid: [], masonry: [], list: [], headlines: [] }, coverSide: "left" };
 
 export function loadLook(): CardLook {
   const hidden = {} as Record<ViewKey, CardField[]>;

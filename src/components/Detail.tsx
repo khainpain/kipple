@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { platform } from "@platform";
 import type { Card, Library, MediaRef, UserFields } from "../lib/types";
 import { T, locale } from "../i18n";
+import { FEATURES } from "../lib/features";
 import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic } from "../lib/library";
 import { Icon } from "./Icon";
 import { coverOf, displayTitle, siteOf } from "./CardView";
@@ -28,10 +29,13 @@ export function Detail(props: {
   lib: Library;
   card: Card;
   topics: string[];
+  /** The topic the card looks like by the person's own sorting; asked only when the menu opens. */
+  suggest?: (c: Card) => string | undefined;
   mode: OpenMode;
   /** Phone: always full screen, so the side/center/full switch is left out. */
   narrow?: boolean;
-  onMode: (m: OpenMode) => void;
+  /** Undefined while the other ways to open a card are frozen (features.ts). */
+  onMode?: (m: OpenMode) => void;
   onNameImage?: () => void;
   onClose: () => void;
   onEdit: (patch: UserFields) => void;
@@ -197,10 +201,10 @@ export function Detail(props: {
           <Icon name="down" />
         </button>
         <span className="spacer" />
-        {!props.narrow && (
+        {!props.narrow && props.onMode && (
         <div className="segmented small" role="radiogroup" aria-label={T.detail.openModes}>
           {OPEN_MODES.map((m) => (
-            <button key={m.key} role="radio" aria-checked={props.mode === m.key} className={props.mode === m.key ? "on" : ""} onClick={() => props.onMode(m.key)} title={m.label}>
+            <button key={m.key} role="radio" aria-checked={props.mode === m.key} className={props.mode === m.key ? "on" : ""} onClick={() => props.onMode?.(m.key)} title={m.label}>
               <Icon name={m.icon} size={15} />
             </button>
           ))}
@@ -341,9 +345,11 @@ export function Detail(props: {
 
         <aside className="detail-side" aria-label={T.detail.properties}>
         <div className="props">
-          <PropRow icon="flag" label={T.detail.status} id="detail-status-label">
-            <StatusChip value={action} labelledBy="detail-status-label" onChange={(a) => props.onEdit({ action: a })} />
-          </PropRow>
+          {FEATURES.statuses && (
+            <PropRow icon="flag" label={T.detail.status} id="detail-status-label">
+              <StatusChip value={action} labelledBy="detail-status-label" onChange={(a) => props.onEdit({ action: a })} />
+            </PropRow>
+          )}
           <PropRow icon="folder" label={T.detail.topic} id="detail-topic-label">
             <button
               type="button"
@@ -363,6 +369,7 @@ export function Detail(props: {
                 matchAnchor
                 topics={props.topics}
                 current={topic || undefined}
+                suggested={topic ? undefined : props.suggest?.(card)}
                 onPick={(t) => {
                   setTopic(t);
                   if (t !== (effectiveTopic(card) ?? "")) {
@@ -377,15 +384,17 @@ export function Detail(props: {
               />
             )}
           </PropRow>
-          <PropRow icon="hash" label={T.detail.tagsShort}>
-            <TagsEditor
-              tags={tags}
-              onChange={(t) => {
-                setTags(t);
-                props.onEdit({ tags: t });
-              }}
-            />
-          </PropRow>
+          {FEATURES.tags && (
+            <PropRow icon="hash" label={T.detail.tagsShort}>
+              <TagsEditor
+                tags={tags}
+                onChange={(t) => {
+                  setTags(t);
+                  props.onEdit({ tags: t });
+                }}
+              />
+            </PropRow>
+          )}
           <PropRow icon="text" label={T.detail.note} id="detail-note-label">
             <NoteField value={note} labelledBy="detail-note-label" onChange={setNote} onSave={saveText} />
           </PropRow>
