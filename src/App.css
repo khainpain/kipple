@@ -3078,6 +3078,10 @@ kbd {
 .topic-menu button.on {
   font-weight: 600;
 }
+.topic-menu-hint {
+  color: var(--muted);
+  font-size: 12px;
+}
 .topic-menu button .icon {
   color: var(--muted);
 }

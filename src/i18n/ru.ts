@@ -365,6 +365,7 @@ export const ru = {
       dupes: "Дубли",
       channel: (name: string) => `Из «${name}»`,
       site: (name: string) => `Ссылки на ${name}`,
+      like: (topic: string) => `Похоже на «${topic}»`,
       photos: "Фото без подписи",
       videos: "Видео без подписи",
       files: "Файлы без подписи",
@@ -379,9 +380,12 @@ export const ru = {
       dupes: "Останется самая полная копия, из одинаковых самая ранняя.",
       notes: "Твой текст без ссылок, не пересланный.",
       rest: "В мусор отсюда только по одной карточке, на доске.",
+      like: "Похожи на карточки, которые ты сам положил в эту тему.",
     },
     keep: "Оставить",
     toTopic: "В тему",
+    /** The look-alike pile goes to the topic it looks like in one click. */
+    toThat: (topic: string) => `В «${topic}»`,
     toJunk: "В мусор",
     keepOne: "Оставить по одному",
     view: "Посмотреть",
@@ -439,6 +443,8 @@ export const ru = {
     filter: "Найти или создать тему",
     create: (name: string) => `Создать тему «${name}»`,
     clear: "Убрать из темы",
+    /** Next to the topic Kipple guesses from the person's own sorting (suggest.ts). */
+    suggested: "похоже",
   },
 
   /** Topics without AI: everything from a channel or site goes to a topic. */

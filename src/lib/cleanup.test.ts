@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Card } from "./types";
 import { applyEdits, editLines, effectiveAction, makeEdit, parseEdits, patchUser } from "./library";
-import { CHANNEL_MIN, breakdown, decide, restore, takeBack, type Pile } from "./cleanup";
+import { CHANNEL_MIN, LIKE_MIN, breakdown, decide, restore, takeBack, type Pile } from "./cleanup";
 import logicSource from "./cleanup.ts?raw";
 import screenSource from "../components/Cleanup.tsx?raw";
 
@@ -190,6 +190,34 @@ describe("breakdown", () => {
   it("says since which year the archive goes", () => {
     expect(breakdown([card(1, { date: "2019-05-01T00:00:00Z" }), card(2), card(3, { date: "2015-01-01T00:00:00Z", removed: true })], NOW).since).toBe(2019);
     expect(breakdown([], NOW).since).toBeUndefined();
+  });
+
+  it("piles cards that look like a topic the person sorted into by hand", () => {
+    const food = (id: number, text: string, topic?: string) => card(id, { kind: "text", text, ...(topic && { user: { topic } }) });
+    const cards = [
+      food(1, "Рецепт шакшуки с фетой", "Еда"),
+      food(2, "Рецепт пасты с томатами", "Еда"),
+      food(3, "Шакшука на завтрак"),
+      food(4, "Рецепты пирогов с фетой"),
+      food(5, "Паста с томатами, рецепт"),
+      food(6, "Погода на выходные"),
+      // From a big channel: the channel pile keeps it, a rule for the channel may follow.
+      ...many(CHANNEL_MIN, 10, (i) => ({ kind: "text", text: `Рецепт ${i}`, forwardedFrom: "Вкусно" })),
+    ];
+    const b = breakdown(cards, NOW);
+    expect(b.piles.map((p) => p.key)).toEqual(["ch:Вкусно", "like:Еда", "notes"]);
+    expect(ids(pileOf(cards, "like:Еда"))).toEqual([3, 4, 5]);
+    expect(pileOf(cards, "like:Еда")).toMatchObject({ kind: "like", name: "Еда" });
+  });
+
+  it("makes no look-alike pile from fewer than LIKE_MIN cards", () => {
+    const cards = [
+      card(1, { kind: "text", text: "Рецепт шакшуки", user: { topic: "Еда" } }),
+      card(2, { kind: "text", text: "Рецепт пасты", user: { topic: "Еда" } }),
+      ...many(LIKE_MIN - 1, 3, (i) => ({ kind: "text", text: `Рецепт номер ${i}` })),
+      card(9, { kind: "text", text: "Погода" }),
+    ];
+    expect(breakdown(cards, NOW).piles.some((p) => p.kind === "like")).toBe(false);
   });
 
   it("sorts a 2,000-card archive well within a second", () => {

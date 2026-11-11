@@ -21,6 +21,7 @@ export const changelog = [
       "A calmer start: AI, Three for today, extra board views, extra statuses and tags are tucked away for now, and the old Send to Telegram group is gone",
       "Topics without AI: send everything from a channel or site to a topic, and links to well-known sites sort themselves",
       "Search understands word forms in English and Russian: “study” also finds “studies”",
+      "Topic suggestions from your own sorting: put a few cards in a topic, and Kipple offers it for similar ones in the topic menu and on the Cleanup screen",
     ],
     ru: [
       "«Открыть в Telegram»: переход от карточки к её сообщению в Избранном",
@@ -36,6 +37,7 @@ export const changelog = [
       "Спокойный старт: AI, «Три на сегодня», лишние виды доски, статусы и теги пока убраны с глаз, а старой отправки в группу Telegram больше нет",
       "Темы без ИИ: всё из канала или с сайта попадает в нужную тему, а ссылки на известные сайты раскладываются сами",
       "Поиск понимает формы слов по-русски и по-английски: «кошка» находит и «кошки», и «кошкой»",
+      "Подсказки тем по твоей раскладке: положи пару карточек в тему, и Kipple предложит её для похожих в меню темы и на экране «Уборка»",
     ],
   },
   {

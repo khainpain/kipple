@@ -17,6 +17,8 @@ export function TopicMenu(props: {
   topics: string[];
   /** The topic the card is in now (single card only). */
   current?: string;
+  /** The topic the card looks like by the person's own sorting (single card only): shown first. */
+  suggested?: string;
   /** "" takes the topic away. */
   onPick: (topic: string) => void;
   onClose: () => void;
@@ -57,6 +59,7 @@ export function TopicMenu(props: {
   const lower = name.toLocaleLowerCase();
   const list = props.topics.filter((t) => !lower || t.toLocaleLowerCase().includes(lower)).sort((a, b) => (lower ? Number(!a.toLocaleLowerCase().startsWith(lower)) - Number(!b.toLocaleLowerCase().startsWith(lower)) : 0) || compareText(a, b));
   const exact = props.topics.find((t) => t.toLocaleLowerCase() === lower);
+  const top = !lower && props.suggested !== props.current ? props.suggested : undefined;
 
   function pick(t: string) {
     props.onPick(t);
@@ -93,7 +96,14 @@ export function TopicMenu(props: {
           }}
         />
         <div className="topic-menu-list">
-          {list.map((t) => (
+          {top && (
+            <button onClick={() => pick(top)}>
+              <span className="topic-dot" style={{ "--h": hueOf(top) } as React.CSSProperties} />
+              <span className="label">{top}</span>
+              <small className="topic-menu-hint">{T.move.suggested}</small>
+            </button>
+          )}
+          {list.filter((t) => t !== top).map((t) => (
             <button key={t} onClick={() => pick(t)} className={t === props.current ? "on" : undefined}>
               <span className="topic-dot" style={{ "--h": hueOf(t) } as React.CSSProperties} />
               <span className="label">{t}</span>

@@ -35,6 +35,7 @@ export type CardHandlers = {
   onPin: (c: Card) => void;
   topics: string[];
   onMove: (c: Card, topic: string) => void;
+  suggest?: (c: Card) => string | undefined;
   /** Show every card from this channel (a click on the name on a card). */
   onSource?: (name: string) => void;
   onOpenLink: (url: string) => void;
@@ -122,6 +123,7 @@ export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?
       onPin={() => props.onPin(c)}
       topics={props.topics}
       onMove={(t) => props.onMove(c, t)}
+      suggest={props.suggest}
       onSource={props.onSource}
       onOpenLink={props.onOpenLink}
     />

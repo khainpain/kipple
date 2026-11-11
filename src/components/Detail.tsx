@@ -29,6 +29,8 @@ export function Detail(props: {
   lib: Library;
   card: Card;
   topics: string[];
+  /** The topic the card looks like by the person's own sorting; asked only when the menu opens. */
+  suggest?: (c: Card) => string | undefined;
   mode: OpenMode;
   /** Phone: always full screen, so the side/center/full switch is left out. */
   narrow?: boolean;
@@ -367,6 +369,7 @@ export function Detail(props: {
                 matchAnchor
                 topics={props.topics}
                 current={topic || undefined}
+                suggested={topic ? undefined : props.suggest?.(card)}
                 onPick={(t) => {
                   setTopic(t);
                   if (t !== (effectiveTopic(card) ?? "")) {

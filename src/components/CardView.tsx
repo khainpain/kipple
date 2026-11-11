@@ -164,6 +164,8 @@ export function CardView(props: {
   /** Topics to offer in "Move to topic", and moving there ("" = no topic). */
   topics: string[];
   onMove: (topic: string) => void;
+  /** The topic the card looks like by the person's own sorting; asked only when the menu opens. */
+  suggest?: (c: Card) => string | undefined;
   /** Click on the channel name: show every card from it. Without it the name is plain text. */
   onSource?: (name: string) => void;
   onOpenLink: (url: string) => void;
@@ -284,7 +286,7 @@ export function CardView(props: {
         <button className={`ha${moveAt ? " on" : ""}`} title={T.move.button} onClick={(e) => setMoveAt(moveAt ? null : e.currentTarget)}>
           <Icon name="folder" size={15} />
         </button>
-        {moveAt && <TopicMenu anchor={moveAt} topics={props.topics} current={effectiveTopic(card)} onPick={props.onMove} onClose={() => setMoveAt(null)} />}
+        {moveAt && <TopicMenu anchor={moveAt} topics={props.topics} current={effectiveTopic(card)} suggested={props.suggest?.(card)} onPick={props.onMove} onClose={() => setMoveAt(null)} />}
         {card.urls[0] && (
           <button className="ha" title={T.card.openLink} onClick={() => props.onOpenLink(card.urls[0])}>
             <Icon name="external" size={15} />

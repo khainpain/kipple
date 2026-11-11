@@ -19,13 +19,13 @@ export interface CleanupSession {
 }
 export const NEW_SESSION: CleanupSession = { later: [], undo: [] };
 
-const ICONS: Record<PileKind, string> = { junk: "trash", dupes: "copy", channel: "send", site: "globe", photos: "photo", videos: "video", files: "file", audio: "music", old: "clock", notes: "text", rest: "inbox" };
+const ICONS: Record<PileKind, string> = { junk: "trash", dupes: "copy", channel: "send", site: "globe", like: "folder", photos: "photo", videos: "video", files: "file", audio: "music", old: "clock", notes: "text", rest: "inbox" };
 const SAMPLES = 4;
 /** Two decisions closer together than this are one press that ran on. */
 const DECIDE_GAP_MS = 400;
 
 export function pileTitle(p: Pile): string {
-  return p.kind === "channel" || p.kind === "site" ? T.cleanup.pile[p.kind](p.name ?? "") : T.cleanup.pile[p.kind];
+  return p.kind === "channel" || p.kind === "site" || p.kind === "like" ? T.cleanup.pile[p.kind](p.name ?? "") : T.cleanup.pile[p.kind];
 }
 
 /**
@@ -253,6 +253,11 @@ export function Cleanup(props: {
                     {c.toJunk}
                   </button>
                 )}
+                {p.kind === "like" && p.name && (
+                  <button className="small-btn" onClick={() => act(p, "topic", p.name)}>
+                    {c.toThat(p.name)}
+                  </button>
+                )}
                 {p.kind !== "dupes" && (
                   <button className="secondary small-btn" onClick={() => act(p, "keep")}>
                     {c.keep}
@@ -263,8 +268,8 @@ export function Cleanup(props: {
                     {c.toTopic}
                   </button>
                 )}
-                {/* A mixed remainder is decided card by card on the board, not thrown out in one go. */}
-                {p.kind !== "dupes" && p.kind !== "junk" && p.kind !== "rest" && (
+                {/* A mixed remainder is decided card by card on the board, and a look-alike pile is wanted, not junk. */}
+                {p.kind !== "dupes" && p.kind !== "junk" && p.kind !== "rest" && p.kind !== "like" && (
                   <button className="secondary small-btn" onClick={() => act(p, "junk")}>
                     {c.toJunk}
                   </button>

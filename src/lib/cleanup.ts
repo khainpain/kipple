@@ -2,6 +2,7 @@ import type { Card, UserPatch } from "./types";
 import { effectiveAction, effectiveTopic } from "./library";
 import { domainOf } from "./rules";
 import { dupeKey, findDuplicates, groupDuplicates } from "./smart";
+import { learnTopics, suggestTopic } from "./suggest";
 
 /**
  * "First cleanup": what the archive is made of, as piles that take one decision each. Everything
@@ -11,16 +12,18 @@ import { dupeKey, findDuplicates, groupDuplicates } from "./smart";
 
 /** A channel or a site becomes a pile from this many cards. */
 export const CHANNEL_MIN = 5;
+/** Cards that look like a topic the person sorted into by hand become a pile from this many. */
+export const LIKE_MIN = 3;
 /** "Old" is anything saved longer ago than this. */
 export const OLD_YEARS = 2;
 
-export type PileKind = "junk" | "dupes" | "channel" | "site" | "photos" | "videos" | "files" | "audio" | "old" | "notes" | "rest";
+export type PileKind = "junk" | "dupes" | "channel" | "site" | "like" | "photos" | "videos" | "files" | "audio" | "old" | "notes" | "rest";
 
 export interface Pile {
   /** Stable while the pile exists: the kind, plus the channel or site. */
   key: string;
   kind: PileKind;
-  /** The channel or the site. */
+  /** The channel, the site, or the topic the cards look like. */
   name?: string;
   cards: Card[];
 }
@@ -42,8 +45,10 @@ export interface Breakdown {
 const TYPE_PILE: Partial<Record<Card["kind"], PileKind>> = { photo: "photos", video: "videos", animation: "videos", video_note: "videos", document: "files", voice: "audio", audio: "audio" };
 const TYPE_ORDER: PileKind[] = ["photos", "videos", "files", "audio"];
 
-/** Takes out of `pool` the groups of at least CHANNEL_MIN cards with the same name, biggest first. */
-function takeGroups(pool: Card[], kind: "channel" | "site", nameOf: (c: Card) => string | undefined): { piles: Pile[]; rest: Card[] } {
+const GROUP_KEY = { channel: "ch", site: "site", like: "like" } as const;
+
+/** Takes out of `pool` the groups of at least `min` cards with the same name, biggest first. */
+function takeGroups(pool: Card[], kind: keyof typeof GROUP_KEY, nameOf: (c: Card) => string | undefined, min = CHANNEL_MIN): { piles: Pile[]; rest: Card[] } {
   const groups = new Map<string, Card[]>();
   for (const c of pool) {
     const name = nameOf(c);
@@ -52,9 +57,9 @@ function takeGroups(pool: Card[], kind: "channel" | "site", nameOf: (c: Card) =>
     if (g) g.push(c);
     else groups.set(name, [c]);
   }
-  const big = [...groups].filter(([, g]) => g.length >= CHANNEL_MIN).sort((a, b) => b[1].length - a[1].length || (a[0] < b[0] ? -1 : 1));
+  const big = [...groups].filter(([, g]) => g.length >= min).sort((a, b) => b[1].length - a[1].length || (a[0] < b[0] ? -1 : 1));
   const taken = new Set(big.flatMap(([, g]) => g));
-  return { piles: big.map(([name, cards]) => ({ key: `${kind === "channel" ? "ch" : "site"}:${name}`, kind, name, cards })), rest: pool.filter((c) => !taken.has(c)) };
+  return { piles: big.map(([name, cards]) => ({ key: `${GROUP_KEY[kind]}:${name}`, kind, name, cards })), rest: pool.filter((c) => !taken.has(c)) };
 }
 
 export function breakdown(cards: Card[], now = Date.now()): Breakdown {
@@ -99,6 +104,11 @@ export function breakdown(cards: Card[], now = Date.now()): Breakdown {
     piles.push(...g.piles);
     pool = g.rest;
   }
+  // After channels and sites, which a rule can then keep sorted: what looks like the person's own sorting.
+  const model = learnTopics(cards);
+  const like = takeGroups(pool, "like", (c) => suggestTopic(model, c), LIKE_MIN);
+  piles.push(...like.piles);
+  pool = like.rest;
   for (const kind of TYPE_ORDER) take(kind, (c) => TYPE_PILE[c.kind] === kind && !c.text.trim());
   const cutoff = new Date(now);
   cutoff.setFullYear(cutoff.getFullYear() - OLD_YEARS);

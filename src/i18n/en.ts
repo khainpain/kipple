@@ -357,6 +357,7 @@ export const en: Dict = {
       dupes: "Duplicates",
       channel: (name) => `From ${name}`,
       site: (name) => `Links to ${name}`,
+      like: (topic) => `Looks like “${topic}”`,
       photos: "Photos without a caption",
       videos: "Videos without a caption",
       files: "Files without a caption",
@@ -370,9 +371,11 @@ export const en: Dict = {
       dupes: "The fullest copy stays; of identical ones, the earliest.",
       notes: "Text you wrote yourself, with no links.",
       rest: "Junk these one card at a time, on the board.",
+      like: "Like the cards you put in this topic yourself.",
     },
     keep: "Keep",
     toTopic: "To a topic",
+    toThat: (topic) => `To “${topic}”`,
     toJunk: "To junk",
     keepOne: "Keep one of each",
     view: "View",
@@ -429,6 +432,7 @@ export const en: Dict = {
     filter: "Find or create a topic",
     create: (name) => `Create topic "${name}"`,
     clear: "Remove from topic",
+    suggested: "likely",
   },
 
   /** Topics without AI: everything from a channel or site goes to a topic. */
