@@ -127,6 +127,8 @@ export function Sidebar(props: {
   scope: Scope;
   tag: string | null;
   listCounts: Record<string, number>;
+  /** Cards the cleanup screen still has in its piles. */
+  cleanupLeft: number;
   topics: Array<[string, number]>;
   noTopic: number;
   tags: Array<[string, number]>;
@@ -162,6 +164,7 @@ export function Sidebar(props: {
 
       <nav className="side-group">
         <Item icon="home" label={T.nav.home} active={is({ kind: "home" })} onClick={() => props.onScope({ kind: "home" })} />
+        <Item icon="broom" label={T.cleanup.title} count={props.cleanupLeft || undefined} active={is({ kind: "cleanup" })} onClick={() => props.onScope({ kind: "cleanup" })} />
         {SMART_LISTS.map((l) => (
           <Item key={l.key} icon={l.icon} label={l.label} count={props.listCounts[l.key]} active={is({ kind: "list", key: l.key })} onClick={() => props.onScope({ kind: "list", key: l.key })} />
         ))}

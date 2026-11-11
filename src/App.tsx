@@ -3,10 +3,10 @@ import { platform } from "@platform";
 import { useUpdateCheck } from "./useUpdateCheck";
 import { useTelegramAccount } from "./useTelegramAccount";
 import "./App.css";
-import type { Card, Library, UserFields } from "./lib/types";
+import type { Card, Library, UserPatch } from "./lib/types";
 import type { Skips, TodayState } from "./lib/today";
-import { effectiveTags, effectiveTopic, findTopic, getOwnTopics, makeEdit, matchesFilter, restorePrevAi, mergeAlias, NO_ALIASES, setAliases, setOwnTopics, topicName, type Aliases } from "./lib/library";
-import { aiAllowed, appendEdit, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadPendingReplies, loadSettings, saveBoardState, saveLibrary, savePendingReplies, saveSettings, wipeAll, type Settings } from "./lib/store";
+import { effectiveTags, effectiveTopic, findTopic, getOwnTopics, makeEdit, matchesFilter, patchUser, restorePrevAi, mergeAlias, NO_ALIASES, setAliases, setOwnTopics, topicName, type Aliases } from "./lib/library";
+import { aiAllowed, appendEdits, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadPendingReplies, loadSettings, saveBoardState, saveLibrary, savePendingReplies, saveSettings, wipeAll, type Settings } from "./lib/store";
 import { dueReplies, nextDue, replyText, scheduleReply, withoutReplies, type PendingReply } from "./lib/tgReplies";
 import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type SendOptions } from "./lib/telegram";
 import { TelegramDialog } from "./components/TelegramDialog";
@@ -63,6 +63,8 @@ export default function App() {
    * so nothing done in it can touch the real library. "Exit demo" goes back to the start.
    */
   const [demo, setDemo] = useState(false);
+  /** The library that was just loaded for the first time: the workspace opens the cleanup screen for it. */
+  const [cleanupFor, setCleanupFor] = useState<Library | null>(null);
   /** Merges tried out in the demo stay in memory, apart from the real ones in settings. */
   const [demoAliases, setDemoAliases] = useState<Aliases>(NO_ALIASES);
   const [demoTopics, setDemoTopics] = useState<string[]>([]);
@@ -406,9 +408,11 @@ export default function App() {
     const src = await pickExportFolder();
     if (!src) return;
     try {
+      const first = !lib || demoRef.current;
       const { lib: next, added, warning } = await importFolder(src, demoRef.current ? null : lib);
       if (lib) retired.current.add(lib);
       await saveLibrary(next);
+      if (first) setCleanupFor(next);
       demoRef.current = false; // before fetchPreviews below, which saves as it goes
       setTelemetrySuspended(false);
       setDemo(false);
@@ -469,6 +473,7 @@ export default function App() {
       if (fresh && l.cards.length) {
         track("import_completed", "direct");
         markImported();
+        if (!ctl.signal.aborted) setCleanupFor(l);
       }
     } catch (e) {
       if (fresh) track("import_failed", "direct");
@@ -503,14 +508,14 @@ export default function App() {
   }
 
   const edit = useCallback(
-    (ids: number[], patch: UserFields) => {
+    (ids: number[], patch: UserPatch) => {
       if (!lib) return;
       const set = new Set(ids);
-      for (const c of lib.cards) if (set.has(c.id)) c.user = { ...c.user, ...patch };
+      for (const c of lib.cards) if (set.has(c.id)) c.user = patchUser(c.user, patch);
       setRev((r) => r + 1);
       if (demoRef.current) return;
       track("item_edited", "tags" in patch ? "tag" : "topic" in patch ? "topic" : "action" in patch ? "status" : "other");
-      for (const id of ids) void appendEdit(makeEdit(id, patch)).catch((e) => notify(T.app.editFailed(String(e))));
+      void appendEdits(ids.map((id) => makeEdit(id, patch))).catch((e) => notify(T.app.editFailed(String(e))));
     },
     [lib, notify],
   );
@@ -860,6 +865,8 @@ export default function App() {
     <div className="app">
       {banners}
       <Workspace
+        // The demo and the person's own library never share what the workspace remembers (filters, cleanup undo).
+        key={demo ? "demo" : "own"}
         lib={lib}
         rev={rev}
         tgAccount={tgAccount}
@@ -886,6 +893,7 @@ export default function App() {
         today={demo ? demoToday.today : settings.today}
         taskSkips={demo ? demoToday.skips : (settings.taskSkips ?? {})}
         onToday={saveToday}
+        firstCleanup={cleanupFor === lib}
       />
       {settingsDialog}
       {consentDialog}

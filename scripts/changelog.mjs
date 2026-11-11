@@ -16,6 +16,7 @@ export const changelog = [
       "Every card shows the channel it came from; click it to see all cards from that channel",
       "Sort the open card from the keyboard: I for important, 1–4 for status, Delete for junk, Ctrl+Z to undo",
       "Voice messages and audio get their own filter",
+      "Cleanup: after the first load Kipple sorts your archive into piles (obvious junk, duplicates, by channel, by site and more), one decision per pile; nothing changes in Telegram",
       "Many fixes: edits and AI titles no longer get lost, sensitive cards never go to the AI",
     ],
     ru: [
@@ -27,6 +28,7 @@ export const changelog = [
       "На каждой карточке виден канал, откуда она пришла; клик показывает все карточки из него",
       "Открытую карточку можно разобрать с клавиатуры: I — в важное, 1–4 — статус, Delete — в мусор, Ctrl+Z — отменить",
       "Голосовые и аудио получили свой фильтр",
+      "«Уборка»: после первой загрузки Kipple раскладывает архив на кучи (очевидный мусор, дубли, по каналам, по сайтам и другие), на каждую одно решение; в Telegram ничего не меняется",
       "Много исправлений: правки и AI-названия больше не теряются, чувствительные карточки никогда не уходят в AI",
     ],
   },

@@ -1,4 +1,4 @@
-import type { Action, Card, EditEvent, Library, UserFields } from "./types";
+import type { Action, Card, EditEvent, Library, UserFields, UserPatch } from "./types";
 import { linkText } from "./embeds";
 
 /**
@@ -45,17 +45,42 @@ export function restorePrevAi(cards: Card[]): boolean {
   return restored;
 }
 
+/** The user's fields after a change; a null in the patch takes that field away. */
+export function patchUser(user: UserFields | undefined, patch: UserPatch): UserFields {
+  return Object.fromEntries(Object.entries({ ...user, ...patch }).filter(([, v]) => v !== null)) as UserFields;
+}
+
+/** Edits as lines of the edit log. They start on a fresh line, so a line torn by a crash doesn't swallow the next edit. */
+export function editLines(events: EditEvent[]): string {
+  return "\n" + events.map((ev) => JSON.stringify(ev) + "\n").join("");
+}
+
+export function parseEdits(text: string): EditEvent[] {
+  const out: EditEvent[] = [];
+  for (const line of text.split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      out.push(JSON.parse(line));
+    } catch {
+      // A torn line after a crash: ignore it.
+    }
+  }
+  return out;
+}
+
 export function applyEdits(cards: Card[], events: EditEvent[]): Card[] {
   const byId = new Map(cards.map((c) => [c.id, c]));
   for (const ev of events) {
     const c = byId.get(ev.id);
-    if (c) c.user = { ...c.user, ...ev.patch };
+    if (c) c.user = patchUser(c.user, ev.patch);
   }
   return cards;
 }
 
+/** A status set by hand, then the rule's junk guess, then the AI's. "Keep" on the cleanup screen overrules a guess of junk. */
 export function effectiveAction(c: Card): Action | undefined {
-  return c.user?.action ?? (c.autoJunk ? "junk" : c.ai?.action);
+  const guess = c.autoJunk && !c.user?.kept ? "junk" : c.ai?.action;
+  return c.user?.action ?? (guess === "junk" && c.user?.kept ? undefined : guess);
 }
 
 /**
@@ -159,7 +184,7 @@ export function matchesFilter(c: Card, f: FilterKey): boolean {
   }
 }
 
-export function makeEdit(id: number, patch: UserFields): EditEvent {
+export function makeEdit(id: number, patch: UserPatch): EditEvent {
   return { t: new Date().toISOString(), id, patch };
 }
 
