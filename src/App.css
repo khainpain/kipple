@@ -2577,6 +2577,31 @@ button.ov-title:hover {
   color: var(--ok);
   margin-top: 2px;
 }
+/* What the screen is, until the first decision. */
+.cl-intro {
+  max-width: 920px;
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+}
+.cl-intro .today-mascot {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+}
+.cl-intro h3 {
+  margin: 0 0 2px;
+  font-size: 14.5px;
+}
+.cl-intro p {
+  margin: 0;
+  font-size: 13px;
+  text-wrap: pretty;
+}
 .cl-piles {
   list-style: none;
   margin: 16px 0 0;

@@ -357,6 +357,9 @@ export const ru = {
     summary: (total: number, since: number | undefined, sorted: number) => `${cards(total)}${since ? ` с ${since} года` : ""}. Разобрано: ${num(sorted)}.`,
     safe: "В Telegram здесь ничего не меняется. «В мусор» только помечает карточки внутри Kipple, и любое решение можно отменить.",
     sensitive: (n: number) => `${cards(n)} ${plural(n, "похожа", "похожи", "похожи")} на пароли и ключи. В кучи они не попадают.`,
+    /** Shown until the first decision on this screen. */
+    introTitle: "Kipple голоден",
+    intro: "Он разложил твоё «Избранное» по кучам и ждёт решений. На каждую хватит одного: оставить, отправить в тему или в мусор. Начни сверху, там самое очевидное.",
     pile: {
       junk: "Очевидный мусор",
       dupes: "Дубли",

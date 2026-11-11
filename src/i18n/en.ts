@@ -350,6 +350,8 @@ export const en: Dict = {
     summary: (total, since, sorted) => `${cards(total)}${since ? ` since ${since}` : ""}. Sorted: ${num(sorted)}.`,
     safe: "Nothing here changes Telegram. “To junk” only marks cards inside Kipple, and every decision can be undone.",
     sensitive: (n) => `${cards(n)} ${n === 1 ? "looks" : "look"} like passwords or keys. They stay out of the piles.`,
+    introTitle: "Kipple is hungry",
+    intro: "It has sorted your Saved Messages into piles and is waiting for your call. Each pile takes one decision: keep it, move it to a topic, or send it to junk. Start at the top, with the obvious ones.",
     pile: {
       junk: "Obvious junk",
       dupes: "Duplicates",
