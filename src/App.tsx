@@ -865,6 +865,8 @@ export default function App() {
     <div className="app">
       {banners}
       <Workspace
+        // The demo and the person's own library never share what the workspace remembers (filters, cleanup undo).
+        key={demo ? "demo" : "own"}
         lib={lib}
         rev={rev}
         tgAccount={tgAccount}

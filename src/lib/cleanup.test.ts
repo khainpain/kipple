@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Card } from "./types";
-import { applyEdits, effectiveAction, makeEdit, patchUser } from "./library";
-import { CHANNEL_MIN, breakdown, decide, restore, type Pile } from "./cleanup";
+import { applyEdits, editLines, effectiveAction, makeEdit, parseEdits, patchUser } from "./library";
+import { CHANNEL_MIN, breakdown, decide, restore, takeBack, type Pile } from "./cleanup";
 import logicSource from "./cleanup.ts?raw";
 import screenSource from "../components/Cleanup.tsx?raw";
 
@@ -76,9 +76,9 @@ describe("breakdown", () => {
     ];
     const b = breakdown(cards, NOW);
     expect(b.piles).toEqual([]);
-    expect(b.sensitive).toBe(7);
-    // Rule-guessed junk that looks sensitive is already in Junk on the board; it stays out of the bulk pile.
-    expect(b.sorted.junk).toBe(1);
+    // Guessed junk that looks sensitive was never decided: it is counted with the sensitive, not as sorted.
+    expect(b.sensitive).toBe(8);
+    expect(b.sorted.junk).toBe(0);
   });
 
   it("makes a channel or site pile only from five cards up, biggest first", () => {
@@ -139,7 +139,6 @@ describe("breakdown", () => {
     const cards = [
       card(1, { user: { action: "junk" } }),
       card(2, { user: { action: "junk", topic: "Dev", kept: true } }),
-      card(3, { ai }), // the AI called it junk: it is in Junk on the board already
       card(4, { user: { topic: "Dev" } }),
       card(5, { ai: { ...ai, action: "reference" } }),
       card(6, { user: { topic: "Dev", kept: true } }),
@@ -148,9 +147,32 @@ describe("breakdown", () => {
       card(9, { removed: true, user: { kept: true } }),
     ];
     const b = breakdown(cards, NOW);
-    expect(b.sorted).toEqual({ junk: 3, topics: 3, kept: 2 });
-    expect(b.total).toBe(8);
+    expect(b.sorted).toEqual({ junk: 2, topics: 3, kept: 2 });
+    expect(b.total).toBe(7);
     expect(b.piles).toEqual([]);
+  });
+
+  it("leaves out of the piles what the person already worked on: a status, important, a note, tags, a title", () => {
+    // Posts from one channel would be a pile, and "To junk" on it would take these along.
+    const cards = [
+      card(1, { forwardedFrom: "News", user: { action: "todo" } }),
+      card(2, { forwardedFrom: "News", user: { pinned: true } }),
+      card(3, { forwardedFrom: "News", user: { note: "ask Anna" } }),
+      card(4, { forwardedFrom: "News", user: { tags: ["trip"] } }),
+      card(5, { forwardedFrom: "News", user: { title: "For May" } }),
+      ...many(CHANNEL_MIN, 6, () => ({ forwardedFrom: "News", user: { note: " ", pinned: false, tags: [], title: "" } })),
+    ];
+    const b = breakdown(cards, NOW);
+    expect(b.sorted.kept).toBe(5);
+    expect(b.piles.map((p) => [p.key, ids(p)])).toEqual([["ch:News", [6, 7, 8, 9, 10]]]);
+  });
+
+  it("offers junk guessed by the AI the same way as junk guessed by a rule", () => {
+    const ai = { title: "", summary: "", topic: "", tags: [], action: "junk" as const, priority: 2 as const, model: "m", at: "t" };
+    const b = breakdown([card(1, { ai }), card(2, { ai, sensitive: true })], NOW);
+    expect(b.piles.map((p) => [p.key, ids(p)])).toEqual([["junk", [1]]]);
+    expect(b.sorted.junk).toBe(0);
+    expect(b.sensitive).toBe(1);
   });
 
   it("offers rule-guessed junk until the person decides, and not again after they took it out", () => {
@@ -198,6 +220,17 @@ describe("decide", () => {
     expect(breakdown([kept], NOW).sorted).toEqual({ kept: 1, topics: 0, junk: 0 });
   });
 
+  it("takes junk out of Junk when it is kept even if a rule and the AI both called it junk", () => {
+    const ai = { title: "", summary: "", topic: "", tags: [], action: "junk" as const, priority: 2 as const, model: "m", at: "t" };
+    const kept = card(1, { kind: "text", text: "ok", autoJunk: true, ai, user: { kept: true } });
+    expect(effectiveAction(kept)).toBeUndefined();
+    const b = breakdown([kept, card(2, { ai, user: { kept: true } })], NOW);
+    expect(b.piles).toEqual([]);
+    expect(b.sorted).toEqual({ kept: 2, topics: 0, junk: 0 });
+    // Another guess of the AI's is still used.
+    expect(effectiveAction(card(3, { autoJunk: true, ai: { ...ai, action: "todo" }, user: { kept: true } }))).toBe("todo");
+  });
+
   it("sends a pile to a topic or to junk inside Kipple", () => {
     const pile = pileOf(five(), "ch:News")!;
     expect(decide(pile, "topic", "Reading")).toEqual([{ ids: [1, 2, 3, 4, 5], patch: { topic: "Reading" } }]);
@@ -213,10 +246,10 @@ describe("decide", () => {
       card(4, { urls: ["https://b.example/y"], text: "https://b.example/y", date: "2026-01-01T00:00:00Z" }),
       card(5, { urls: ["https://b.example/y"], text: "https://b.example/y for the trip in May", date: "2026-02-01T00:00:00Z" }),
       card(6, { urls: ["https://c.example/z"], text: "z", date: "2026-01-01T00:00:00Z" }),
-      card(7, { urls: ["https://c.example/z"], text: "z", date: "2026-02-01T00:00:00Z", user: { note: "ask Anna about this" } }),
+      card(7, { urls: ["https://c.example/z"], text: "z", date: "2026-01-01T00:00:00Z" }),
     ];
     const edits = decide(pileOf(cards, "dupes")!, "keepOne");
-    expect(edits).toEqual([{ ids: [1, 3, 4, 6], patch: { action: "junk" } }]);
+    expect(edits).toEqual([{ ids: [1, 3, 4, 7], patch: { action: "junk" } }]);
   });
 
   it("can be taken back exactly: the cards return to the pile they were in", () => {
@@ -238,11 +271,21 @@ describe("decide", () => {
 
   it("puts back a topic or status the card had before", () => {
     const cards = [...five({ user: { action: "idea" } }), card(9, { forwardedFrom: "News" })];
-    const edits = decide(pileOf(cards, "ch:News")!, "junk");
-    expect(restore(cards, edits)).toEqual([
+    expect(restore(cards, [{ ids: [1, 2, 3, 4, 5, 9], patch: { action: "junk" } }])).toEqual([
       { ids: [1, 2, 3, 4, 5], patch: { action: "idea" } },
       { ids: [9], patch: { action: null } },
     ]);
+  });
+
+  it("takes back only what still is as the decision left it: a later choice on the board stays", () => {
+    const cards = five();
+    const edits = decide(pileOf(cards, "ch:News")!, "junk");
+    const back = restore(cards, edits);
+    applyEdits(cards, edits.flatMap((e) => e.ids.map((id) => makeEdit(id, e.patch))));
+    // On the board, after "View": one card got a status of its own, another was taken out of junk.
+    applyEdits(cards, [makeEdit(2, { action: "todo" }), makeEdit(4, { action: undefined })]);
+    expect(takeBack(cards, { edits, back })).toEqual([{ ids: [1, 3, 5], patch: { action: null } }]);
+    expect(takeBack(cards, { edits, back: [] })).toEqual([]);
   });
 });
 
@@ -266,5 +309,18 @@ describe("patchUser", () => {
   it("is what replaying the edit log uses", () => {
     const [c] = applyEdits([card(1, { user: { action: "junk", note: "n" } })], [makeEdit(1, { action: null })]);
     expect(c.user).toEqual({ note: "n" });
+  });
+});
+
+describe("the edit log", () => {
+  it("reads a bulk decision back whole", () => {
+    const events = [1, 2, 3].map((id) => makeEdit(id, { action: "junk" }));
+    expect(parseEdits(editLines(events) + editLines([makeEdit(1, { action: null })]))).toEqual([...events, makeEdit(1, { action: null })]);
+  });
+
+  it("loses only the torn line after a crash mid-write, not the edit written next", () => {
+    const torn = editLines([makeEdit(1, { kept: true }), makeEdit(2, { kept: true })]).slice(0, -12);
+    const next = makeEdit(3, { topic: "Travel" });
+    expect(parseEdits(torn + editLines([next])).map((e) => e.id)).toEqual([1, 3]);
   });
 });

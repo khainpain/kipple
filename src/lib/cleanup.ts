@@ -30,7 +30,7 @@ export interface Breakdown {
   total: number;
   /** Year of the oldest card. */
   since?: number;
-  /** Already decided: in Junk, in a topic, or kept as is. */
+  /** Already decided: sent to Junk, in a topic, or kept as is (also whatever the person already worked on by hand). */
   sorted: { kept: number; topics: number; junk: number };
   /** Look like passwords or keys: never in a pile, shown as a line of their own. */
   sensitive: number;
@@ -68,13 +68,15 @@ export function breakdown(cards: Card[], now = Date.now()): Breakdown {
     if (c.removed) continue;
     total++;
     if (!oldest || c.date < oldest) oldest = c.date;
-    if (effectiveAction(c) === "junk") {
-      // Junk guessed by a rule waits for a yes or no; anything sensitive is never offered in bulk.
-      if (c.user?.action === undefined && c.autoJunk && !c.sensitive) junk.push(c);
-      else sorted.junk++;
-    } else if (c.sensitive) sensitive++;
+    const u = c.user;
+    if (u?.action === "junk") sorted.junk++;
+    // Anything sensitive is never offered in bulk.
+    else if (c.sensitive) sensitive++;
+    // Junk that a rule or the AI guessed waits for a yes or no.
+    else if (effectiveAction(c) === "junk") junk.push(c);
     else if (effectiveTopic(c)) sorted.topics++;
-    else if (c.user?.kept || c.user?.hidden) sorted.kept++;
+    // Anything the person did to a card by hand is a decision too: a pile sent to junk must not take it along.
+    else if (u?.kept || u?.hidden || u?.action || u?.pinned || u?.note?.trim() || u?.tags?.length || u?.title?.trim()) sorted.kept++;
     else pool.push(c);
   }
 
@@ -117,9 +119,9 @@ export interface PileEdit {
   patch: UserPatch;
 }
 
-const fullness = (c: Card) => c.text.trim().length + (c.user?.note?.trim().length ?? 0);
+const fullness = (c: Card) => c.text.trim().length;
 
-/** Of each group of copies, all but the one to keep: the fullest (text and note), else the earliest. */
+/** Of each group of copies, all but the one to keep: the one with the most text, else the earliest. */
 function extraCopies(cards: Card[]): Card[] {
   const groups = new Map<string, Card[]>();
   for (const c of cards) {
@@ -145,6 +147,12 @@ export function decide(pile: Pile, how: Decision, topic?: string): PileEdit[] {
   return edit?.ids.length ? [edit] : [];
 }
 
+/** A decision as the screen remembers it for Undo: what it wrote, and what puts that back. */
+export interface Done {
+  edits: PileEdit[];
+  back: PileEdit[];
+}
+
 /** The edits that put back what `edits` are about to change; taken before they are applied. */
 export function restore(cards: Card[], edits: PileEdit[]): PileEdit[] {
   const byId = new Map(cards.map((c) => [c.id, c]));
@@ -160,4 +168,15 @@ export function restore(cards: Card[], edits: PileEdit[]): PileEdit[] {
     }
   }
   return [...out.values()];
+}
+
+/** Undo of a decision, without the cards that were changed again since: a later choice on the board stays. */
+export function takeBack(cards: Card[], done: Done): PileEdit[] {
+  const byId = new Map(cards.map((c) => [c.id, c]));
+  const asLeft = new Set<number>();
+  for (const e of done.edits) {
+    const keys = Object.keys(e.patch) as (keyof UserPatch)[];
+    for (const id of e.ids) if (keys.every((k) => byId.get(id)?.user?.[k] === e.patch[k])) asLeft.add(id);
+  }
+  return done.back.map((e) => ({ ...e, ids: e.ids.filter((id) => asLeft.has(id)) })).filter((e) => e.ids.length);
 }

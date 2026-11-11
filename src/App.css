@@ -2736,8 +2736,10 @@ button.ov-title:hover {
   color: var(--bg);
   box-shadow: var(--shadow-float);
 }
+/* Stays in the page while empty, so a screen reader hears the next message appear. */
 .cl-note:not(.on) {
-  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 .cl-note .link-btn {
   color: inherit;

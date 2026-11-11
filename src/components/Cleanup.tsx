@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Card, Library, UserPatch } from "../lib/types";
-import { decide, restore, type Breakdown, type Decision, type Pile, type PileEdit, type PileKind } from "../lib/cleanup";
+import { decide, restore, takeBack, type Breakdown, type Decision, type Done, type Pile, type PileKind } from "../lib/cleanup";
 import { track } from "../lib/telemetry";
 import { T, formatNumber } from "../i18n";
 import { coverOf, displayTitle } from "./CardView";
@@ -12,22 +12,27 @@ import mascot from "../../brand/kipple-mascot-light.svg";
 export interface CleanupSession {
   /** Piles set aside with "Later", by key. */
   later: string[];
-  /** Decisions that can be taken back, the latest last: the edits that restore what each one changed. */
-  undo: PileEdit[][];
+  /** Decisions that can be taken back, the latest last, each with the pile it was about. */
+  undo: (Done & { key: string })[];
 }
 export const NEW_SESSION: CleanupSession = { later: [], undo: [] };
 
 const ICONS: Record<PileKind, string> = { junk: "trash", dupes: "copy", channel: "send", site: "globe", photos: "photo", videos: "video", files: "file", audio: "music", old: "clock", notes: "text", rest: "inbox" };
 const SAMPLES = 4;
+/** Two decisions closer together than this are one press that ran on. */
+const DECIDE_GAP_MS = 400;
 
 export function pileTitle(p: Pile): string {
   return p.kind === "channel" || p.kind === "site" ? T.cleanup.pile[p.kind](p.name ?? "") : T.cleanup.pile[p.kind];
 }
 
-/** One example from a pile: its picture when it has one, else its first line. */
-function Sample({ lib, card }: { lib: Library; card: Card }) {
+/**
+ * One example from a pile: its picture when it has one, else its first line. Guessed junk is
+ * hidden on the board until someone looks, so its examples are text and load no picture either.
+ */
+function Sample({ lib, card, plain }: { lib: Library; card: Card; plain: boolean }) {
   const [failed, setFailed] = useState(false);
-  const src = failed ? undefined : coverOf(lib, card).src;
+  const src = failed || plain ? undefined : coverOf(lib, card).src;
   if (src) return <img className="cl-thumb" src={src} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} />;
   return <span className="cl-line">{displayTitle(card)}</span>;
 }
@@ -52,10 +57,13 @@ export function Cleanup(props: {
   onApplyTelegram?: () => void;
 }) {
   const { breakdown: b, session } = props;
-  const [menu, setMenu] = useState<{ pile: Pile; at: HTMLElement } | null>(null);
-  const [note, setNote] = useState("");
-  /** Where the focus goes once the list has changed: the pile now at this place, or the summary. */
-  const [focusAt, setFocusAt] = useState<number | null>(null);
+  /** "To a topic" is open for this pile; the pile itself is looked up again when a topic is picked. */
+  const [menu, setMenu] = useState<{ key: string; at: HTMLElement } | null>(null);
+  /** What just happened, and whether it is a decision that Undo takes back. */
+  const [note, setNote] = useState({ text: "", undo: false });
+  /** Where the focus goes once the list has changed: the pile now at this place or with this key, else the summary. */
+  const [focusAt, setFocusAt] = useState<number | string | null>(null);
+  const decidedAt = useRef(-DECIDE_GAP_MS);
   const list = useRef<HTMLUListElement>(null);
   const summary = useRef<HTMLHeadingElement>(null);
 
@@ -75,35 +83,41 @@ export function Cleanup(props: {
   useEffect(() => {
     if (focusAt === null) return;
     const rows = list.current?.querySelectorAll<HTMLElement>(":scope > li") ?? [];
-    const next = rows[Math.min(focusAt, rows.length - 1)]?.querySelector<HTMLElement>("button");
+    const at = typeof focusAt === "number" ? Math.min(focusAt, rows.length - 1) : active.findIndex((p) => p.key === focusAt);
+    const next = rows[at]?.querySelector<HTMLElement>("button");
     (next ?? summary.current)?.focus({ preventScroll: !next });
     setFocusAt(null);
   }, [focusAt]);
 
   function act(pile: Pile, how: Decision, topic?: string) {
+    // The next pile moves up under the pointer and takes the focus: a double click or a held Enter must not decide it too.
+    if (performance.now() - decidedAt.current < DECIDE_GAP_MS) return;
     const edits = decide(pile, how, topic);
     const n = edits.reduce((sum, e) => sum + e.ids.length, 0);
     if (!n) return;
+    decidedAt.current = performance.now();
     const back = restore(props.lib.cards, edits);
     for (const e of edits) props.onEdit(e.ids, e.patch);
-    props.onSession({ ...session, undo: [...session.undo, back] });
+    props.onSession({ ...session, undo: [...session.undo, { edits, back, key: pile.key }] });
     const c = T.cleanup;
-    setNote(how === "keep" ? c.kept(n) : how === "topic" ? c.moved(n, topic!.trim()) : how === "junk" ? c.junked(n) : c.extras(n));
-    setFocusAt(active.indexOf(pile));
+    setNote({ text: how === "keep" ? c.kept(n) : how === "topic" ? c.moved(n, topic!.trim()) : how === "junk" ? c.junked(n) : c.extras(n), undo: true });
+    setFocusAt(active.findIndex((p) => p.key === pile.key));
     track("cleanup_decided", how === "keepOne" ? "keep_one" : how);
   }
 
   function undo() {
     const last = session.undo[session.undo.length - 1];
     if (!last) return;
-    for (const e of last) props.onEdit(e.ids, e.patch);
+    // Cards changed again since (on the board, after "View") keep that later choice.
+    for (const e of takeBack(props.lib.cards, last)) props.onEdit(e.ids, e.patch);
     props.onSession({ ...session, undo: session.undo.slice(0, -1) });
-    setNote(T.cleanup.undone);
+    setNote({ text: T.cleanup.undone, undo: false });
+    setFocusAt(last.key);
   }
 
   function setAside(pile: Pile) {
     props.onSession({ ...session, later: [...session.later, pile.key] });
-    setNote("");
+    setNote({ text: "", undo: false });
     setFocusAt(active.indexOf(pile));
     track("cleanup_decided", "later");
   }
@@ -111,22 +125,22 @@ export function Cleanup(props: {
   async function copySummary() {
     try {
       await navigator.clipboard.writeText(T.cleanup.share(b.sorted.kept, b.sorted.topics, b.sorted.junk));
-      setNote(T.cleanup.copied);
+      setNote({ text: T.cleanup.copied, undo: false });
     } catch {
-      setNote(T.cleanup.copyFailed);
+      setNote({ text: T.cleanup.copyFailed, undo: false });
     }
   }
 
-  // Ctrl+Z takes the last decision back. Caught before the board's own shortcuts; a dialog on top
-  // or a text field keeps its keys.
+  // Ctrl+Z takes the last decision back. Caught before the board's own shortcuts, so on this screen it
+  // never undoes something on the board out of sight; a dialog on top, the topic menu or a field keeps its keys.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.code !== "KeyZ" || !session.undo.length) return;
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.code !== "KeyZ") return;
       const el = e.target as HTMLElement;
-      if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable || document.querySelector(".modal-backdrop")) return;
+      if (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable || el.closest(".topic-menu") || document.querySelector(".modal-backdrop")) return;
       e.preventDefault();
       e.stopImmediatePropagation();
-      undo();
+      if (!e.repeat) undo(); // a held key takes back one decision, not all of them
     }
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
@@ -225,7 +239,7 @@ export function Cleanup(props: {
                   </button>
                 )}
                 {p.kind !== "dupes" && p.kind !== "junk" && (
-                  <button className="secondary small-btn" aria-haspopup="dialog" aria-expanded={menu?.pile.key === p.key} onClick={(e) => setMenu(menu?.pile.key === p.key ? null : { pile: p, at: e.currentTarget })}>
+                  <button className="secondary small-btn" aria-expanded={menu?.key === p.key} onClick={(e) => setMenu(menu?.key === p.key ? null : { key: p.key, at: e.currentTarget })}>
                     {c.toTopic}
                   </button>
                 )}
@@ -244,14 +258,29 @@ export function Cleanup(props: {
               </div>
               <div className="cl-samples" aria-hidden="true">
                 {p.cards.slice(0, SAMPLES).map((card) => (
-                  <Sample key={card.id} lib={props.lib} card={card} />
+                  <Sample key={card.id} lib={props.lib} card={card} plain={p.kind === "junk"} />
                 ))}
               </div>
             </li>
           );
         })}
       </ul>
-      {menu && <TopicMenu anchor={menu.at} topics={props.topics} onPick={(t) => act(menu.pile, "topic", t)} onClose={() => setMenu(null)} />}
+      {menu && (
+        <TopicMenu
+          anchor={menu.at}
+          topics={props.topics}
+          onPick={(t) => {
+            const pile = active.find((p) => p.key === menu.key);
+            if (pile) act(pile, "topic", t);
+          }}
+          onClose={() => {
+            setMenu(null);
+            // The keyboard is back on the button (without scrolling: the menu also closes when the list is scrolled).
+            // After a pick the pile leaves the list and the focus moves on from there.
+            menu.at.focus({ preventScroll: true });
+          }}
+        />
+      )}
 
       {later.length > 0 && (
         <section className="cl-later-list" aria-labelledby="cl-later">
@@ -262,7 +291,7 @@ export function Cleanup(props: {
                 <Icon name={ICONS[p.kind]} size={14} />
                 <span className="label">{pileTitle(p)}</span>
                 <small>{formatNumber(p.cards.length)}</small>
-                <button className="link-btn" onClick={() => props.onSession({ ...session, later: session.later.filter((k) => k !== p.key) })}>
+                <button className="link-btn" onClick={() => (props.onSession({ ...session, later: session.later.filter((k) => k !== p.key) }), setNote({ text: "", undo: false }), setFocusAt(p.key))}>
                   {c.bringBack}
                 </button>
               </li>
@@ -271,9 +300,9 @@ export function Cleanup(props: {
         </section>
       )}
 
-      <div className={`cl-note${note ? " on" : ""}`} role="status">
-        {note && <span>{note}</span>}
-        {note && session.undo.length > 0 && (
+      <div className={`cl-note${note.text ? " on" : ""}`}>
+        <span role="status">{note.text}</span>
+        {note.undo && session.undo.length > 0 && (
           <button className="link-btn" onClick={undo}>
             {c.undo} <kbd>Ctrl+Z</kbd>
           </button>

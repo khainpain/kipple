@@ -111,7 +111,7 @@ export function Workspace(props: {
   onToday: (p: { today?: TodayState; skips?: Skips }) => void;
 }) {
   const { lib, rev, onEdit } = props;
-  const [scope, setScope] = useState<Scope>({ kind: "home" });
+  const [scope, setScope] = useState<Scope>({ kind: props.firstCleanup ? "cleanup" : "home" });
   const [type, setType] = useState<TypeKey | null>(null);
   const theme = useThemePref();
   const [tag, setTag] = useState<string | null>(null);
@@ -299,7 +299,8 @@ export function Workspace(props: {
   const piles = useMemo(() => breakdown(lib.cards), [lib, rev]); // eslint-disable-line react-hooks/exhaustive-deps
   const cleanupLeft = useMemo(() => piles.piles.reduce((n, p) => n + p.cards.length, 0), [piles]);
   useEffect(() => {
-    if (props.firstCleanup) pickScope({ kind: "cleanup" });
+    // After a load from Telegram this comes when everything is in: someone already busy on the board stays there.
+    if (props.firstCleanup && scope.kind === "home" && !query.trim() && openId == null) pickScope({ kind: "cleanup" });
   }, [props.firstCleanup]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const inScope = useMemo(() => base.filter((c) => matchesScope(c, shown, dupes) && (!pile || pile.ids.has(c.id))), [base, JSON.stringify(shown), dupes, pile]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -381,6 +382,8 @@ export function Workspace(props: {
   function pickScope(s: Scope) {
     setDrawer(false);
     setScope(s);
+    // The cleanup screen has keys of its own (Ctrl+Z); a card left open would answer them too.
+    if (s.kind === "cleanup") setOpenId(null);
     setTag(null);
     setSource(null);
     setPile(null);
@@ -411,7 +414,7 @@ export function Workspace(props: {
 
   /** Shows every card from the channel the clicked card came from; from the overview, across all cards. */
   function pickSource(name: string) {
-    if (scope.kind === "home") setScope({ kind: "list", key: "all" });
+    if (scope.kind === "home" || scope.kind === "cleanup") setScope({ kind: "list", key: "all" });
     setSub(null);
     setSelected(new Set());
     setSource(name);

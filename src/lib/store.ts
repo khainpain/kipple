@@ -1,6 +1,6 @@
 import { platform } from "@platform";
 import type { EditEvent, Library } from "./types";
-import { annotateContext, applyEdits, restorePrevAi, type Aliases } from "./library";
+import { annotateContext, applyEdits, editLines, parseEdits, restorePrevAi, type Aliases } from "./library";
 import { emptyBoardState, type BoardState } from "./telegram";
 import type { LangPref } from "../i18n";
 import { DEFAULT_AI_MODEL, type AiModel } from "./ai";
@@ -80,23 +80,12 @@ export async function saveLibrary(lib: Library) {
 }
 
 export async function loadEdits(): Promise<EditEvent[]> {
-  if (!(await exists(EDITS))) return [];
-  const text = await read(EDITS);
-  const out: EditEvent[] = [];
-  for (const line of text.split("\n")) {
-    if (!line.trim()) continue;
-    try {
-      out.push(JSON.parse(line));
-    } catch {
-      // A torn last line after a crash: ignore it.
-    }
-  }
-  return out;
+  return (await exists(EDITS)) ? parseEdits(await read(EDITS)) : [];
 }
 
-/** One write for the whole change, so a decision about a thousand cards is saved together or not at all. */
+/** One write for the whole change: a decision about a thousand cards is one append, and one message if it fails. */
 export async function appendEdits(events: EditEvent[]) {
-  if (events.length) await append(EDITS, events.map((ev) => JSON.stringify(ev) + "\n").join(""));
+  if (events.length) await append(EDITS, editLines(events));
 }
 
 /** Whether anything may go to the AI at all: turned on and agreed to. */
