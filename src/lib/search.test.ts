@@ -49,5 +49,12 @@ describe("search", () => {
     const ix = buildIndex([{ ...card(1, []), text: "Новости про ии" }, { ...card(2, []), text: "Игра и история" }]);
     expect(ix.search("ии").map((h) => h.id)).toEqual([1]);
   });
+  it("finds a word written with a stress mark", () => {
+    const ix = buildIndex([{ ...card(1, []), text: "Моя рабо\u0301та" }, card(2, [])]);
+    expect(ix.search("работа").map((h) => h.id)).toEqual([1]);
+  });
+  it("does not let a half-typed word's stem match unrelated words", () => {
+    const ix = buildIndex([{ ...card(1, []), text: "красивый вид" }, { ...card(2, []), text: "красный цвет" }]);
+    expect(ix.search("красив").map((h) => h.id)).toEqual([1]);
+  });
 });
-

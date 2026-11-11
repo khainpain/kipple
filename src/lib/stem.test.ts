@@ -30,4 +30,8 @@ describe("stem", () => {
   it("treats ё as е and ignores case", () => {
     expect(stem("Ёлки")).toBe(stem("елка"));
   });
+  it("ignores stress marks and decomposed letters", () => {
+    expect(stem("рабо\u0301та")).toBe(stem("работа"));
+    expect(stem("е\u0308лки")).toBe(stem("елка"));
+  });
 });
