@@ -174,14 +174,6 @@ export function Cleanup(props: {
         <p className="cl-safe">
           <Icon name="lock" size={14} /> {c.safe}
         </p>
-        {b.sensitive > 0 && (
-          <p className="hint">
-            {c.sensitive(b.sensitive)}{" "}
-            <button className="link-btn" onClick={props.onSensitive}>
-              {c.view}
-            </button>
-          </p>
-        )}
       </header>
 
       {done && (
@@ -301,6 +293,15 @@ export function Cleanup(props: {
             menu.at.focus({ preventScroll: true });
           }}
         />
+      )}
+
+      {b.sensitive > 0 && (
+        <p className="hint cl-sensitive">
+          {c.sensitive(b.sensitive)}{" "}
+          <button className="link-btn" onClick={props.onSensitive}>
+            {c.view}
+          </button>
+        </p>
       )}
 
       {later.length > 0 && (

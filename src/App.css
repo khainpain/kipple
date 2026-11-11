@@ -2683,6 +2683,9 @@ button.ov-title:hover {
   color: var(--muted);
   padding: 5px 6px;
 }
+.cl-sensitive {
+  margin: 14px 0 0;
+}
 .cl-later-list {
   margin-top: 20px;
 }
