@@ -431,6 +431,36 @@ export const en: Dict = {
     clear: "Remove from topic",
   },
 
+  /** Topics without AI: everything from a channel or site goes to a topic. */
+  rules: {
+    offerChannel: (channel, topic, n) => `Send everything from ${channel} to ${topic}? That's ${cards(n)} more right now.`,
+    offerSite: (site, topic, n) => `Send everything from ${site} to ${topic}? That's ${cards(n)} more right now.`,
+    always: "Always",
+    alsoNew: "New ones from there too",
+    added: "Done. You can change rules in Settings.",
+    channelPick: "Topic for channel",
+    channelIs: (topic) => `Topic: ${topic}`,
+    channelHint: "Everything from this channel goes to one topic, new cards too",
+    title: "Topics without AI",
+    desc: "Everything from a channel or site goes to its topic. A topic you pick by hand wins over a rule. Links to well-known sites (GitHub, IMDb, Spotify and more) get a topic on their own unless you or the AI set one.",
+    empty: "No rules yet. Give a card from a channel a topic and Kipple will offer one.",
+    channel: (name) => `Channel ${name}`,
+    site: (domain) => `Site ${domain}`,
+    remove: (what) => `Remove rule: ${what}`,
+  },
+  /** Topics for well-known sites (src/lib/siteTopics.ts), given with no AI. */
+  siteTopics: {
+    dev: "Development",
+    design: "Design",
+    science: "Science",
+    movies: "Movies",
+    books: "Books",
+    music: "Music",
+    shopping: "Shopping",
+    travel: "Travel",
+    recipes: "Recipes",
+    learning: "Learning",
+  },
   topics: {
     add: "New topic",
     namePlaceholder: "Topic name",

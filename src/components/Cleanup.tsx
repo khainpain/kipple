@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Card, Library, UserPatch } from "../lib/types";
 import { decide, restore, takeBack, type Breakdown, type Decision, type Done, type Pile, type PileKind } from "../lib/cleanup";
+import { getTopicRules } from "../lib/library";
 import { track } from "../lib/telemetry";
 import { T, formatNumber } from "../i18n";
 import { coverOf, displayTitle } from "./CardView";
@@ -50,6 +51,8 @@ export function Cleanup(props: {
   session: CleanupSession;
   onSession: (s: CleanupSession) => void;
   onEdit: (ids: number[], patch: UserPatch) => void;
+  /** Everything new from this channel or site goes to the topic too (library.ts TopicRules). */
+  onRule: (kind: "channel" | "site", key: string, topic: string) => void;
   /** Opens the pile on the board. */
   onView: (pile: Pile) => void;
   onSensitive: () => void;
@@ -61,7 +64,7 @@ export function Cleanup(props: {
   /** "To a topic" is open for this pile; the pile itself is looked up again when a topic is picked. */
   const [menu, setMenu] = useState<{ key: string; at: HTMLElement } | null>(null);
   /** What just happened, and whether it is a decision that Undo takes back. */
-  const [note, setNote] = useState({ text: "", undo: false });
+  const [note, setNote] = useState<{ text: string; undo: boolean; rule?: { kind: "channel" | "site"; key: string; topic: string } }>({ text: "", undo: false });
   /** Where the focus goes once the list has changed: the pile now at this place or with this key, else the summary. */
   const [focusAt, setFocusAt] = useState<number | string | null>(null);
   /** Nobody has decided anything on this screen yet: a few words on what it is, until the first decision. */
@@ -110,7 +113,11 @@ export function Cleanup(props: {
     for (const e of edits) props.onEdit(e.ids, e.patch);
     props.onSession({ ...session, undo: [...session.undo, { edits, back, key: pile.key }] });
     const c = T.cleanup;
-    setNote({ text: how === "keep" ? c.kept(n) : how === "topic" ? c.moved(n, topic!.trim()) : how === "junk" ? c.junked(n) : c.extras(n), undo: true });
+    // A whole channel or site went to a topic: offer the same for what comes from there later.
+    const kind = pile.kind === "channel" || pile.kind === "site" ? pile.kind : undefined;
+    const rules = getTopicRules();
+    const rule = how === "topic" && kind && pile.name && !Object.prototype.hasOwnProperty.call(kind === "channel" ? rules.channels : rules.sites, pile.name) ? { kind, key: pile.name, topic: topic!.trim() } : undefined;
+    setNote({ text: how === "keep" ? c.kept(n) : how === "topic" ? c.moved(n, topic!.trim()) : how === "junk" ? c.junked(n) : c.extras(n), undo: true, rule });
     setFocusAt(active.findIndex((p) => p.key === pile.key));
     track("cleanup_decided", how === "keepOne" ? "keep_one" : how);
   }
@@ -327,6 +334,11 @@ export function Cleanup(props: {
         {note.undo && session.undo.length > 0 && (
           <button className="link-btn" onClick={undo}>
             {c.undo} <kbd>Ctrl+Z</kbd>
+          </button>
+        )}
+        {note.rule && (
+          <button className="link-btn" onClick={() => (props.onRule(note.rule!.kind, note.rule!.key, note.rule!.topic), setNote({ text: T.rules.added, undo: false }))}>
+            {T.rules.alsoNew}
           </button>
         )}
       </div>

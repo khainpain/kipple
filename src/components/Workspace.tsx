@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { platform } from "@platform";
 import type { Card, Library, UserFields, UserPatch } from "../lib/types";
-import { effectiveAction, effectiveTags, effectiveTopic, getOwnTopics, matchesFilter, tagName, topicName } from "../lib/library";
+import { effectiveAction, effectiveTags, effectiveTopic, getOwnTopics, getTopicRules, matchesFilter, tagName, topicName } from "../lib/library";
 import { countDuplicateGroups, findDuplicates, groupDuplicates, isImportant, isUnsorted } from "../lib/smart";
 import { Overview, type OverviewSection } from "./Overview";
 import { TidyDialog, type TidyKind } from "./TidyDialog";
@@ -95,6 +95,8 @@ export function Workspace(props: {
   onApplyTelegram?: () => void;
   /** This library was just loaded for the first time: start on the cleanup screen. */
   firstCleanup?: boolean;
+  /** Everything from a channel or site goes to a topic from now on; "" drops the rule. */
+  onRule: (kind: "channel" | "site", key: string, topic: string) => void;
   /** Merged topics and tags, and saving a change to them. */
   aliases: Aliases;
   onAliases: (a: Aliases) => void;
@@ -117,6 +119,8 @@ export function Workspace(props: {
   const [tag, setTag] = useState<string | null>(null);
   /** Cards forwarded from one channel or person, picked by clicking its name on a card. */
   const [source, setSource] = useState<string | null>(null);
+  /** "Topic for this channel" menu, open next to the channel filter. */
+  const [ruleAt, setRuleAt] = useState<HTMLElement | null>(null);
   /** A pile from the cleanup screen opened on the board ("View"): only its cards show. */
   const [pile, setPile] = useState<{ title: string; ids: Set<number> } | null>(null);
   /** What the cleanup screen keeps while the workspace is open: piles set aside and what can be undone. */
@@ -427,6 +431,7 @@ export function Workspace(props: {
     if (scope.kind === "home" || scope.kind === "cleanup") setScope({ kind: "list", key: "all" });
     setSub(null);
     setSelected(new Set());
+    setRuleAt(null);
     setSource(name);
   }
 
@@ -664,6 +669,7 @@ export function Workspace(props: {
             session={cleanupSession}
             onSession={setCleanupSession}
             onEdit={onEdit}
+            onRule={props.onRule}
             onView={viewPile}
             onSensitive={() => pickScope({ kind: "list", key: "sensitive" })}
             onBoard={() => pickScope({ kind: "list", key: "all" })}
@@ -737,6 +743,20 @@ export function Workspace(props: {
                 <button className="pill active" onClick={() => setSource(null)} title={T.card.allFrom(source)}>
                   {source} <Icon name="close" size={12} />
                 </button>
+              )}
+              {source && (
+                <button className="pill ghost" aria-haspopup="listbox" aria-expanded={!!ruleAt} onClick={(e) => setRuleAt(ruleAt ? null : e.currentTarget)} title={T.rules.channelHint}>
+                  <Icon name="folder" size={13} /> {getTopicRules().channels[source] ? T.rules.channelIs(topicName(getTopicRules().channels[source])) : T.rules.channelPick}
+                </button>
+              )}
+              {source && ruleAt && (
+                <TopicMenu
+                  anchor={ruleAt}
+                  topics={topicNames}
+                  current={getTopicRules().channels[source] ? topicName(getTopicRules().channels[source]) : undefined}
+                  onPick={(t) => props.onRule("channel", source, t)}
+                  onClose={() => setRuleAt(null)}
+                />
               )}
               {FEATURES.tags && tag && (
                 <button className="pill active" onClick={() => setTag(null)}>

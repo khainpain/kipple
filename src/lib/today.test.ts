@@ -16,10 +16,11 @@ describe("dates", () => {
 });
 
 describe("candidates", () => {
+  // vc.ru, not a site from the built-in topic list (siteTopics.ts), whose cards already have a topic.
   it("offers sites with enough cards without a topic, biggest first, with topics from the same site", () => {
-    const cards = [...site("habr.com", 4, 1), ...site("habr.com", 2, 10, { ai: ai("Dev") }), ...site("youtube.com", 3, 20), ...site("tiny.io", 2, 30)];
+    const cards = [...site("vc.ru", 4, 1), ...site("vc.ru", 2, 10, { ai: ai("Dev") }), ...site("youtube.com", 3, 20), ...site("tiny.io", 2, 30)];
     const tasks = candidates(cards, {}, TODAY);
-    expect(tasks.map((t) => t.key)).toEqual(["s:habr.com", "s:youtube.com"]);
+    expect(tasks.map((t) => t.key)).toEqual(["s:vc.ru", "s:youtube.com"]);
     const habr = tasks[0];
     expect(habr.kind === "site" && habr.cards.length).toBe(4);
     expect(habr.kind === "site" && habr.suggest[0]).toBe("Dev");

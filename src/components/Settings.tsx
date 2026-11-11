@@ -9,6 +9,7 @@ import { setThemePref, THEME_ICONS, THEME_LABELS, THEME_PREFS, useThemePref } fr
 import { Icon } from "./Icon";
 import { Select } from "./Select";
 import { AiConsentDialog } from "./AiConsent";
+import { cleanRules, topicName, type TopicRules } from "../lib/library";
 import { Done, HoldToConfirm, Switch } from "./Motion";
 import "./Settings.css";
 import { LANGS, T, systemLang, type LangPref } from "../i18n";
@@ -19,6 +20,9 @@ import { useEscape } from "./useEscape";
 
 export function SettingsDialog(props: {
   settings: Settings;
+  /** Topic rules as they are now; removing one saves at once, apart from the dialog's Save. */
+  rules: TopicRules;
+  onRemoveRule: (kind: "channel" | "site", key: string) => void;
   hasKey: boolean;
   version: string;
   onSave: (s: Settings, apiKey: string | null) => void;
@@ -55,6 +59,12 @@ export function SettingsDialog(props: {
   }, [props.hasKey, aiOn]);
 
   const model = aiModelOf(s.aiModel);
+
+  const rules = cleanRules(props.rules);
+  const ruleRows = [
+    ...Object.entries(rules.channels).map(([key, topic]) => ({ field: "channels" as const, key, topic, label: T.rules.channel(key) })),
+    ...Object.entries(rules.sites).map(([key, topic]) => ({ field: "sites" as const, key, topic, label: T.rules.site(key) })),
+  ];
 
   return (
     <>
@@ -208,6 +218,32 @@ export function SettingsDialog(props: {
           </div>
             </>
           )}
+
+          <h3 className="s2-sec">{T.rules.title}</h3>
+          <div className="s2-panel">
+            <div className="s2-row">
+              <div className="s2-text">
+                <small>{T.rules.desc}</small>
+              </div>
+            </div>
+            {ruleRows.length === 0 && (
+              <div className="s2-row">
+                <small className="s2-note">{T.rules.empty}</small>
+              </div>
+            )}
+            {ruleRows.map((r) => (
+              <div key={`${r.field}:${r.key}`} className="s2-row s2-icon-row">
+                <Icon name={r.field === "channels" ? "send" : "link"} size={16} />
+                <div className="s2-text">
+                  <b>{r.label}</b>
+                  <small>→ {topicName(r.topic)}</small>
+                </div>
+                <button className="icon-btn" aria-label={T.rules.remove(r.label)} title={T.rules.remove(r.label)} onClick={() => props.onRemoveRule(r.field === "channels" ? "channel" : "site", r.key)}>
+                  <Icon name="close" size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
 
           {platform.canFetchLinks && (
             <>
