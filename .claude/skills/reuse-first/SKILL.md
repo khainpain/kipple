@@ -13,6 +13,8 @@ The best code is the code never written. Solve the whole task with the least new
 
 Read the task and the code it touches. List every place the change must reach: callers, tests, fixtures, i18n (`ru.ts` and `en.ts`), both platforms (`src/platform/tauri.ts` and `web.ts`), Rust commands. Check what it could break for users: data it would lose or expose, older installed apps (prompts in `src/lib/prompts.ts`, the `io.getkipple.app` identifier). That is scope. Extra features are not.
 
+Say your assumptions before you code. If the task can be read two ways, show both and start on the likelier one; don't pick silently.
+
 ## The smallest complete change
 
 Take the first option that fully works:
@@ -27,6 +29,7 @@ Take the first option that fully works:
 - Lazy about the solution, never about the change: finish every part the task needs, including callers, tests and fixtures it breaks.
 - No abstraction, wrapper, option, config or "for later" code nobody asked for. Deletion beats addition. Keep the existing layers and conventions.
 - The shortest working diff wins, once you know everything it must touch. A one-liner that needs decoding is not short.
+- Surgical: touch only lines the task needs. Don't restyle, refactor or reword nearby code. Remove what your change made dead; name other dead code you notice, don't delete it.
 - Comment only the why the code cannot show, in one line.
 - Bug fix: grep every caller of the function you touch, then fix the root cause once in the shared code.
 - Code you move or merge keeps its error handling and validation.
