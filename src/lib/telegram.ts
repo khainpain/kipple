@@ -156,7 +156,7 @@ export interface SendProgress {
 
 export class TelegramAuthError extends Error {}
 
-const sleepFor = (ms: number, signal?: AbortSignal) =>
+export const sleepFor = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve) => {
     if (signal?.aborted) return resolve();
     const t = setTimeout(resolve, ms);
@@ -164,6 +164,44 @@ const sleepFor = (ms: number, signal?: AbortSignal) =>
   });
 
 const isRpcName = (msg: string) => /^[A-Z][A-Z0-9_]+$/.test(msg);
+
+/**
+ * Wraps Telegram calls: rate limits are waited out (`onWait` gets the seconds, then undefined
+ * when the pause is over), network hiccups get a few retries, a lost sign-in becomes
+ * TelegramAuthError, and Telegram's own errors go through.
+ */
+export function retrying(o: {
+  signal?: AbortSignal;
+  sleep: (ms: number, signal?: AbortSignal) => Promise<void>;
+  onWait: (seconds: number | undefined) => void;
+  onFlood?: () => void;
+}) {
+  return async function call<T>(fn: () => Promise<T>): Promise<T> {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await fn();
+      } catch (e) {
+        const msg = String(e instanceof Error ? e.message : e);
+        const flood = /^FLOOD_WAIT:(\d+)/.exec(msg);
+        if (flood && !o.signal?.aborted) {
+          const secs = Number(flood[1]);
+          o.onWait(secs);
+          await o.sleep(secs * 1000 + 1000, o.signal);
+          o.onWait(undefined);
+          o.onFlood?.();
+          continue;
+        }
+        if (/AUTH_KEY|SESSION_REVOKED|USER_DEACTIVATED|^NO_API$/.test(msg)) throw new TelegramAuthError(msg);
+        // Network hiccups (not Telegram error names) get a few retries.
+        if (!isRpcName(msg) && attempt < 3 && !o.signal?.aborted) {
+          await o.sleep(5000 * (attempt + 1), o.signal);
+          continue;
+        }
+        throw e;
+      }
+    }
+  };
+}
 
 export interface SendDeps {
   tg: TelegramApi;
@@ -185,31 +223,12 @@ export async function sendToTelegram(cards: Card[], state: BoardState, opts: Sen
   let delay = deps.baseDelayMs ?? 1500;
   const progress: SendProgress = { done: 0, total: 0, missing: 0 };
 
-  async function call<T>(fn: () => Promise<T>): Promise<T> {
-    for (let attempt = 0; ; attempt++) {
-      try {
-        return await fn();
-      } catch (e) {
-        const msg = String(e instanceof Error ? e.message : e);
-        const flood = /^FLOOD_WAIT:(\d+)/.exec(msg);
-        if (flood && !signal?.aborted) {
-          const secs = Number(flood[1]);
-          onProgress({ ...progress, waitSeconds: secs });
-          await sleep(secs * 1000 + 1000, signal);
-          onProgress({ ...progress });
-          delay = Math.min(Math.round(delay * 1.5), 8000);
-          continue;
-        }
-        if (/AUTH_KEY|SESSION_REVOKED|USER_DEACTIVATED|^NO_API$/.test(msg)) throw new TelegramAuthError(msg);
-        // Network hiccups (not Telegram error names) get a few retries.
-        if (!isRpcName(msg) && attempt < 3 && !signal?.aborted) {
-          await sleep(5000 * (attempt + 1), signal);
-          continue;
-        }
-        throw e;
-      }
-    }
-  }
+  const call = retrying({
+    signal,
+    sleep,
+    onWait: (secs) => onProgress(secs === undefined ? { ...progress } : { ...progress, waitSeconds: secs }),
+    onFlood: () => (delay = Math.min(Math.round(delay * 1.5), 8000)),
+  });
 
   const board = await call(() => tg.ensureBoard(state.board ?? null, BOARD_TITLE, boardAbout()));
   if (board.created || !state.board) {

@@ -47,6 +47,8 @@ jobs:
           # Optional: Telegram app credentials from my.telegram.org, so users don't enter their own.
           TG_API_ID: ${{ secrets.TG_API_ID }}
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
+          # Test build (version 0.1.0): without this the updater would replace it with the latest release.
+          KIPPLE_TEST_BUILD: "1"
         run: |
           if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
             npx tauri build

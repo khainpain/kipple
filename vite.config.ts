@@ -35,7 +35,7 @@ export default defineConfig(({ mode }) => ({
       "@platform": fileURLToPath(new URL(mode === "web" ? "./src/platform/web.ts" : "./src/platform/tauri.ts", import.meta.url)),
     },
   },
-  define: { __BUILD_ID__: JSON.stringify(buildId), __WEB_DEMO_ONLY__: JSON.stringify(webDemoOnly), __WEB_DOWNLOAD__: JSON.stringify(webDownload) },
+  define: { __BUILD_ID__: JSON.stringify(buildId), __WEB_DEMO_ONLY__: JSON.stringify(webDemoOnly), __WEB_DOWNLOAD__: JSON.stringify(webDownload), __TEST_BUILD__: JSON.stringify(process.env.KIPPLE_TEST_BUILD === "1") },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

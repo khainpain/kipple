@@ -25,6 +25,7 @@ export const ru = {
     loading: "Загрузка…",
     close: "Закрыть",
     cancel: "Отмена",
+    holdHint: (s: number) => `Нажми и удерживай ${String(s).replace(".", ",")} с, чтобы подтвердить`,
     save: "Сохранить",
     open: "Открыть",
     stop: "Стоп",
@@ -51,10 +52,26 @@ export const ru = {
     aiFailed: (n: number) => `AI не смог разметить ${cards(n)}, можно запустить ещё раз.`,
     aiError: (e: string) => `Ошибка AI: ${e}`,
     imported: (total: number, added: number) => `Импорт готов: ${cards(total)}, новых: ${num(added)}.`,
-    exported: (n: number, path: string) => `Сохранено: ${cards(n)} в ${path}`,
     tgMissing: (n: number) => ` ${num(n)} ${plural(n, "сообщения", "сообщений", "сообщений")} уже нет в «Избранном», они пропущены.`,
     tgStopped: (done: number, total: number) => `Остановлено: отправлено ${num(done)} из ${num(total)}. Нажми «Отправить» ещё раз, чтобы продолжить.`,
     tgDone: (n: number, board: string) => `Готово: ${cards(n)} в группе «${board}».`,
+    jobTags: "Теги в Telegram",
+    jobTagsPause: (s: number) => `Теги в Telegram, пауза ${s} с`,
+    tagsDone: (n: number, skipped: number) =>
+      `Готово: теги у ${num(n)} ${plural(n, "сообщения", "сообщений", "сообщений")} в «Избранном».` +
+      (skipped ? ` ${num(skipped)} ${plural(skipped, "пропущено", "пропущены", "пропущены")}: пересланные, удалённые или без места для меток.` : ""),
+    tagsStopped: (done: number, total: number) => `Остановлено: ${num(done)} из ${num(total)}. Нажми «Перенести теги» ещё раз, чтобы продолжить.`,
+    tagsNoPremium: "Метки в «Избранном» есть только с Telegram Premium. Выбери хештеги.",
+    jobApply: "Применяю в Telegram",
+    jobApplyPause: (s: number) => `Применяю в Telegram, пауза ${s} с`,
+    applyDone: (deleted: number, pinned: number, unpinned: number, skipped: number) => {
+      const parts = [deleted ? `удалено ${cards(deleted)}` : "", pinned ? `закреплено ${num(pinned)}` : "", unpinned ? `откреплено ${num(unpinned)}` : ""].filter(Boolean);
+      return (
+        (parts.length ? `Готово: ${parts.join(", ")}.` : "Готово: в Telegram ничего не изменилось.") +
+        (skipped ? ` ${num(skipped)} ${plural(skipped, "пропущено", "пропущены", "пропущены")}: сообщения уже нет в «Избранном» или под этим номером теперь другое.` : "")
+      );
+    },
+    applyStopped: (done: number, total: number) => `Остановлено: ${num(done)} из ${num(total)}. Нажми «Применить» ещё раз, чтобы продолжить.`,
     wiped: "Все данные удалены с этого компьютера.",
     busy: "Сначала дождись конца текущей задачи или останови её.",
     statsNotice: "Kipple теперь отправляет анонимную статистику: без id и текста сообщений. Выключить можно в Настройках.",
@@ -517,11 +534,7 @@ export const ru = {
     runAi: (n: number) => `Разметить ${num(n)}`,
     loadTelegram: "Загрузить новое из «Избранного» в Telegram",
     import: "Импортировать новый экспорт: правки и разметка сохранятся",
-    export: "Экспорт",
-    exportSelected: (n: number) => `Выбранные: ${num(n)}`,
-    exportAll: (n: number) => `Все на экране: ${num(n)}`,
-    telegram: (board: string) => `Отправить в Telegram: разложить по темам в группе «${board}»`,
-    telegramAccount: "Аккаунт Telegram",
+    telegram: "Применить в Telegram",
     settings: "Настройки",
     selected: (n: number) => `Выбрано ${num(n)}`,
     selectAll: (n: number) => `Выбрать все ${num(n)}`,
@@ -635,9 +648,24 @@ export const ru = {
     replyHint: "нажми на цитату, чтобы перейти к сообщению",
     replyNoOriginal: "Этого сообщения уже нет в Избранном",
     replyNoChat: "Ответ с цитатой уже в Избранном: открой Telegram, он там последним",
-    title: "Отправить в Telegram",
-    accountTitle: "Аккаунт Telegram",
-    accountIntro: "Вход идёт напрямую в Telegram, ключ сеанса хранится только на этом компьютере, в диспетчере учётных данных Windows.",
+    title: "Применить в Telegram",
+    applyIntro: "То, что ты разобрал в Kipple, переносится в «Избранное». Ничего не меняется, пока не нажмёшь кнопку.",
+    // Junk and important (src/lib/tgApply.ts).
+    cleanTitle: "Мусор и важное",
+    deleteJunk: (n: number) => `Удалить из Telegram то, что ты отправил в «Мусор»: ${num(n)}`,
+    deleteJunkHint:
+      "Только карточки, которые ты сам отправил в «Мусор», догадки AI не в счёт. Перед удалением текст каждого сообщения сохраняется в локальной копии (Настройки → Данные). В Telegram удаление не отменить.",
+    deleteJunkFiles: (n: number) =>
+      `С файлами, фото или видео: ${num(n)}. Их файлы есть только в Telegram, а локальная копия хранит текст и название файла, так что сами файлы удалятся навсегда.`,
+    pinImportant: (pin: number, unpin: number) =>
+      `Закрепить важное в «Избранном»: ${num(pin)}` + (unpin ? `, открепить ${num(unpin)}, которые больше не важные` : ""),
+    pinImportantHint: "Kipple снимает только свои закрепы. То, что ты закрепил в Telegram сам, остаётся.",
+    applyNothing: "В Telegram всё уже так же, как в Kipple.",
+    apply: "Применить",
+    applyHold: "Удерживай, чтобы применить",
+    applyHoldDone: "Применяю",
+    applyRunning: "Применяю…",
+    boardTitle: (board: string) => `Группа «${board}» с темами`,
     intro: (board: string) =>
       `Приложение создаст у тебя закрытую группу «${board}» с темами по разделам библиотеки и перешлёт туда оригиналы сообщений из «Избранного». Под каждым будет короткое описание и хештеги. Вход идёт напрямую в Telegram, ключ сеанса хранится только на этом компьютере, в диспетчере учётных данных Windows.`,
     checking: "Проверяю вход…",
@@ -662,6 +690,20 @@ export const ru = {
     untagged: (n: number, other: string) => ` ${cards(n)} ещё без AI-разметки ${plural(n, "попадёт", "попадут", "попадут")} в тему «${other}»; лучше сначала нажать «Разметить».`,
     sending: "Уже отправляю…",
     send: (n: number) => `Отправить ${num(n)}`,
+    // Tags on the messages in Saved Messages (src/lib/tgTags.ts).
+    tagsTitle: "Теги в «Избранном»",
+    tagsIntro: "Теги из Kipple появятся у самих сообщений в Telegram. Ничего не меняется, пока не нажмёшь кнопку.",
+    tagsModeTags: "Метками Telegram",
+    tagsModeTagsHint: (max: number, per: number) =>
+      `Самые частые теги (до ${num(max)}) станут метками «Избранного», у каждого сообщения до ${num(per)}. Твои собственные метки останутся.`,
+    tagsNoPremium: "Метки в «Избранном» есть только с Telegram Premium.",
+    tagsModeHashtags: "Хештегами в тексте",
+    tagsModeHashtagsHint:
+      "Хештеги допишутся в конец твоих собственных сообщений. Пересланные Telegram менять не даёт, они останутся как есть. Перед правкой текст сохраняется в локальной копии.",
+    tagsPlan: (n: number) => `К обновлению: ${num(n)} ${plural(n, "сообщение", "сообщения", "сообщений")}.`,
+    tagsNothing: "Все теги уже в Telegram.",
+    tagsStart: "Перенести теги",
+    tagsRunning: "Переношу…",
     // What goes into the group itself.
     boardAbout: (board: string) => `Разобранное «Избранное»: темы, описания и теги из ${board}.`,
     otherTopic: "Разное",
@@ -693,15 +735,8 @@ export const ru = {
     noMessages: "В файле нет списка сообщений. Нужен result.json из экспорта Telegram Desktop в формате JSON.",
     savedMessages: "Избранное",
     pickTitle: "Папка экспорта Telegram (с файлом result.json)",
-    saveTitle: "Экспорт карточек",
     noFile: (rel: string) => `Нет файла ${rel}`,
     fileGone: (rel: string) => `Файл ${rel} недоступен: выбери папку экспорта ещё раз.`,
-    downloads: (name: string) => `«Загрузки» (${name})`,
-  },
-
-  exporter: {
-    noTopic: "Без темы",
-    exported: (date: string, n: number) => `Экспортировано ${date}, карточек: ${num(n)}.`,
   },
 
   aiConsent: {
