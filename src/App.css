@@ -3601,8 +3601,9 @@ kbd {
 .quick-results li.on {
   background: var(--hover);
 }
-.quick-results li.quick-empty {
-  cursor: default;
+.quick-empty {
+  margin: 0;
+  padding: 14px 16px;
   color: var(--muted);
 }
 .quick-icon {

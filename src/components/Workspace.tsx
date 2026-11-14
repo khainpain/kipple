@@ -66,6 +66,9 @@ function markEdges(el: HTMLElement | null) {
   else delete el.dataset.right;
 }
 
+/** "Looks like these belong here" stops counting here: enough to act on, and cheap on big libraries. */
+const SUGGEST_MAX = 50;
+
 /** Topics smaller than this aren't worth splitting into subgroups. */
 const GROUP_MIN = 12;
 
@@ -328,8 +331,9 @@ export function Workspace(props: {
   const cleanupLeft = useMemo(() => piles.piles.reduce((n, p) => n + p.cards.length, 0), [piles]);
   /** "Looks like these belong here" on an open topic: unsorted cards the person's own sorting points to it. */
   const topicSuggest = useMemo(
-    () => (scope.kind === "topic" && !query.trim() && !hiddenSuggest.has(scope.name) ? suggestedFor(lib.cards, scope.name, suggest) : []),
-    [scope, query, hiddenSuggest, lib, rev, suggest], // eslint-disable-line react-hooks/exhaustive-deps
+    () => (scope.kind === "topic" && !query.trim() && !hiddenSuggest.has(scope.name) ? suggestedFor(lib.cards, scope.name, suggest, SUGGEST_MAX) : []),
+    // `suggest` already follows lib and rev; the scope is compared by its topic name.
+    [scope.kind === "topic" ? scope.name : null, query, hiddenSuggest, suggest], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const links = useMemo(() => linkCounts(lib.cards), [lib, rev]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -507,20 +511,6 @@ export function Workspace(props: {
       return next.size === prev.size ? prev : next;
     });
   }, [visible, searchActive]);
-
-  // Cards are dragged onto topics with the web's own drag and drop (Tauri's file drop is off for
-  // that). A file dropped anywhere else must not make the window navigate to it.
-  useEffect(() => {
-    const stop = (e: DragEvent) => {
-      if (e.dataTransfer?.types.includes("Files")) e.preventDefault();
-    };
-    window.addEventListener("dragover", stop);
-    window.addEventListener("drop", stop);
-    return () => {
-      window.removeEventListener("dragover", stop);
-      window.removeEventListener("drop", stop);
-    };
-  }, []);
 
   // Keyboard: "/" focuses search, Esc closes the panel or clears the selection, ↑/↓ (or j/k) step through cards,
   // I / 1-4 / Delete sort the open card and Ctrl+Z takes the last of those back.
@@ -856,7 +846,9 @@ export function Workspace(props: {
             narrow
               ? undefined
               : (c, e) => {
-                  e.dataTransfer.setData(CARDS_MIME, JSON.stringify(dragIds(selected, c.id)));
+                  // Only what's on screen: a selection kept across searches may hold cards the board hides.
+                  const shownSel = new Set(visible.filter((x) => selected.has(x.id)).map((x) => x.id));
+                  e.dataTransfer.setData(CARDS_MIME, JSON.stringify(dragIds(shownSel, c.id)));
                   e.dataTransfer.effectAllowed = "move";
                 }
           }

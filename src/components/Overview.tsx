@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
+import { platform } from "@platform";
 import { useNarrow } from "../lib/narrow";
 import type { Card, Library } from "../lib/types";
 import { T, formatNumber } from "../i18n";
@@ -228,13 +229,15 @@ function LinkCheck(props: { counts: ReturnType<typeof linkCounts>; busy: boolean
   const L = T.linkCheck;
   const { counts } = props;
   const checked = counts.checked > 0;
+  // Junking every gone link is one step from a mistake: the first press asks, the second does it.
+  const [sure, setSure] = useState(false);
   return (
     <section className="link-check" aria-labelledby="link-check-h">
       <header>
         <Icon name="link" />
         <div className="link-check-titles">
           <h2 id="link-check-h">{L.title}</h2>
-          <span className="hint">{L.hint}</span>
+          <span className="hint">{platform.kind === "web" ? L.hintWeb : L.hint}</span>
         </div>
         <button className="secondary small-btn" onClick={props.onRun} disabled={props.busy}>
           {checked ? L.again : L.run(counts.links)}
@@ -254,8 +257,16 @@ function LinkCheck(props: { counts: ReturnType<typeof linkCounts>; busy: boolean
                 <button className="link-btn" onClick={props.onShow}>
                   {L.show}
                 </button>
-                <button className="link-btn" onClick={props.onJunk}>
-                  {L.junk}
+                <button
+                  className="link-btn"
+                  onClick={() => {
+                    if (!sure) return setSure(true);
+                    setSure(false);
+                    props.onJunk?.();
+                  }}
+                  onBlur={() => setSure(false)}
+                >
+                  {sure ? L.junkSure : L.junk(counts.broken.length)}
                 </button>
               </span>
             )}

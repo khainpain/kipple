@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Card } from "./types";
-import { healthOf, linkCounts } from "./linkcheck";
+import { healthOf, keepHealth, linkCounts } from "./linkcheck";
 
 const link = (id: number, health?: "ok" | "broken" | "unknown", over: Partial<Card> = {}): Card => ({
   id,
@@ -21,9 +21,9 @@ describe("healthOf", () => {
     expect(healthOf({ status: 404 })).toBe("broken");
     expect(healthOf({ status: 410 })).toBe("broken");
   });
-  it("a site whose name no longer resolves is broken", () => {
-    expect(healthOf({ error: "error sending request: dns error: failed to lookup address information" })).toBe("broken");
-    expect(healthOf({ error: "net::ERR_NAME_NOT_RESOLVED" })).toBe("broken");
+  it("a failed name lookup can't tell: it may be a flaky network as much as a dead site", () => {
+    expect(healthOf({ error: "error sending request: dns error: failed to lookup address information" })).toBe("unknown");
+    expect(healthOf({ error: "RESOLVE_FAILED" })).toBe("unknown");
   });
   it("blocks, rate limits, server errors and timeouts can't tell", () => {
     for (const status of [401, 403, 429, 500, 503]) expect(healthOf({ status })).toBe("unknown");
@@ -39,5 +39,15 @@ describe("linkCounts", () => {
   });
   it("leaves out cards already in the junk", () => {
     expect(linkCounts([link(1, "broken", { user: { action: "junk" } }), link(2, "broken")]).broken).toEqual([2]);
+  });
+});
+
+describe("keepHealth", () => {
+  it("a page that opened again forgets an old \"gone\"", () => {
+    expect(keepHealth({ health: "broken", checkedAt: "t" }, { url: "u", fetchedAt: "t2", title: "Back" })).toEqual({});
+  });
+  it("a refresh that failed keeps what the check found", () => {
+    expect(keepHealth({ health: "broken", checkedAt: "t" }, { url: "u", fetchedAt: "t2", error: "HTTP 404" })).toEqual({ health: "broken", checkedAt: "t" });
+    expect(keepHealth(undefined, { url: "u", fetchedAt: "t2", error: "HTTP 404" })).toEqual({});
   });
 });

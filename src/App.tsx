@@ -14,7 +14,7 @@ import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type
 import { TelegramDialog } from "./components/TelegramDialog";
 import { importFolder, pickExportFolder } from "./lib/importer";
 import { fetchLinkMeta, needsPreview, probeLink } from "./lib/linkmeta";
-import { healthOf } from "./lib/linkcheck";
+import { healthOf, keepHealth } from "./lib/linkcheck";
 import { AiStop, aiModelOf, type AiAuth, classifyCards, retagCount, nameImages, pendingForAi, pendingImages, suggestSynonyms, groupCards } from "./lib/ai";
 import { displayTitle } from "./components/CardView";
 import { toCsv, toMarkdown } from "./lib/exporters";
@@ -240,9 +240,9 @@ export default function App() {
     const worker = async () => {
       while (next < todo.length && !signal.aborted) {
         const c = todo[next++];
-        // A refreshed preview keeps what the last "Check links" found.
-        const { health, checkedAt } = c.link ?? {};
-        c.link = { ...(await fetchLinkMeta(c.urls[0])), health, checkedAt };
+        // A refreshed preview keeps what the last "Check links" found, unless the page opened now.
+        const fresh = await fetchLinkMeta(c.urls[0]);
+        c.link = { ...fresh, ...keepHealth(c.link, fresh) };
         done++;
         if (done % 10 === 0 || done === todo.length) {
           setJob({ label: T.app.jobLinks, done, total: todo.length });
@@ -387,7 +387,7 @@ export default function App() {
   async function checkLinks(l: Library) {
     const ctl = startJob("work");
     if (!ctl) return;
-    const todo = l.cards.filter((c) => !c.removed && c.kind === "link" && c.urls[0]);
+    const todo = l.cards.filter((c) => !c.removed && c.kind === "link" && c.urls[0] && matchesFilter(c, "all"));
     let done = 0;
     let next = 0;
     setJob({ label: T.linkCheck.job, done, total: todo.length });
@@ -395,16 +395,20 @@ export default function App() {
       const worker = async () => {
         while (next < todo.length && !ctl.signal.aborted) {
           const c = todo[next++];
-          const health = healthOf(await probeLink(c.urls[0]));
+          let health = healthOf(await probeLink(c.urls[0]));
+          // "Gone" is only believed when the site says so twice: a one-off 404 stays "can't tell".
+          if (health === "broken" && !ctl.signal.aborted && healthOf(await probeLink(c.urls[0])) !== "broken") health = "unknown";
           c.link = { ...(c.link ?? { url: c.urls[0], fetchedAt: "" }), health, checkedAt: new Date().toISOString() };
           done++;
           if (done % 10 === 0 || done === todo.length) {
             setJob({ label: T.linkCheck.job, done, total: todo.length });
             setRev((r) => r + 1);
           }
+          if (platform.kind === "web") await new Promise((r) => setTimeout(r, 600));
         }
       };
-      await Promise.all(Array.from({ length: 6 }, worker));
+      // The browser goes through /api/fetch, which allows 120 requests a minute: one at a time there.
+      await Promise.all(Array.from({ length: platform.kind === "web" ? 1 : 6 }, worker));
       await persist(l);
     } finally {
       endJob(ctl);

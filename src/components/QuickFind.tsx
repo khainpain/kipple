@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Card } from "../lib/types";
 import { effectiveTitle } from "../lib/library";
 import { domainOf } from "../lib/rules";
@@ -18,6 +18,14 @@ export function QuickFind(props: { cards: Card[]; index: ReturnType<typeof build
   const found = useMemo(() => quickFind(props.cards, props.index, query, LIMIT), [props.cards, props.index, query]);
   const active = Math.min(at, Math.max(found.length - 1, 0));
   useEscape(props.onClose);
+  // Closing gives the focus back to where it was (an opened card takes it on its own).
+  useEffect(() => {
+    const was = document.activeElement as HTMLElement | null;
+    return () => {
+      if (was?.isConnected && document.activeElement === document.body) was.focus({ preventScroll: true });
+    };
+  }, []);
+  const listed = query.trim() !== "";
 
   function open(c: Card | undefined) {
     if (!c) return;
@@ -28,7 +36,7 @@ export function QuickFind(props: { cards: Card[]; index: ReturnType<typeof build
   return (
     <div className="modal-backdrop quick-backdrop" onClick={props.onClose}>
       <div className="quick-find" role="dialog" aria-modal="true" aria-label={T.quick.label} onClick={(e) => e.stopPropagation()}>
-        <label className="quick-input">
+        <div className="quick-input">
           <Icon name="search" />
           <input
             autoFocus
@@ -36,12 +44,18 @@ export function QuickFind(props: { cards: Card[]; index: ReturnType<typeof build
             placeholder={T.quick.placeholder}
             aria-label={T.quick.label}
             role="combobox"
-            aria-expanded={found.length > 0}
-            aria-controls="quick-results"
+            aria-autocomplete="list"
+            aria-expanded={listed && found.length > 0}
+            aria-controls={listed && found.length > 0 ? "quick-results" : undefined}
             aria-activedescendant={found[active] ? `quick-${found[active].id}` : undefined}
-            onChange={(e) => (setQuery(e.target.value), setAt(0))}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setAt(0);
+            }}
             onKeyDown={(e) => {
-              if (e.key === "ArrowDown") {
+              // The palette is the only thing open: Tab stays in the field.
+              if (e.key === "Tab") e.preventDefault();
+              else if (e.key === "ArrowDown") {
                 e.preventDefault();
                 setAt(found.length ? (active + 1) % found.length : 0);
               } else if (e.key === "ArrowUp") {
@@ -53,8 +67,8 @@ export function QuickFind(props: { cards: Card[]; index: ReturnType<typeof build
               }
             }}
           />
-        </label>
-        {query.trim() !== "" && (
+        </div>
+        {listed && found.length > 0 && (
           <ul className="quick-results" id="quick-results" role="listbox" aria-label={T.quick.label}>
             {found.map((c, i) => {
               const sub = (c.kind === "link" ? domainOf(c.urls[0]) : undefined) || c.forwardedFrom;
@@ -68,8 +82,12 @@ export function QuickFind(props: { cards: Card[]; index: ReturnType<typeof build
                 </li>
               );
             })}
-            {found.length === 0 && <li className="quick-empty">{T.quick.empty}</li>}
           </ul>
+        )}
+        {listed && found.length === 0 && (
+          <p className="quick-empty" role="status">
+            {T.quick.empty}
+          </p>
         )}
         <footer className="quick-keys" aria-hidden="true">
           <span>

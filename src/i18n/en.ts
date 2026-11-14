@@ -506,6 +506,7 @@ export const en: Dict = {
   linkCheck: {
     title: "Link check",
     hint: "Only when you press the button. No cookies or keys; requests go only to the sites in your links.",
+    hintWeb: "Only when you press the button. No cookies or keys; requests go through our server, which keeps nothing but a short cache.",
     run: (n) => `Check ${num(n)} ${n === 1 ? "link" : "links"}`,
     again: "Check again",
     job: "Checking links",
@@ -514,7 +515,8 @@ export const en: Dict = {
     unknown: "Can't tell",
     unknownHint: "The site blocked us, timed out or returned an error. These cards are left alone.",
     show: "Show",
-    junk: "Move to junk",
+    junk: (n) => `Move ${num(n)} to junk`,
+    junkSure: "Press again to move them",
     pile: "Gone links",
   },
   suggestHere: {
