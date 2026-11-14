@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { embedOf, headline, instagramCode, instantImage, isVideoLink, linkText, splitInstagram, tiktokId, vimeoId, youtubeId } from "./embeds";
+import { cardEmbed, embedOf, headline, instagramCode, instantImage, isVideoLink, linkText, splitInstagram, tiktokId, tiktokShort, vimeoId, wantsImage, youtubeId } from "./embeds";
 
 describe("youtubeId", () => {
   it.each([
@@ -40,9 +40,33 @@ describe("embedOf", () => {
     expect(tiktokId("https://www.tiktok.com/@someone/video/7234567890123456789")).toBe("7234567890123456789");
     expect(tiktokId("https://vm.tiktok.com/ZMabc/")).toBeUndefined();
   });
+  it("recognises TikTok's short share links", () => {
+    expect(tiktokShort("https://vm.tiktok.com/ZMabc/")).toBe(true);
+    expect(tiktokShort("https://vt.tiktok.com/ZSabc/")).toBe(true);
+    expect(tiktokShort("https://www.tiktok.com/t/ZTabc/")).toBe(true);
+    expect(tiktokShort("https://www.tiktok.com/@someone/video/7234567890123456789")).toBe(false);
+    expect(tiktokShort("https://example.com/t/abc")).toBe(false);
+  });
+  it("wants a cover for TikTok, short links included", () => {
+    expect(wantsImage("https://www.tiktok.com/@someone/video/7234567890123456789")).toBe(true);
+    expect(wantsImage("https://vm.tiktok.com/ZMabc/")).toBe(true);
+    expect(wantsImage("https://www.tiktok.com/@someone")).toBe(false);
+  });
+  it("plays a short TikTok link through the address it led to", () => {
+    const short = { urls: ["https://vm.tiktok.com/ZMabc/"], link: { url: "https://www.tiktok.com/@someone/video/7234567890123456789" } };
+    expect(cardEmbed(short)).toMatchObject({ provider: "tiktok", src: "https://www.tiktok.com/player/v1/7234567890123456789?autoplay=1&rel=0" });
+    expect(cardEmbed({ urls: ["https://vm.tiktok.com/ZMabc/"] })).toBeUndefined();
+    expect(cardEmbed({ urls: ["https://youtu.be/dQw4w9WgXcQ"], link: { url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" } })?.provider).toBe("youtube");
+  });
   it("leaves other links alone", () => {
     expect(embedOf("https://example.com/video.mp4")).toBeUndefined();
     expect(embedOf(undefined)).toBeUndefined();
+  });
+});
+
+describe("linkText", () => {
+  it("shows a TikTok author as the author, as with YouTube", () => {
+    expect(linkText({ url: "https://www.tiktok.com/@chef.anna/video/7234567890123456789", title: "Pasta", description: "Chef Anna" })).toEqual({ title: "Pasta", author: "Chef Anna" });
   });
 });
 

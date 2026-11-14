@@ -5,7 +5,7 @@ const fetch = platform.httpFetch;
 import type { Card, LinkMeta } from "./types";
 import type { PreviewResponse } from "../platform/types";
 import { publicAssetUrl } from "./assetUrl";
-import { instagramCode, wantsImage, youtubeId, youtubeThumb } from "./embeds";
+import { instagramCode, tiktokId, tiktokShort, wantsImage, youtubeId, youtubeThumb } from "./embeds";
 
 const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|0\.|\[?::1\]?$|.*\.local$)/i;
 const MAX_HTML = 600_000;
@@ -167,6 +167,30 @@ async function instagram(url: string, code: string): Promise<Omit<LinkMeta, "fet
   return meta;
 }
 
+/**
+ * TikTok pages show bots no cover, so the cover, title and author come from its oEmbed. A short
+ * share link is followed first, and the video's own address is kept so the card can play it.
+ * The cover is a signed link that expires, so a small copy is kept like Instagram's.
+ */
+async function tiktok(url: string): Promise<Omit<LinkMeta, "fetchedAt"> | undefined> {
+  let at = url;
+  if (!tiktokId(url)) at = (await get(url, { connectTimeout: 8000, headers: { "User-Agent": UA, Accept: "text/html,*/*;q=0.5" } })).url;
+  const id = tiktokId(at);
+  if (!id) return undefined; // a profile or a photo post: an ordinary page
+  const u = new URL(at);
+  const video = `https://www.tiktok.com${u.pathname}`;
+  const base = { url: video, siteName: "TikTok", favicon: "https://www.tiktok.com/favicon.ico" };
+  try {
+    const { res } = await get(`https://www.tiktok.com/oembed?url=${encodeURIComponent(video)}`, { connectTimeout: 8000, headers: { "User-Agent": UA, Accept: "application/json" } });
+    if (!res.ok) return base;
+    const j = (await res.json()) as { title?: string; author_name?: string; thumbnail_url?: string };
+    const image = j.thumbnail_url ? await inlineImage(j.thumbnail_url) : undefined;
+    return { ...base, title: j.title?.trim() || undefined, description: j.author_name, image };
+  } catch {
+    return base; // the player still works without a cover
+  }
+}
+
 export async function fetchLinkMeta(url: string): Promise<LinkMeta> {
   return { ...(await fetchMeta(url)), fetchedAt: new Date().toISOString(), v: PARSE_VERSION };
 }
@@ -179,6 +203,10 @@ async function fetchMeta(url: string): Promise<Omit<LinkMeta, "fetchedAt">> {
     if (yt) return await youtube(url, yt);
     const ig = instagramCode(url);
     if (ig) return await instagram(url, ig);
+    if (tiktokId(url) || tiktokShort(url)) {
+      const tt = await tiktok(url);
+      if (tt) return tt;
+    }
     const { res, url: at } = await get(url, {
       connectTimeout: 8000,
       headers: { "User-Agent": UA, Accept: "text/html,*/*;q=0.5" },

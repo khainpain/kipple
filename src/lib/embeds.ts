@@ -45,7 +45,7 @@ export function instantImage(url: string | undefined): string | undefined {
 
 /** Links worth fetching again when an earlier attempt left them without a picture. */
 export function wantsImage(url: string): boolean {
-  return !!(youtubeId(url) || instagramCode(url));
+  return !!(youtubeId(url) || instagramCode(url) || tiktokId(url) || tiktokShort(url));
 }
 
 /** Vimeo video id from vimeo.com/123 or player.vimeo.com/video/123. */
@@ -67,6 +67,16 @@ export function tiktokId(url: string): string | undefined {
     return u.pathname.match(/\/video\/(\d{8,})/)?.[1];
   } catch {
     return undefined;
+  }
+}
+
+/** TikTok's share links (vm.tiktok.com/…, vt.tiktok.com/…, tiktok.com/t/…): the video id appears only after the redirect. */
+export function tiktokShort(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return /^(vm|vt)\.tiktok\.com$/.test(u.hostname) || (/(^|\.)tiktok\.com$/.test(u.hostname) && /^\/t\/[\w-]+/.test(u.pathname));
+  } catch {
+    return false;
   }
 }
 
@@ -104,6 +114,11 @@ export function embedOf(url: string | undefined): Embed | undefined {
   return undefined;
 }
 
+/** A card's player: from its own link, or from where a short link led when the preview was fetched. */
+export function cardEmbed(card: { urls: string[]; link?: { url: string } }): Embed | undefined {
+  return embedOf(card.urls[0]) ?? embedOf(card.link?.url);
+}
+
 /** Links that are a video (or a post that may be one): the card gets a play mark and an in-card player. */
 export function isVideoLink(url: string | undefined): boolean {
   return !!embedOf(url)?.video;
@@ -137,8 +152,8 @@ export function headline(text: string, max = 90): string {
 /** Title, description and author to show for a link preview; Instagram's run-on title is split up. */
 export function linkText(link: { url: string; title?: string; description?: string } | undefined): { title?: string; description?: string; author?: string } {
   if (!link) return {};
-  // The app stores the channel name as a YouTube video's description (that's all oEmbed gives).
-  if (youtubeId(link.url)) return { title: link.title, author: link.description };
+  // YouTube and TikTok: the app stores the channel name as the description (that's all oEmbed gives).
+  if (youtubeId(link.url) || tiktokId(link.url)) return { title: link.title, author: link.description };
   if (!instagramCode(link.url)) return { title: link.title, description: link.description };
   const { author, caption } = splitInstagram(link.title, link.description);
   if (caption) {
