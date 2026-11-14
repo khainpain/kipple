@@ -80,7 +80,45 @@ export function tiktokShort(url: string): boolean {
   }
 }
 
-export type EmbedProvider = "youtube" | "instagram" | "vimeo" | "tiktok";
+/** Rutube video id (32 hex) from rutube.ru/video/…, /shorts/…, /video/private/…; the private key from ?p=. */
+export function rutubeVideo(url: string): { id: string; key?: string; short: boolean } | undefined {
+  try {
+    const u = new URL(url);
+    if (!/(^|\.)rutube\.ru$/.test(u.hostname)) return undefined;
+    const m = u.pathname.match(/^\/(video(?:\/private)?|shorts)\/([0-9a-f]{32})\b/);
+    if (!m) return undefined;
+    const key = u.searchParams.get("p");
+    return { id: m[2], key: key && /^[\w-]+$/.test(key) ? key : undefined, short: m[1] === "shorts" };
+  } catch {
+    return undefined;
+  }
+}
+
+/** VK video or clip from vk.com / vkvideo.ru: /video-1_2, /clip-1_2, or ?z=video-1_2 on a wall or a group page. */
+export function vkVideo(url: string): { oid: string; id: string; clip: boolean } | undefined {
+  try {
+    const u = new URL(url);
+    if (!/(^|\.)(vk\.com|vk\.ru|vkvideo\.ru)$/.test(u.hostname)) return undefined;
+    const m = `${u.pathname} ${u.searchParams.get("z") ?? ""}`.match(/(video|clip)(-?\d+)_(\d+)/);
+    return m ? { oid: m[2], id: m[3], clip: m[1] === "clip" } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Dailymotion video id from dailymotion.com/video/x… or dai.ly/x…. */
+export function dailymotionId(url: string): string | undefined {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, "");
+    const m = host === "dai.ly" ? u.pathname.match(/^\/([a-z0-9]{5,})/i) : /(^|\.)dailymotion\.com$/.test(host) ? u.pathname.match(/\/video\/([a-z0-9]{5,})/i) : null;
+    return m?.[1];
+  } catch {
+    return undefined;
+  }
+}
+
+export type EmbedProvider = "youtube" | "instagram" | "vimeo" | "tiktok" | "rutube" | "vk" | "dailymotion";
 
 export interface Embed {
   provider: EmbedProvider;
@@ -111,6 +149,12 @@ export function embedOf(url: string | undefined): Embed | undefined {
   if (vm) return { provider: "vimeo", src: `https://player.vimeo.com/video/${vm}?autoplay=1&dnt=1`, ratio: 16 / 9, video: true };
   const tt = tiktokId(url);
   if (tt) return { provider: "tiktok", src: `https://www.tiktok.com/player/v1/${tt}?autoplay=1&rel=0`, ratio: 9 / 16, video: true };
+  const rt = rutubeVideo(url);
+  if (rt) return { provider: "rutube", src: `https://rutube.ru/play/embed/${rt.id}${rt.key ? `?p=${rt.key}` : ""}`, ratio: rt.short ? 9 / 16 : 16 / 9, video: true };
+  const vk = vkVideo(url);
+  if (vk) return { provider: "vk", src: `https://vkvideo.ru/video_ext.php?oid=${vk.oid}&id=${vk.id}&hd=2&autoplay=1`, ratio: vk.clip ? 9 / 16 : 16 / 9, video: true };
+  const dm = dailymotionId(url);
+  if (dm) return { provider: "dailymotion", src: `https://geo.dailymotion.com/player.html?video=${dm}`, ratio: 16 / 9, video: true };
   return undefined;
 }
 

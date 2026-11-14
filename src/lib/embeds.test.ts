@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { cardEmbed, embedOf, headline, instagramCode, instantImage, isVideoLink, linkText, splitInstagram, tiktokId, tiktokShort, vimeoId, wantsImage, youtubeId } from "./embeds";
 
@@ -58,6 +59,24 @@ describe("embedOf", () => {
     expect(cardEmbed({ urls: ["https://vm.tiktok.com/ZMabc/"] })).toBeUndefined();
     expect(cardEmbed({ urls: ["https://youtu.be/dQw4w9WgXcQ"], link: { url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" } })?.provider).toBe("youtube");
   });
+  it("plays Rutube videos and shorts, private links with their key", () => {
+    const id = "a1b2c3d4e5f60718293a4b5c6d7e8f90";
+    expect(embedOf(`https://rutube.ru/video/${id}/`)).toMatchObject({ provider: "rutube", src: `https://rutube.ru/play/embed/${id}`, ratio: 16 / 9, video: true });
+    expect(embedOf(`https://rutube.ru/shorts/${id}/`)?.ratio).toBe(9 / 16);
+    expect(embedOf(`https://rutube.ru/video/private/${id}/?p=Xy_z-1`)?.src).toBe(`https://rutube.ru/play/embed/${id}?p=Xy_z-1`);
+    expect(embedOf("https://rutube.ru/channel/123/")).toBeUndefined();
+  });
+  it("plays VK videos and clips", () => {
+    expect(embedOf("https://vk.com/video-22822305_456242010")).toMatchObject({ provider: "vk", src: "https://vkvideo.ru/video_ext.php?oid=-22822305&id=456242010&hd=2&autoplay=1", ratio: 16 / 9 });
+    expect(embedOf("https://vkvideo.ru/video123_456")?.src).toContain("oid=123&id=456");
+    expect(embedOf("https://vk.com/clip-1_2")).toMatchObject({ provider: "vk", ratio: 9 / 16 });
+    expect(embedOf("https://vk.com/wall-1?z=video-5_6%2Fpl_wall")?.src).toContain("oid=-5&id=6");
+    expect(embedOf("https://vk.com/durov")).toBeUndefined();
+  });
+  it("plays Dailymotion", () => {
+    expect(embedOf("https://www.dailymotion.com/video/x8abc12")).toMatchObject({ provider: "dailymotion", src: "https://geo.dailymotion.com/player.html?video=x8abc12", video: true });
+    expect(embedOf("https://dai.ly/x8abc12")?.provider).toBe("dailymotion");
+  });
   it("leaves other links alone", () => {
     expect(embedOf("https://example.com/video.mp4")).toBeUndefined();
     expect(embedOf(undefined)).toBeUndefined();
@@ -100,5 +119,23 @@ describe("linkText", () => {
   it("cuts headings at a word", () => {
     expect(headline("first line\nsecond")).toBe("first line");
     expect(headline("word ".repeat(40), 20)).toBe("word word word word…");
+  });
+});
+
+describe("players and the desktop CSP", () => {
+  it("lets every player's site into a frame, and nothing more", () => {
+    const conf = JSON.parse(readFileSync(new URL("../../src-tauri/tauri.conf.json", import.meta.url), "utf8"));
+    const frames = (conf.app.security.csp as string).match(/frame-src ([^;]+)/)![1].split(" ").filter((s) => s.startsWith("https://"));
+    const samples = [
+      "https://youtu.be/dQw4w9WgXcQ",
+      "https://www.instagram.com/reel/DAbc-12/",
+      "https://vimeo.com/76979871",
+      "https://www.tiktok.com/@a/video/7234567890123456789",
+      "https://rutube.ru/video/a1b2c3d4e5f60718293a4b5c6d7e8f90/",
+      "https://vk.com/video-1_2",
+      "https://dai.ly/x8abc12",
+    ];
+    const origins = samples.map((u) => new URL(embedOf(u)!.src).origin);
+    expect(frames.sort()).toEqual([...new Set(origins)].sort());
   });
 });

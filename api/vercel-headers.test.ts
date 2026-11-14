@@ -29,7 +29,7 @@ describe("vercel.json CSP", () => {
       expect(csp!.get("base-uri")).toEqual(["'none'"]);
       expect(csp!.get("form-action")).toEqual(["'none'"]);
       // Only the players the app embeds (src/lib/embeds.ts) and its own blob: PDFs.
-      expect(csp!.get("frame-src")!.sort()).toEqual(["blob:", "https://player.vimeo.com", "https://www.instagram.com", "https://www.tiktok.com", "https://www.youtube-nocookie.com"]);
+      expect(csp!.get("frame-src")!.sort()).toEqual(["blob:", "https://geo.dailymotion.com", "https://player.vimeo.com", "https://rutube.ru", "https://vkvideo.ru", "https://www.instagram.com", "https://www.tiktok.com", "https://www.youtube-nocookie.com"]);
       for (const list of csp!.values()) expect(list).not.toContain("'unsafe-eval'");
       expect(csp!.get("script-src")).not.toContain("'unsafe-inline'");
     });

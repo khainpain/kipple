@@ -52,7 +52,7 @@ export function LinkPlayer({ embed, cover }: { embed: Embed; cover?: string }) {
         <span className="play-btn">
           <Icon name="play" size={26} />
         </span>
-        <span className="facade-hint">{embed.video ? T.player.hint(PROVIDER_NAMES[embed.provider]) : T.player.post(PROVIDER_NAMES[embed.provider])}</span>
+        <span className="facade-hint">{embed.video ? T.player.hint(siteName(embed.provider)) : T.player.post(siteName(embed.provider))}</span>
       </button>
     );
   }
@@ -61,7 +61,7 @@ export function LinkPlayer({ embed, cover }: { embed: Embed; cover?: string }) {
       <iframe
         ref={frame}
         src={embed.src}
-        title={PROVIDER_NAMES[embed.provider]}
+        title={siteName(embed.provider)}
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write"
         allowFullScreen
         referrerPolicy="strict-origin-when-cross-origin"
@@ -71,9 +71,14 @@ export function LinkPlayer({ embed, cover }: { embed: Embed; cover?: string }) {
   );
 }
 
-const PROVIDER_NAMES: Record<Embed["provider"], string> = {
+/** VK's player is called differently in each language; the others are brand names. */
+const siteName = (p: Embed["provider"]) => (p === "vk" ? T.player.vk : PROVIDER_NAMES[p]);
+
+const PROVIDER_NAMES: Record<Exclude<Embed["provider"], "vk">, string> = {
   youtube: "YouTube",
   instagram: "Instagram",
   vimeo: "Vimeo",
   tiktok: "TikTok",
+  rutube: "Rutube",
+  dailymotion: "Dailymotion",
 };

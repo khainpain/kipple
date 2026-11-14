@@ -755,6 +755,7 @@ export const en: Dict = {
     showPost: "Show post",
     hint: (site) => `Watch here · loads from ${site}`,
     post: (site) => `Show post · loads from ${site}`,
+    vk: "VK Video",
   },
 
   demo: {
