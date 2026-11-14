@@ -252,6 +252,7 @@ describe("decide", () => {
     const cards = [card(1, { kind: "text", text: "", urls: [], autoJunk: true })];
     expect(effectiveAction(cards[0])).toBeUndefined();
     expect(pileOf(cards, "junk")).toBeUndefined();
+    expect(breakdown(cards, NOW).piles).toEqual([]); // not in "notes" either, which offers "to junk"
   });
 
   it("takes rule-guessed junk out of Junk when it is kept, without giving it a status", () => {

@@ -285,6 +285,12 @@ describe("messages Kipple can't fully read", () => {
     expect(cards.some((c) => c.autoJunk)).toBe(false);
     expect(cards.map((c) => c.kind)).toEqual(["text", "text"]);
   });
+
+  it("keeps a captioned message with unknown media an ordinary card", () => {
+    const [c] = messagesToCards([msg(1, { text: "a caption", media: { kind: "unsupported" } })]);
+    expect(c).toMatchObject({ kind: "text", text: "a caption" });
+    expect(c.unreadable).toBeFalsy();
+  });
 });
 
 describe("leftover helper replies", () => {

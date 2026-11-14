@@ -62,7 +62,8 @@ export function toRawMessage(m: SavedMessage): RawMessage {
       return { ...raw, text, text_entities: text ? [{ type: "plain", text }] : [] };
     }
     case "unsupported":
-      return { ...raw, unreadable: true };
+      // With a caption the card shows that; without one there is nothing Kipple can read.
+      return m.text.trim() ? raw : { ...raw, unreadable: true };
     case "contact":
       return { ...raw, contact_information: { first_name: undef(md.firstName), last_name: undef(md.lastName), phone_number: undef(md.phone) } };
     default:

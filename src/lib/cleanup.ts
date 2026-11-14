@@ -1,6 +1,6 @@
 import type { Card, UserPatch } from "./types";
 import { effectiveAction, effectiveTopic } from "./library";
-import { domainOf } from "./rules";
+import { domainOf, isUnreadable } from "./rules";
 import { dupeKey, findDuplicates, groupDuplicates } from "./smart";
 import { learnTopics, suggestTopic } from "./suggest";
 
@@ -78,6 +78,8 @@ export function breakdown(cards: Card[], now = Date.now(), likes = true): Breakd
     if (u?.action === "junk") sorted.junk++;
     // Anything sensitive is never offered in bulk.
     else if (c.sensitive) sensitive++;
+    // Nor what Kipple couldn't read: it stays (Apply to Telegram never deletes it either).
+    else if (isUnreadable(c)) sorted.kept++;
     // Junk that a rule or the AI guessed waits for a yes or no.
     else if (effectiveAction(c) === "junk") junk.push(c);
     else if (effectiveTopic(c)) sorted.topics++;
