@@ -1,6 +1,6 @@
 import { T } from "../i18n";
 import type { Card, CardKind, MediaRef } from "./types";
-import { isAutoJunk, isSensitive } from "./rules";
+import { isAutoJunk, isSensitive, isUnreadable } from "./rules";
 import { isKippleReply } from "./tgReplies";
 
 /** Loose shape of one message in Telegram Desktop's result.json. The format is undocumented, so every field is optional. */
@@ -35,6 +35,8 @@ export interface RawMessage {
   poll?: { question?: string; answers?: Array<{ text?: string }> };
   location_information?: { latitude?: number; longitude?: number };
   contact_information?: { first_name?: string; last_name?: string; phone_number?: string };
+  /** Not in exports: a message loaded from Telegram that Kipple can't read. */
+  unreadable?: boolean;
 }
 
 interface RawChat {
@@ -180,7 +182,8 @@ export function messageToCard(msg: RawMessage): Card | null {
     forwardedFrom: msg.forwarded_from ?? msg.saved_from ?? undefined,
   };
   if (isSensitive(text)) card.sensitive = true;
-  if (isAutoJunk(card)) card.autoJunk = true;
+  if (msg.unreadable || isUnreadable(card)) card.unreadable = true;
+  else if (isAutoJunk(card)) card.autoJunk = true;
   return card;
 }
 

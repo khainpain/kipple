@@ -9,7 +9,7 @@
 //! note). The send loop, pacing and "what was already sent" bookkeeping live in TypeScript
 //! (src/lib/telegram.ts) where they are easy to test.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -963,7 +963,8 @@ pub async fn tg_delete_saved(app: tauri::AppHandle, state: tauri::State<'_, TgSt
     // can never remove a message in someone else's chat (for both sides).
     let mine: Vec<tl::enums::Message> = messages
         .into_iter()
-        .filter(|m| matches!(m, tl::enums::Message::Message(m) if m.out && matches!(&m.peer_id, tl::enums::Peer::User(p) if p.user_id == owner)))
+        // Only Kipple's own helper replies (src/lib/tgReplies.ts REPLY_MARK): one edited into a note since is kept.
+        .filter(|m| matches!(m, tl::enums::Message::Message(m) if m.out && m.message.starts_with(REPLY_MARK) && matches!(&m.peer_id, tl::enums::Peer::User(p) if p.user_id == owner)))
         .collect();
     if mine.is_empty() {
         return Ok(());
@@ -977,6 +978,9 @@ pub async fn tg_delete_saved(app: tauri::AppHandle, state: tauri::State<'_, TgSt
     }
     Ok(())
 }
+
+/// The start of every "Open in Telegram" helper reply (src/lib/tgReplies.ts).
+const REPLY_MARK: &str = "\u{2191} Kipple";
 
 /// Telegram takes at most 100 message ids per messages.getMessages / messages.deleteMessages.
 const IDS_PER_CALL: usize = 100;
@@ -1007,8 +1011,9 @@ pub struct CardRef {
 #[derive(Serialize)]
 pub struct CardStatus {
     id: i32,
-    /// "deleted", "missing" (gone already), "changed" (another message has this id) or "kept"
-    /// (fine, but another message of its album wasn't, so none of them went).
+    /// "deleted", "missing" (gone already), "changed" (another message has this id), "unreadable"
+    /// (Kipple can't read it, so it stays) or "kept" (fine, but another message of its album
+    /// wasn't, so none of them went).
     status: &'static str,
 }
 
@@ -1025,10 +1030,16 @@ fn card_checks(items: &[CardRef], found: &HashMap<i32, (bool, i32)>) -> Vec<(i32
         .collect()
 }
 
+/// No text and nothing Kipple can show: an empty-looking message that may hold something Kipple
+/// doesn't understand (a newer kind of message), so it is never deleted.
+fn is_unreadable(m: &tl::types::Message) -> bool {
+    m.message.trim().is_empty() && m.media.as_ref().and_then(media_of).is_none_or(|x| x.kind == "unsupported")
+}
+
 /// The ids to delete. `whole` (one album): all of them or none, so a card is never left half
 /// deleted; ones already gone don't stop the rest.
 fn to_delete(checks: &[(i32, &'static str)], whole: bool) -> Vec<i32> {
-    if whole && checks.iter().any(|(_, s)| *s == "changed") {
+    if whole && checks.iter().any(|(_, s)| *s == "changed" || *s == "unreadable") {
         return vec![];
     }
     checks.iter().filter(|(_, s)| *s == "ok").map(|(id, _)| *id).collect()
@@ -1067,7 +1078,16 @@ pub async fn tg_delete_cards(app: tauri::AppHandle, state: tauri::State<'_, TgSt
             _ => None,
         })
         .collect();
-    let checks = card_checks(&items, &found);
+    // A message Kipple can't read is never deleted: its backup would hold nothing.
+    let unreadable: HashSet<i32> = messages
+        .iter()
+        .filter_map(|m| match m {
+            tl::enums::Message::Message(m) if is_unreadable(m) => Some(m.id),
+            _ => None,
+        })
+        .collect();
+    let checks: Vec<(i32, &'static str)> =
+        card_checks(&items, &found).into_iter().map(|(id, s)| if s == "ok" && unreadable.contains(&id) { (id, "unreadable") } else { (id, s) }).collect();
     let ok = to_delete(&checks, whole);
     if !ok.is_empty() {
         let keep: Vec<SavedMessage> = to_saved(&messages, &users, &chats).into_iter().filter(|m| ok.contains(&m.id)).collect();
@@ -1122,7 +1142,9 @@ pub struct SavedEntity {
 #[serde(rename_all = "camelCase")]
 pub struct SavedMedia {
     /// photo, video_file, animation, voice_message, video_message, audio_file, sticker,
-    /// document, poll, location or contact (the names Telegram Desktop's export uses).
+    /// document, poll, location or contact (the names Telegram Desktop's export uses), "todo"
+    /// (a checklist: title in poll_question, items in poll_answers, ticks in done) or
+    /// "unsupported" (something Kipple can't read, such as a newer kind of message).
     kind: String,
     width: Option<i32>,
     height: Option<i32>,
@@ -1133,6 +1155,8 @@ pub struct SavedMedia {
     emoji: Option<String>,
     poll_question: Option<String>,
     poll_answers: Option<Vec<String>>,
+    /// For a checklist: whether each item is ticked.
+    done: Option<Vec<bool>>,
     latitude: Option<f64>,
     longitude: Option<f64>,
     first_name: Option<String>,
@@ -1272,7 +1296,23 @@ fn media_of(media: &tl::enums::MessageMedia) -> Option<SavedMedia> {
             phone: Some(c.phone_number.clone()),
             ..Default::default()
         }),
-        _ => None,
+        M::ToDo(t) => {
+            let tl::enums::TodoList::List(list) = &t.todo;
+            let ticked: HashSet<i32> = t.completions.iter().flatten().map(|c| { let tl::enums::TodoCompletion::Completion(c) = c; c.id }).collect();
+            let items: Vec<&tl::types::TodoItem> = list.list.iter().map(|i| { let tl::enums::TodoItem::Item(i) = i; i }).collect();
+            Some(SavedMedia {
+                kind: "todo".into(),
+                poll_question: Some(text_of(&list.title)),
+                poll_answers: Some(items.iter().map(|i| text_of(&i.title)).collect()),
+                done: Some(items.iter().map(|i| ticked.contains(&i.id)).collect()),
+                ..Default::default()
+            })
+        }
+        // No media, or a link preview (the link is in the text).
+        M::Empty | M::WebPage(_) => None,
+        // Dice, stories, invoices, kinds newer than this layer (Telegram sends "unsupported") and
+        // the rest: nothing to show, but the message isn't empty, so it is never taken for junk.
+        _ => Some(SavedMedia { kind: "unsupported".into(), ..Default::default() }),
     }
 }
 
@@ -2056,6 +2096,40 @@ mod tests {
         assert_eq!(to_delete(&checks, false), vec![1, 3]);
         assert!(to_delete(&checks, true).is_empty());
         assert_eq!(to_delete(&[(1, "ok"), (2, "missing")], true), vec![1]);
+    }
+
+    #[test]
+    fn an_unreadable_message_is_never_deleted() {
+        assert_eq!(to_delete(&[(1, "ok"), (2, "unreadable")], false), vec![1]);
+        assert!(to_delete(&[(1, "ok"), (2, "unreadable")], true).is_empty());
+    }
+
+    #[test]
+    fn reads_a_checklist_and_marks_what_it_cannot_read() {
+        let text = |t: &str| tl::enums::TextWithEntities::Entities(tl::types::TextWithEntities { text: t.into(), entities: vec![] });
+        let todo = tl::enums::MessageMedia::ToDo(tl::types::MessageMediaToDo {
+            todo: tl::enums::TodoList::List(tl::types::TodoList {
+                others_can_append: false,
+                others_can_complete: false,
+                title: text("Shop"),
+                list: vec![
+                    tl::enums::TodoItem::Item(tl::types::TodoItem { id: 1, title: text("Milk") }),
+                    tl::enums::TodoItem::Item(tl::types::TodoItem { id: 2, title: text("Bread") }),
+                ],
+            }),
+            completions: Some(vec![tl::enums::TodoCompletion::Completion(tl::types::TodoCompletion {
+                id: 2,
+                completed_by: tl::enums::Peer::User(tl::types::PeerUser { user_id: 7 }),
+                date: 0,
+            })]),
+        });
+        let m = media_of(&todo).unwrap();
+        assert_eq!(m.kind, "todo");
+        assert_eq!(m.poll_question.as_deref(), Some("Shop"));
+        assert_eq!(m.poll_answers, Some(vec!["Milk".to_string(), "Bread".to_string()]));
+        assert_eq!(m.done, Some(vec![false, true]));
+        assert_eq!(media_of(&tl::enums::MessageMedia::Unsupported).unwrap().kind, "unsupported");
+        assert!(media_of(&tl::enums::MessageMedia::Empty).is_none());
     }
 
     #[test]

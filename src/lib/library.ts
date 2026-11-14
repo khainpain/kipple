@@ -1,6 +1,7 @@
 import type { Action, Card, EditEvent, Library, UserFields, UserPatch } from "./types";
 import { linkText } from "./embeds";
 import { hostChain } from "./siteMarks";
+import { isUnreadable } from "./rules";
 import { builtinKeyOf, type SiteTopic } from "./siteTopics";
 import { T } from "../i18n/index.js";
 
@@ -82,7 +83,7 @@ export function applyEdits(cards: Card[], events: EditEvent[]): Card[] {
 
 /** A status set by hand, then the rule's junk guess, then the AI's. "Keep" on the cleanup screen overrules a guess of junk. */
 export function effectiveAction(c: Card): Action | undefined {
-  const guess = c.autoJunk && !c.user?.kept ? "junk" : c.ai?.action;
+  const guess = c.autoJunk && !c.user?.kept && !isUnreadable(c) ? "junk" : c.ai?.action;
   return c.user?.action ?? (guess === "junk" && c.user?.kept ? undefined : guess);
 }
 

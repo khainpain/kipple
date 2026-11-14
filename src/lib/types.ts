@@ -101,6 +101,8 @@ export interface Card {
   sensitive?: boolean;
   /** Rule-based junk guess (empty, single sticker, etc.). */
   autoJunk?: boolean;
+  /** Kipple couldn't read the message (a newer kind of message): never junk, never deleted. */
+  unreadable?: boolean;
   /** Present in an earlier import but missing from the latest one. */
   removed?: boolean;
   link?: LinkMeta;

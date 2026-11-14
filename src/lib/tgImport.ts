@@ -3,6 +3,7 @@ import type { SavedMessage, TelegramApi } from "../platform/types";
 import { parseExport, type RawMessage } from "./parser";
 import { annotateContext } from "./library";
 import type { Card, Library, MediaRef, TelegramSync } from "./types";
+import { leftoverReplies } from "./tgReplies";
 
 /**
  * Loading Saved Messages straight from Telegram, instead of a Telegram Desktop export.
@@ -54,6 +55,15 @@ export function toRawMessage(m: SavedMessage): RawMessage {
       return { ...raw, poll: { question: undef(md.pollQuestion), answers: (md.pollAnswers ?? []).map((text) => ({ text })) } };
     case "location":
       return { ...raw, location_information: { latitude: undef(md.latitude), longitude: undef(md.longitude) } };
+    case "todo": {
+      // A checklist: one item per line, ticked or not, so it reads (and is found) like a note.
+      const items = (md.pollAnswers ?? []).map((t, i) => `${md.done?.[i] ? "☑" : "☐"} ${t}`);
+      const text = [md.pollQuestion ?? "", ...items].filter((l) => l.trim()).join("\n");
+      return { ...raw, text, text_entities: text ? [{ type: "plain", text }] : [] };
+    }
+    case "unsupported":
+      // With a caption the card shows that; without one there is nothing Kipple can read.
+      return m.text.trim() ? raw : { ...raw, unreadable: true };
     case "contact":
       return { ...raw, contact_information: { first_name: undef(md.firstName), last_name: undef(md.lastName), phone_number: undef(md.phone) } };
     default:
@@ -232,6 +242,9 @@ export interface SyncDeps {
   onProgress(p: SyncProgress): void;
   /** Called after cards were added or photos arrived, to redraw. */
   onChange(): void;
+  /** Kipple's own helper replies met on the way (they never become cards), to delete them.
+   *  A failure stops the load before the page counts as read, so the next load meets them again. */
+  onReplies?(owner: number, ids: number[]): Promise<void>;
   signal: AbortSignal;
   /** For tests. */
   sleep?: (ms: number) => Promise<void>;
@@ -303,6 +316,16 @@ export async function syncSaved(lib: Library, deps: SyncDeps): Promise<{ added: 
         throw new Error("OTHER_ACCOUNT_LIBRARY");
       }
       sync.owner = page.owner;
+    }
+    // Reported page by page: the next load starts above these, so they must not wait for the end.
+    const replies = leftoverReplies(page.messages);
+    if (replies.length && sync.owner != null && deps.onReplies) {
+      try {
+        await deps.onReplies(sync.owner, replies);
+      } catch (e) {
+        await deps.save(lib).catch(() => undefined); // keep what came in; this page is read again
+        throw e;
+      }
     }
     if (page.nextOffset == null || page.nextOffset <= sync.top) {
       // Read everything down to `top`: the pass is complete.

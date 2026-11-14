@@ -558,6 +558,7 @@ export const ru = {
   },
 
   card: {
+    unreadable: "Kipple не может прочитать это сообщение, открой его в Telegram",
     allFrom: (name: string) => `Все карточки из «${name}»`,
     important: "Важное",
     pin: "В важное",

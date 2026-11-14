@@ -57,7 +57,8 @@ export interface SavedMessage {
   /** Telegram made a link preview with a picture; savedPhotos downloads it like a photo. */
   webPhoto?: boolean;
   media?: {
-    /** photo, video_file, animation, voice_message, video_message, audio_file, sticker, document, poll, location, contact */
+    /** photo, video_file, animation, voice_message, video_message, audio_file, sticker, document, poll, location, contact,
+     *  todo (a checklist), unsupported (something Kipple can't read) */
     kind: string;
     width?: number | null;
     height?: number | null;
@@ -68,6 +69,8 @@ export interface SavedMessage {
     emoji?: string | null;
     pollQuestion?: string | null;
     pollAnswers?: string[] | null;
+    /** A checklist ("todo"): whether each item in pollAnswers is ticked. */
+    done?: boolean[] | null;
     latitude?: number | null;
     longitude?: number | null;
     firstName?: string | null;
@@ -136,13 +139,13 @@ export interface TelegramApi {
   /**
    * Deletes these messages of the user's cards from Saved Messages, on all devices (up to 100).
    * Each is checked first: still there, in the signed-in account's Saved Messages, with this
-   * date; and copied to the local backup. "deleted", "missing" (gone already) or "changed"
+   * date; and copied to the local backup. "deleted", "missing" (gone already), "unreadable" (never deleted) or "changed"
    * (another message has this id) per message; nothing is deleted if the backup fails.
    * `whole` (one album): if any message is "changed", none is deleted and the rest are "kept".
    * `owner`: the account the library was loaded from; with another one signed in, nothing is
    * deleted and it throws OTHER_ACCOUNT_LIBRARY.
    */
-  deleteCards(items: Array<{ id: number; date: number }>, whole: boolean, owner?: number): Promise<Array<{ id: number; status: "deleted" | "missing" | "changed" | "kept" }>>;
+  deleteCards(items: Array<{ id: number; date: number }>, whole: boolean, owner?: number): Promise<Array<{ id: number; status: "deleted" | "missing" | "changed" | "unreadable" | "kept" }>>;
   /**
    * Pins (or unpins) a Saved Message after the same check as deleteCards. Silent: no notification.
    * "same" when it's pinned (unpinned) already; "refused" when Telegram won't, e.g. too many pins.

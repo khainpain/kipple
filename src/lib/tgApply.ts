@@ -8,6 +8,7 @@
 // Which pins are Kipple's is kept in telegram-pins.json.
 import type { TelegramApi } from "../platform/types";
 import { effectiveAction } from "./library";
+import { isUnreadable } from "./rules";
 import { isImportant } from "./smart";
 import { retrying, sleepFor } from "./telegram";
 import type { Card } from "./types";
@@ -32,7 +33,8 @@ export interface DeleteItem {
 }
 
 /** Cards the user sent to junk themselves. A guess by the rules or the AI is never deleted. */
-const userJunk = (c: Card) => !c.removed && c.user?.action === "junk";
+// A message Kipple couldn't read stays: its backup would hold nothing.
+const userJunk = (c: Card) => !c.removed && c.user?.action === "junk" && !isUnreadable(c);
 
 export function deletePlan(cards: Card[]): DeleteItem[] {
   return cards

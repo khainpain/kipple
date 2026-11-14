@@ -42,11 +42,20 @@ export function isSensitive(text: string): boolean {
   return looksLikeSeedPhrase(text);
 }
 
-export function isAutoJunk(card: Pick<Card, "kind" | "text" | "urls" | "media">): boolean {
+/**
+ * Kipple couldn't read the message: marked so, or a text card with nothing in it (loaded by an
+ * older version, which took such messages for empty). Telegram sends newer kinds of message to
+ * Kipple as empty, so these are never guessed as junk and never deleted.
+ */
+export function isUnreadable(card: Pick<Card, "kind" | "text" | "urls" | "media" | "unreadable">): boolean {
+  return !!card.unreadable || (card.kind === "text" && !card.text.trim() && card.urls.length === 0 && !card.media);
+}
+
+export function isAutoJunk(card: Pick<Card, "kind" | "text" | "urls" | "media" | "unreadable">): boolean {
   const text = card.text.trim();
+  if (isUnreadable(card)) return false;
   if (card.kind === "sticker") return true;
   if (card.kind === "text" && card.urls.length === 0) {
-    if (text.length === 0) return true;
     if (text.length <= 3) return true;
     if (/^(test|тест|ok|ок|\.|\+|-)$/i.test(text)) return true;
   }

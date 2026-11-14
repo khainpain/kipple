@@ -545,6 +545,7 @@ export const en: Dict = {
   },
 
   card: {
+    unreadable: "Kipple can't read this message yet. Open it in Telegram",
     allFrom: (name) => `All cards from ${name}`,
     important: "Important",
     pin: "Mark important",
