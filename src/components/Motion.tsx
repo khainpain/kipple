@@ -15,6 +15,7 @@ import StatusMark from "./bits/StatusMark";
 import HoldButton from "./bits/HoldButton";
 import SwipeToast from "./bits/SwipeToast";
 import { useThemePref } from "../lib/theme";
+import { T } from "../i18n";
 import "../motion.css";
 
 /** The curves and timings from MOTION.md, for motion's `transition`. */
@@ -181,6 +182,7 @@ export function HoldToConfirm(props: { children: ReactNode; doneLabel: ReactNode
       doneLabel={props.doneLabel}
       disabled={props.disabled}
       holdTime={1600}
+      hint={T.common.holdHint(1.6)}
       size="sm"
       radius={8}
       backgroundColor="var(--panel)"

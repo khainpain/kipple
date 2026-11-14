@@ -81,6 +81,11 @@ pub fn run() {
             telegram::tg_delete_saved,
             telegram::tg_backup_step,
             telegram::tg_backup_info,
+            telegram::tg_tags_setup,
+            telegram::tg_tags_apply,
+            telegram::tg_tags_hashtags,
+            telegram::tg_delete_cards,
+            telegram::tg_pin_saved,
             telegram::tg_saved_photos,
             telegram::tg_forget_media
         ])

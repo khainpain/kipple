@@ -87,10 +87,12 @@ function fakeTg(opts: { floodOnce?: boolean; missing?: number[] } = {}) {
   let flooded = false;
   const tg: TelegramApi = {
     status: async () => ({ hasApi: true, builtInApi: true, customApi: false, authorized: true, name: "Me" }),
-    account: async () => ({ name: "Me" }),
+    account: async () => ({ id: 1, name: "Me" }),
     savedPage: async () => ({ messages: [], nextOffset: null, total: 0 }),
     quoteSaved: async () => ({ id: 1, open: null, owner: null }),
     deleteSaved: async () => undefined,
+    deleteCards: async () => [],
+    pinSaved: async () => "ok",
     backupStep: async () => ({ done: true, saved: 0 }),
     backupInfo: async () => ({ dir: "", messages: 0 }),
     openBackup: async () => undefined,
@@ -116,6 +118,9 @@ function fakeTg(opts: { floodOnce?: boolean; missing?: number[] } = {}) {
       return ids.map(() => nextMsg++);
     },
     sendNote: async (_b, topic, replyTo) => (log.push(`note ${replyTo} in ${topic}`), nextMsg++),
+    tagsSetup: async () => ({ premium: false, owner: 1, tags: [] }),
+    tagsApply: async () => ({ status: "same", applied: [] }),
+    tagsHashtags: async () => ({ status: "same", applied: [] }),
   };
   return { tg, log };
 }

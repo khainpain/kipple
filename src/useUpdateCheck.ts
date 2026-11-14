@@ -25,7 +25,7 @@ export function useUpdateCheck(busy: () => boolean) {
     const now = Date.now();
     if (!force && now - lastCheck.current < MIN_GAP_MS) return;
     // Never swap the update object while it is downloading.
-    if (busyRef.current()) return;
+    if (__TEST_BUILD__ || busyRef.current()) return;
     lastCheck.current = now;
     try {
       const found = await platform.checkUpdate();
