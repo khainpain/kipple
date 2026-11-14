@@ -14,7 +14,7 @@ import { Icon } from "./Icon";
 import { SiteIcon } from "./SiteIcon";
 import { hueOf, type CardField, type CardLook, type ViewKey } from "./nav";
 
-const KIND_ICON: Record<string, string> = {
+export const KIND_ICON: Record<string, string> = {
   document: "file",
   voice: "mic",
   audio: "music",
@@ -175,6 +175,8 @@ export function CardView(props: {
   enterDelay?: number;
   /** Called when the entrance starts (or at once with reduced motion). */
   onEntered?: () => void;
+  /** Set where a card can be dragged onto a topic in the sidebar. */
+  onDragStart?: (e: React.DragEvent) => void;
 }) {
   const { card, lib, view } = props;
   const [enter] = useState(() => props.enter ?? false);
@@ -203,6 +205,8 @@ export function CardView(props: {
   return (
     <article
       className={cls}
+      draggable={props.onDragStart ? true : undefined}
+      onDragStart={props.onDragStart}
       style={enter && enterDelay ? { animationDelay: `${enterDelay}ms` } : undefined}
       onAnimationStart={(e) => {
         if (e.target === e.currentTarget && e.animationName === "k-card-in") props.onEntered?.();

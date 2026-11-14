@@ -54,7 +54,12 @@ export interface LinkMeta {
   fetchedAt: string;
   /** Which parseHtml found the picture (linkmeta.ts PARSE_VERSION); missing means 1. */
   v?: number;
+  /** The last "Check links" (linkcheck.ts): whether the page still opens, and when that was. */
+  health?: LinkHealth;
+  checkedAt?: string;
 }
+
+export type LinkHealth = "ok" | "broken" | "unknown";
 
 export interface AiFields {
   title: string;

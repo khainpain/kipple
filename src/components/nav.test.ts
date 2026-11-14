@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PANEL_WIDTH, cardKey, clampPanelWidth, matchesSource, matchesType, sortCards } from "./nav";
+import { PANEL_WIDTH, cardKey, dragIds, readDragIds, clampPanelWidth, matchesSource, matchesType, sortCards } from "./nav";
 import type { Card } from "../lib/types";
 
 const card = (id: number, text: string, priority?: 1 | 2 | 3): Card => ({
@@ -78,5 +78,27 @@ describe("matchesType", () => {
     expect(matchesType(of("audio"), "audio")).toBe(true);
     expect(matchesType(of("audio"), "docs")).toBe(false);
     expect(matchesType(of("document"), "docs")).toBe(true);
+  });
+});
+
+describe("dragIds", () => {
+  it("drags the whole selection when the card is in it", () => {
+    expect(dragIds(new Set([1, 2, 3]), 2)).toEqual([1, 2, 3]);
+  });
+  it("drags only the card when it isn't selected", () => {
+    expect(dragIds(new Set([1, 3]), 2)).toEqual([2]);
+    expect(dragIds(new Set(), 5)).toEqual([5]);
+  });
+});
+
+describe("readDragIds", () => {
+  it("reads back the dragged card ids", () => {
+    expect(readDragIds(JSON.stringify([3, 1]))).toEqual([3, 1]);
+  });
+  it("ignores anything that isn't a list of card ids", () => {
+    expect(readDragIds("")).toEqual([]);
+    expect(readDragIds("{bad")).toEqual([]);
+    expect(readDragIds(JSON.stringify({ a: 1 }))).toEqual([]);
+    expect(readDragIds(JSON.stringify([1, "x", 2.5, -1]))).toEqual([1]);
   });
 });

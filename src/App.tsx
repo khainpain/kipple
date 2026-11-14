@@ -13,7 +13,8 @@ import { dueReplies, nextDue, replyText, scheduleReply, withoutReplies, type Pen
 import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type SendOptions } from "./lib/telegram";
 import { TelegramDialog } from "./components/TelegramDialog";
 import { importFolder, pickExportFolder } from "./lib/importer";
-import { fetchLinkMeta, needsPreview } from "./lib/linkmeta";
+import { fetchLinkMeta, needsPreview, probeLink } from "./lib/linkmeta";
+import { healthOf } from "./lib/linkcheck";
 import { AiStop, aiModelOf, type AiAuth, classifyCards, retagCount, nameImages, pendingForAi, pendingImages, suggestSynonyms, groupCards } from "./lib/ai";
 import { displayTitle } from "./components/CardView";
 import { toCsv, toMarkdown } from "./lib/exporters";
@@ -239,7 +240,9 @@ export default function App() {
     const worker = async () => {
       while (next < todo.length && !signal.aborted) {
         const c = todo[next++];
-        c.link = await fetchLinkMeta(c.urls[0]);
+        // A refreshed preview keeps what the last "Check links" found.
+        const { health, checkedAt } = c.link ?? {};
+        c.link = { ...(await fetchLinkMeta(c.urls[0])), health, checkedAt };
         done++;
         if (done % 10 === 0 || done === todo.length) {
           setJob({ label: T.app.jobLinks, done, total: todo.length });
@@ -375,6 +378,38 @@ export default function App() {
     }
     await persist(l);
     return true;
+  }
+
+  /**
+   * "Check links" (only from its button): one request to every saved link, keeping just whether
+   * it still opens. The preview itself is left as it was, so a page that is gone keeps its card.
+   */
+  async function checkLinks(l: Library) {
+    const ctl = startJob("work");
+    if (!ctl) return;
+    const todo = l.cards.filter((c) => !c.removed && c.kind === "link" && c.urls[0]);
+    let done = 0;
+    let next = 0;
+    setJob({ label: T.linkCheck.job, done, total: todo.length });
+    try {
+      const worker = async () => {
+        while (next < todo.length && !ctl.signal.aborted) {
+          const c = todo[next++];
+          const health = healthOf(await probeLink(c.urls[0]));
+          c.link = { ...(c.link ?? { url: c.urls[0], fetchedAt: "" }), health, checkedAt: new Date().toISOString() };
+          done++;
+          if (done % 10 === 0 || done === todo.length) {
+            setJob({ label: T.linkCheck.job, done, total: todo.length });
+            setRev((r) => r + 1);
+          }
+        }
+      };
+      await Promise.all(Array.from({ length: 6 }, worker));
+      await persist(l);
+    } finally {
+      endJob(ctl);
+      setRev((r) => r + 1);
+    }
   }
 
   /** Link previews for new cards, after an import or a load from Telegram. No AI here. */
@@ -948,6 +983,7 @@ export default function App() {
         taskSkips={demo ? demoToday.skips : (settings.taskSkips ?? {})}
         onToday={saveToday}
         firstCleanup={cleanupFor === lib}
+        onCheckLinks={!demo && settings.fetchLinks && platform.canFetchLinks ? () => void checkLinks(lib) : undefined}
       />
       {settingsDialog}
       {consentDialog}

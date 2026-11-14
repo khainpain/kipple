@@ -72,3 +72,17 @@ function wordForms(q: string): Query {
     }),
   };
 }
+
+/** Ctrl+K: the live cards that match, best first. */
+export function quickFind(cards: Card[], index: ReturnType<typeof buildIndex>, query: string, limit: number): Card[] {
+  const q = query.trim();
+  if (!q) return [];
+  const byId = new Map(cards.map((c) => [c.id, c]));
+  const out: Card[] = [];
+  for (const h of index.search(q)) {
+    const c = byId.get(h.id as number);
+    if (c && !c.removed) out.push(c);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
