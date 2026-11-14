@@ -48,10 +48,9 @@ describe("TikTok previews", () => {
     expect(m.title).toBe("Pasta in 10 minutes");
   });
 
-  it("still saves the video's address when oEmbed fails", async () => {
+  it("still saves the video's address when oEmbed fails, with the reason", async () => {
     answers = { "https://vm.tiktok.com/": ok(FULL, "text/html", "<html></html>"), "https://www.tiktok.com/oembed": { status: 404, url: "x", contentType: "text/html", body: "" } };
     const m = await fetchLinkMeta("https://vm.tiktok.com/ZMabc/");
-    expect(m).toMatchObject({ url: FULL, siteName: "TikTok" });
-    expect(m.error).toBeUndefined();
+    expect(m).toMatchObject({ url: FULL, siteName: "TikTok", error: "HTTP 404" });
   });
 });
