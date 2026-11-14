@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dueReplies, isKippleReply, nextDue, replyText, scheduleReply, validReplies, withoutReplies } from "./tgReplies";
+import { dueReplies, isKippleReply, leftoverReplies, nextDue, replyText, scheduleLeftovers, scheduleReply, validReplies, withoutReplies } from "./tgReplies";
 import { messageToCard } from "./parser";
 
 const now = new Date("2026-11-07T20:00:00Z");
@@ -35,5 +35,30 @@ describe("helper replies", () => {
     expect(isKippleReply("hello")).toBe(false);
     expect(messageToCard({ id: 9, type: "message", date: "2026-11-07T20:00:00", text: replyText() })).toBeNull();
     expect(messageToCard({ id: 10, type: "message", date: "2026-11-07T20:00:00", text: "a note" })).not.toBeNull();
+  });
+
+  it("still knows the replies of older versions, with or without the emoji", () => {
+    expect(isKippleReply("↑ Kipple · Tap the quote above to go to the message")).toBe(true);
+    expect(replyText()).toMatch(/^↑ Kipple \p{Extended_Pictographic}/u);
+  });
+
+  it("finds leftover helper replies among loaded messages, only the user's own plain ones", () => {
+    const m = (id: number, text: string, over: object = {}) => ({ id, date: 0, text, entities: [], ...over });
+    expect(
+      leftoverReplies([
+        m(1, replyText()),
+        m(2, "a note"),
+        m(3, replyText(), { forwardedFrom: "Someone" }),
+        m(4, replyText(), { media: { kind: "photo" } }),
+        m(5, "↑ Kipple · old text"),
+      ]),
+    ).toEqual([1, 5]);
+  });
+
+  it("schedules leftovers by the setting, keeping replies that are already waiting", () => {
+    const waiting = [{ id: 1, owner: 7, at: "2026-11-07T19:59:00.000Z" }];
+    expect(scheduleLeftovers(waiting, [1, 2], 7, now, "1m")).toEqual([...waiting, { id: 2, owner: 7, at: "2026-11-07T20:01:00.000Z" }]);
+    expect(scheduleLeftovers(waiting, [2], 7, now, "never")).toBe(waiting);
+    expect(scheduleLeftovers(waiting, [], 7, now, "1m")).toBe(waiting);
   });
 });

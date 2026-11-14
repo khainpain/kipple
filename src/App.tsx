@@ -9,7 +9,7 @@ import { cleanRules, effectiveTags, effectiveTopic, findTopic, getOwnTopics, mak
 import { renameInRules, ruleOffer, withoutRulesTo } from "./lib/topicRules";
 import { FEATURES } from "./lib/features";
 import { aiAllowed, appendEdits, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadPendingReplies, loadSettings, loadPinState, loadTagSyncState, saveBoardState, savePinState, saveLibrary, savePendingReplies, saveSettings, saveTagSyncState, wipeAll, type Settings } from "./lib/store";
-import { dueReplies, nextDue, replyText, scheduleReply, withoutReplies, type PendingReply } from "./lib/tgReplies";
+import { dueReplies, nextDue, replyText, scheduleLeftovers, scheduleReply, withoutReplies, type PendingReply } from "./lib/tgReplies";
 import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type SendOptions } from "./lib/telegram";
 import { NoPremiumError, syncTags, type TagMode } from "./lib/tgTags";
 import { applyToTelegram, type ApplyOptions, type ApplyProgress } from "./lib/tgApply";
@@ -476,6 +476,11 @@ export default function App() {
         signal: ctl.signal,
         onProgress: (p) => setJob({ label: p.phase === "messages" ? T.app.jobTgLoad : T.app.jobTgPhotos, done: p.done, total: p.total }),
         onChange: () => setRev((r) => r + 1),
+        // Helper replies left over from an earlier "Open in Telegram": deleted like new ones.
+        onReplies: (owner, ids) =>
+          void updateReplies((l) => scheduleLeftovers(l, ids, owner, new Date(), settingsRef.current.replyCleanup))
+            .then(() => cleanReplies())
+            .catch(() => undefined),
       });
       added = res.added;
       if (fresh || added) notify(T.app.tgLoaded(l.cards.length, added));

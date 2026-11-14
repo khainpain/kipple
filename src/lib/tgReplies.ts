@@ -1,4 +1,5 @@
 import { T } from "../i18n";
+import type { SavedMessage } from "../platform/types";
 
 /**
  * "Open in Telegram". Telegram can't link to a message inside Saved Messages (desktop apps only
@@ -35,10 +36,29 @@ export function validReplies(list: unknown): PendingReply[] {
   );
 }
 
-export const replyText = () => `${REPLY_MARK} · ${T.telegram.replyHint}`;
+/** Kipple's mark in the reply (a plain Unicode emoji: custom ones need a sticker set and Premium). */
+const REPLY_EMOJI = "🗂️";
+
+export const replyText = () => `${REPLY_MARK} ${REPLY_EMOJI} · ${T.telegram.replyHint}`;
 
 export function isKippleReply(text: string | undefined): boolean {
   return !!text?.startsWith(REPLY_MARK);
+}
+
+/**
+ * Helper replies among loaded messages: left in Saved Messages when the app was closed before
+ * their deletion, or posted by an older version. Only plain text the user posted (not forwarded),
+ * so someone else's message that happens to start with the mark is never touched.
+ */
+export function leftoverReplies(messages: Array<Pick<SavedMessage, "id" | "text" | "forwardedFrom" | "media">>): number[] {
+  return messages.filter((m) => isKippleReply(m.text) && !m.forwardedFrom && !m.media).map((m) => m.id);
+}
+
+/** The pending list with these leftovers added (replies already waiting keep their time), or unchanged when replies are kept. */
+export function scheduleLeftovers(list: PendingReply[], ids: number[], owner: number, now: Date, cleanup: ReplyCleanup): PendingReply[] {
+  const fresh = ids.filter((id) => !list.some((p) => p.id === id && p.owner === owner));
+  if (!fresh.length || DELAY[cleanup] === null) return list;
+  return fresh.reduce((l, id) => scheduleReply(l, id, owner, now, cleanup), list);
 }
 
 /** The pending list with this reply added, or unchanged when replies are kept. */

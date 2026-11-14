@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SavedMessage, SavedPage } from "../platform/types";
+import { replyText } from "./tgReplies";
 import { addCards, backupSaved, emptyTelegramLibrary, messagesToCards, pendingPhotos, syncSaved, textEntities, toRawMessage, type SyncDeps } from "./tgImport";
 import type { Library } from "./types";
 
@@ -265,6 +266,20 @@ describe("albums across pages", () => {
     const cards = messagesToCards([msg(11, { ...g, text: "late caption", media: { kind: "photo" } }), msg(10, { ...g, media: { kind: "photo" } })]);
     expect(cards).toHaveLength(1);
     expect(cards[0]).toMatchObject({ id: 10, text: "late caption", albumIds: [11] });
+  });
+});
+
+describe("leftover helper replies", () => {
+  it("reports Kipple's own old replies it read, with the account, and makes no cards of them", async () => {
+    const tg: SyncDeps["tg"] = {
+      savedPage: async () => ({ messages: [msg(2, { text: replyText() }), msg(1, { text: "note" })], nextOffset: null, total: 2, owner: 7 }),
+      savedPhotos: async () => [],
+    };
+    const lib = emptyTelegramLibrary();
+    const met: Array<[number, number[]]> = [];
+    await syncSaved(lib, { ...deps(tg), onReplies: (owner, ids) => void met.push([owner, ids]) });
+    expect(met).toEqual([[7, [2]]]);
+    expect(lib.cards.map((c) => c.id)).toEqual([1]);
   });
 });
 
