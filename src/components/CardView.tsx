@@ -6,7 +6,7 @@ import { T, formatNumber, locale } from "../i18n";
 import { mediaUrl } from "../lib/importer";
 import { FEATURES } from "../lib/features";
 import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic } from "../lib/library";
-import { domainOf } from "../lib/rules";
+import { domainOf, isUnreadable } from "../lib/rules";
 import { instantImage, isVideoLink, linkText } from "../lib/embeds";
 import { isImportant } from "../lib/smart";
 import { TopicMenu } from "./TopicMenu";
@@ -89,6 +89,7 @@ export function displayTitle(card: Card): string {
   if (card.kind === "voice") return T.card.voice;
   if (card.kind === "video_note") return T.card.videoNote;
   if (card.kind === "sticker") return T.card.sticker(card.text);
+  if (isUnreadable(card)) return T.card.unreadable;
   const line = card.text.split("\n").find((l) => l.trim());
   if (line) return line.slice(0, 120);
   const site = siteOf(card);

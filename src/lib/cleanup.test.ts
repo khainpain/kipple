@@ -248,6 +248,12 @@ describe("decide", () => {
     expect(edits).toEqual([{ ids: [1, 2, 3, 4, 5], patch: { kept: true } }]);
   });
 
+  it("doesn't offer as junk an empty card an older version guessed was junk", () => {
+    const cards = [card(1, { kind: "text", text: "", urls: [], autoJunk: true })];
+    expect(effectiveAction(cards[0])).toBeUndefined();
+    expect(pileOf(cards, "junk")).toBeUndefined();
+  });
+
   it("takes rule-guessed junk out of Junk when it is kept, without giving it a status", () => {
     const cards = [card(1, { kind: "sticker", text: "", autoJunk: true })];
     expect(effectiveAction(cards[0])).toBe("junk");

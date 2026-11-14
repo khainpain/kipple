@@ -50,9 +50,11 @@ describe("helper replies", () => {
         m(2, "a note"),
         m(3, replyText(), { forwardedFrom: "Someone" }),
         m(4, replyText(), { media: { kind: "photo" } }),
-        m(5, "↑ Kipple · old text"),
+        m(5, "↑ Kipple · нажми на цитату, чтобы перейти к сообщению"),
+        m(6, "↑ Kipple · tap the quote to jump to the message"),
+        m(7, "↑ Kipple ideas for the roadmap"),
       ]),
-    ).toEqual([1, 5]);
+    ).toEqual([1, 5, 6]);
   });
 
   it("schedules leftovers by the setting, keeping replies that are already waiting", () => {

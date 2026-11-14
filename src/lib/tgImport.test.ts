@@ -269,6 +269,24 @@ describe("albums across pages", () => {
   });
 });
 
+describe("messages Kipple can't fully read", () => {
+  it("shows a Telegram checklist as a list with its ticks", () => {
+    const [c] = messagesToCards([
+      msg(1, { media: { kind: "todo", pollQuestion: "Shop", pollAnswers: ["Milk", "Bread"], done: [false, true] } }),
+    ]);
+    expect(c).toMatchObject({ kind: "text", text: "Shop\n☐ Milk\n☑ Bread" });
+    expect(c.autoJunk).toBeFalsy();
+    expect(c.unreadable).toBeFalsy();
+  });
+
+  it("never takes an empty or unknown message for junk", () => {
+    const cards = messagesToCards([msg(1), msg(2, { media: { kind: "unsupported" } })]);
+    for (const c of cards) expect(c).toMatchObject({ unreadable: true, text: "" });
+    expect(cards.some((c) => c.autoJunk)).toBe(false);
+    expect(cards.map((c) => c.kind)).toEqual(["text", "text"]);
+  });
+});
+
 describe("leftover helper replies", () => {
   it("reports Kipple's own old replies it read, with the account, and makes no cards of them", async () => {
     const tg: SyncDeps["tg"] = {
@@ -277,7 +295,7 @@ describe("leftover helper replies", () => {
     };
     const lib = emptyTelegramLibrary();
     const met: Array<[number, number[]]> = [];
-    await syncSaved(lib, { ...deps(tg), onReplies: (owner, ids) => void met.push([owner, ids]) });
+    await syncSaved(lib, { ...deps(tg), onReplies: async (owner, ids) => void met.push([owner, ids]) });
     expect(met).toEqual([[7, [2]]]);
     expect(lib.cards.map((c) => c.id)).toEqual([1]);
   });

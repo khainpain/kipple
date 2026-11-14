@@ -477,10 +477,10 @@ export default function App() {
         onProgress: (p) => setJob({ label: p.phase === "messages" ? T.app.jobTgLoad : T.app.jobTgPhotos, done: p.done, total: p.total }),
         onChange: () => setRev((r) => r + 1),
         // Helper replies left over from an earlier "Open in Telegram": deleted like new ones.
-        onReplies: (owner, ids) =>
-          void updateReplies((l) => scheduleLeftovers(l, ids, owner, new Date(), settingsRef.current.replyCleanup))
-            .then(() => cleanReplies())
-            .catch(() => undefined),
+        onReplies: async (owner, ids) => {
+          await updateReplies((l) => scheduleLeftovers(l, ids, owner, new Date(), settingsRef.current.replyCleanup));
+          void cleanReplies().catch(() => undefined); // offline: the timer tries again
+        },
       });
       added = res.added;
       if (fresh || added) notify(T.app.tgLoaded(l.cards.length, added));

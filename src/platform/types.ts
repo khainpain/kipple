@@ -57,7 +57,8 @@ export interface SavedMessage {
   /** Telegram made a link preview with a picture; savedPhotos downloads it like a photo. */
   webPhoto?: boolean;
   media?: {
-    /** photo, video_file, animation, voice_message, video_message, audio_file, sticker, document, poll, location, contact */
+    /** photo, video_file, animation, voice_message, video_message, audio_file, sticker, document, poll, location, contact,
+     *  todo (a checklist), unsupported (something Kipple can't read) */
     kind: string;
     width?: number | null;
     height?: number | null;
@@ -68,6 +69,8 @@ export interface SavedMessage {
     emoji?: string | null;
     pollQuestion?: string | null;
     pollAnswers?: string[] | null;
+    /** A checklist ("todo"): whether each item in pollAnswers is ticked. */
+    done?: boolean[] | null;
     latitude?: number | null;
     longitude?: number | null;
     firstName?: string | null;

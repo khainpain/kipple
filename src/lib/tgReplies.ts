@@ -1,4 +1,6 @@
 import { T } from "../i18n";
+import { en } from "../i18n/en";
+import { ru } from "../i18n/ru";
 import type { SavedMessage } from "../platform/types";
 
 /**
@@ -45,13 +47,18 @@ export function isKippleReply(text: string | undefined): boolean {
   return !!text?.startsWith(REPLY_MARK);
 }
 
+/** Exactly what Kipple posts, in either language, with or without the emoji (older versions). */
+const EXACT = new Set(
+  [ru, en].flatMap((d) => [`${REPLY_MARK} · ${d.telegram.replyHint}`, `${REPLY_MARK} ${REPLY_EMOJI} · ${d.telegram.replyHint}`]),
+);
+
 /**
  * Helper replies among loaded messages: left in Saved Messages when the app was closed before
- * their deletion, or posted by an older version. Only plain text the user posted (not forwarded),
- * so someone else's message that happens to start with the mark is never touched.
+ * their deletion, or posted by an older version. These get deleted, so only exactly Kipple's text,
+ * not forwarded, without media: a note of the user's that merely starts with the mark stays.
  */
 export function leftoverReplies(messages: Array<Pick<SavedMessage, "id" | "text" | "forwardedFrom" | "media">>): number[] {
-  return messages.filter((m) => isKippleReply(m.text) && !m.forwardedFrom && !m.media).map((m) => m.id);
+  return messages.filter((m) => EXACT.has(m.text) && !m.forwardedFrom && !m.media).map((m) => m.id);
 }
 
 /** The pending list with these leftovers added (replies already waiting keep their time), or unchanged when replies are kept. */

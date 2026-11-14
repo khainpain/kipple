@@ -27,6 +27,15 @@ describe("deletePlan", () => {
     expect(deletePlan(cards).map((d) => d.cardId)).toEqual([1]);
   });
 
+  it("never deletes a message Kipple couldn't read, even when the user sent it to junk", () => {
+    const cards = [
+      card(1, JAN, { user: { action: "junk" }, text: "", unreadable: true }),
+      card(2, JAN, { user: { action: "junk" }, text: "" }), // loaded by an older version: empty, no flag
+      card(3, JAN, { user: { action: "junk" } }),
+    ];
+    expect(deletePlan(cards).map((d) => d.cardId)).toEqual([3]);
+  });
+
   it("skips cards already gone and takes every message of an album", () => {
     const cards = [
       card(1, JAN, { user: { action: "junk" }, removed: true }),
