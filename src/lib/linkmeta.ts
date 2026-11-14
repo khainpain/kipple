@@ -174,9 +174,12 @@ async function instagram(url: string, code: string): Promise<Omit<LinkMeta, "fet
  */
 async function tiktok(url: string): Promise<Omit<LinkMeta, "fetchedAt"> | undefined> {
   let at = url;
-  if (!tiktokId(url)) at = (await get(url, { connectTimeout: 8000, headers: { "User-Agent": UA, Accept: "text/html,*/*;q=0.5" } })).url;
-  const id = tiktokId(at);
-  if (!id) return undefined; // a profile or a photo post: an ordinary page
+  if (!tiktokId(url)) {
+    const page = await getHtml(url);
+    if (!page) return undefined;
+    at = page.url;
+    if (!tiktokId(at)) return parseHtml(page.html, at); // a profile or a photo post: an ordinary page
+  }
   const u = new URL(at);
   const video = `https://www.tiktok.com${u.pathname}`;
   const base = { url: video, siteName: "TikTok", favicon: "https://www.tiktok.com/favicon.ico" };
@@ -235,8 +238,8 @@ export function needsPreview(c: Card): boolean {
   // Passing problems (a home-network address, too many requests, a server error): again after a day.
   if (c.link.error === "private" || /^HTTP (429|5\d\d)$/.test(c.link.error ?? "")) return Date.now() - Date.parse(c.link.fetchedAt || "0") > DAY;
   if ((c.link.v ?? 1) < PARSE_VERSION) return true;
-  if (/^HTTP (404|410)$/.test(c.link.error ?? "")) return false; // gone for good
+  if (/^HTTP 4(?!08|29)\d\d$/.test(c.link.error ?? "")) return false; // deleted or private: won't come back
   // A short link is judged by where it led: a TikTok profile, unlike a video, has no cover to wait for.
-  if (!wantsImage(c.urls[0]) || !wantsImage(c.link.url || c.urls[0])) return false;
+  if (!wantsImage(tiktokShort(c.urls[0]) ? c.link.url || c.urls[0] : c.urls[0])) return false;
   return Date.now() - Date.parse(c.link.fetchedAt || "0") > DAY;
 }

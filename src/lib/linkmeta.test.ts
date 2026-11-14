@@ -47,8 +47,13 @@ describe("needsPreview for TikTok", () => {
   it("keeps trying a short link it couldn't follow", () => {
     expect(needsPreview(card({ error: "timeout", fetchedAt: old, v: PARSE_VERSION }, "https://vm.tiktok.com/ZMabc/"))).toBe(true);
   });
-  it("leaves a deleted video alone", () => {
-    expect(needsPreview(card({ error: "HTTP 404", fetchedAt: old, v: PARSE_VERSION }, "https://www.tiktok.com/@a/video/7234567890123456789"))).toBe(false);
+  const video = "https://www.tiktok.com/@a/video/7234567890123456789";
+  it("leaves a deleted or private video alone", () => {
+    for (const error of ["HTTP 404", "HTTP 400", "HTTP 403"]) expect(needsPreview(card({ error, fetchedAt: old, v: PARSE_VERSION }, video))).toBe(false);
+    expect(needsPreview(card({ error: "HTTP 408", fetchedAt: old, v: PARSE_VERSION }, video))).toBe(true);
+  });
+  it("judges a full video link by itself, not by where an old fetch ended up", () => {
+    expect(needsPreview(card({ url: "https://www.tiktok.com/login", title: "TikTok", fetchedAt: old, v: PARSE_VERSION }, video))).toBe(true);
   });
 });
 
