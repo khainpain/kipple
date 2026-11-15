@@ -1,4 +1,9 @@
 name: release
+# Title in the Actions list: "Release v0.1.18 · main" (or "Release v0.1.<run number> · main" when no version is given).
+run-name: >-
+  ${{ inputs.version == '' && format('Release v0.1.{0} · {1}', github.run_number, github.ref_name)
+  || startsWith(inputs.version, 'v') && format('Release {0} · {1}', inputs.version, github.ref_name)
+  || format('Release v{0} · {1}', inputs.version, github.ref_name) }}
 
 # Runs only on demand: Actions -> release -> Run workflow.
 # Publishes a signed Windows release (v0.1.<run number> unless a version is given).
