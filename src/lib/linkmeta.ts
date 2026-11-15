@@ -225,6 +225,31 @@ async function fetchMeta(url: string): Promise<Omit<LinkMeta, "fetchedAt">> {
   }
 }
 
+/**
+ * One plain request to a saved link for "Check links": its status, or why there was none.
+ * Same route as a preview (private addresses refused), and nothing is parsed or kept.
+ */
+export async function probeLink(url: string): Promise<{ status?: number; error?: string }> {
+  try {
+    const u = new URL(url);
+    if (!/^https?:$/.test(u.protocol) || PRIVATE_HOST.test(u.hostname)) return { error: "skipped" };
+    const { res } = await get(url, { connectTimeout: 8000, headers: { "User-Agent": UA, Accept: "text/html,*/*;q=0.5" } });
+    // Only the site's own answer carries x-final-url (Rust and /api/fetch both set it); anything
+    // else is the route failing (no /api/fetch, its own refusal), which says nothing about the link.
+    if (!res.headers.has("x-final-url")) return { error: `no answer from the site (HTTP ${res.status})` };
+    // Single-page sites on static hosting answer 404 to every path and draw the page in the
+    // browser: when the "missing" page is the very same HTML as the home page, it says nothing.
+    if ((res.status === 404 || res.status === 410) && (res.headers.get("content-type") ?? "").includes("html") && u.pathname !== "/") {
+      const page = await res.text();
+      const home = await get(u.origin + "/", { connectTimeout: 8000, headers: { "User-Agent": UA, Accept: "text/html,*/*;q=0.5" } }).catch(() => null);
+      if (home?.res.ok && (await home.res.text()) === page) return { error: "app shell: the site answers 404 for every page" };
+    }
+    return { status: res.status };
+  } catch (e) {
+    return { error: e instanceof PrivateHostError ? "skipped" : String(e).slice(0, 200) };
+  }
+}
+
 const DAY = 86_400_000;
 
 /**

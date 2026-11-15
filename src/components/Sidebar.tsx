@@ -4,7 +4,7 @@ import logoLight from "../../brand/kipple-icon-tiny-light.svg";
 import logoDark from "../../brand/kipple-icon-tiny-dark.svg";
 import { Icon } from "./Icon";
 import { T, formatNumber } from "../i18n";
-import { SMART_LISTS, hueOf, sameScope, type Scope } from "./nav";
+import { CARDS_MIME, SMART_LISTS, hueOf, readDragIds, sameScope, type Scope } from "./nav";
 import { TopicActions } from "./TopicActions";
 
 const TOPICS_SHOWN = 10;
@@ -139,12 +139,37 @@ export function Sidebar(props: {
   onCreateTopic: (name: string) => void;
   onRenameTopic: (from: string, to: string) => void;
   onDeleteTopic: (name: string) => void;
+  /** Cards dragged from the board and dropped on a topic. */
+  onDropCards?: (ids: number[], topic: string) => void;
 }) {
   const [showAllTags, setShowAllTags] = useState(false);
   const [showAllTopics, setShowAllTopics] = useState(false);
   const [adding, setAdding] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [menu, setMenu] = useState<{ name: string; count: number; at: HTMLElement } | null>(null);
+  /** The topic cards are being dragged over. */
+  const [dropOn, setDropOn] = useState<string | null>(null);
+  const dropProps = (t: string) =>
+    props.onDropCards
+      ? {
+          onDragOver: (e: React.DragEvent) => {
+            if (!e.dataTransfer.types.includes(CARDS_MIME)) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            if (dropOn !== t) setDropOn(t);
+          },
+          onDragLeave: (e: React.DragEvent) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDropOn(null);
+          },
+          onDrop: (e: React.DragEvent) => {
+            setDropOn(null);
+            const ids = readDragIds(e.dataTransfer.getData(CARDS_MIME));
+            if (!ids.length) return;
+            e.preventDefault();
+            props.onDropCards!(ids, t);
+          },
+        }
+      : {};
   const is = (s: Scope) => sameScope(props.scope, s);
   // Topics are the shelves: the biggest few, the rest one click away. The open one, and the
   // user's own still empty ones, always show.
@@ -202,7 +227,8 @@ export function Sidebar(props: {
           ) : (
             <div
               key={t}
-              className={`side-row${menu?.name === t ? " menu-open" : ""}`}
+              className={`side-row${menu?.name === t ? " menu-open" : ""}${dropOn === t ? " drop-on" : ""}`}
+              {...dropProps(t)}
               onContextMenu={(e) => {
                 e.preventDefault();
                 setMenu({ name: t, count: n, at: e.currentTarget });

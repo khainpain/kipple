@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import type { Card } from "./types";
 import { NO_ALIASES, setAliases } from "./library";
-import { learnTopics, suggestTopic } from "./suggest";
+import { learnTopics, suggestTopic, suggestedFor } from "./suggest";
 
 const card = (id: number, text: string, over: Partial<Card> = {}): Card => ({ id, date: "2026-06-01T10:00:00Z", kind: "text", text, urls: [], hashtags: [], ...over });
 const sorted = (id: number, text: string, topic: string, over: Partial<Card> = {}) => card(id, text, { ...over, user: { topic } });
@@ -105,5 +105,21 @@ describe("suggestTopic", () => {
     setAliases({ topics: { Food: "Еда" }, tags: {} });
     const cards = [sorted(1, "Рецепт шакшуки", "Food"), sorted(2, "Рецепт пасты", "Еда"), card(3, "Погода"), card(4, "Лампочка")];
     expect(suggestTopic(learnTopics(cards), card(5, "Рецепт борща"))).toBe("Еда");
+  });
+});
+
+describe("suggestedFor", () => {
+  it("lists cards without a topic that would be suggested this topic, at most limit", () => {
+    const cards = [...library(), card(10, "Рецепт пирога с тыквой"), card(11, "План встречи с клиентом"), card(12, "Ещё рецепты супов")];
+    const m = learnTopics(cards);
+    const ids = (cs: Card[]) => cs.map((c) => c.id);
+    expect(ids(suggestedFor(cards, "Еда", (c) => suggestTopic(m, c)))).toEqual([10, 12]);
+    expect(ids(suggestedFor(cards, "Еда", (c) => suggestTopic(m, c), 1))).toEqual([10]);
+    expect(ids(suggestedFor(cards, "Работа", (c) => suggestTopic(m, c)))).toEqual([11]);
+  });
+  it("skips junk and removed cards", () => {
+    const cards = [...library(), card(10, "Рецепт пирога с тыквой", { removed: true }), card(12, "Ещё рецепты супов", { user: { action: "junk" } })];
+    const m = learnTopics(cards);
+    expect(suggestedFor(cards, "Еда", (c) => suggestTopic(m, c))).toEqual([]);
   });
 });

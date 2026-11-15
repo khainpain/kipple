@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
+import { platform } from "@platform";
 import { useNarrow } from "../lib/narrow";
 import type { Card, Library } from "../lib/types";
 import { T, formatNumber } from "../i18n";
@@ -6,6 +7,7 @@ import { CardView } from "./CardView";
 import { Icon } from "./Icon";
 import { taskRow } from "./TodayDialog";
 import type { DailyTask } from "../lib/today";
+import type { linkCounts } from "../lib/linkcheck";
 import { hueOf, type ListKey, type Scope } from "./nav";
 
 const WIDE_GAP = 16;
@@ -46,12 +48,21 @@ export function Overview(props: {
   /** Show every card from this channel (a click on the name on a card). */
   onSource?: (name: string) => void;
   onOpenLink: (url: string) => void;
+  /** Drag a card onto a sidebar topic (left out on a phone). */
+  onDragStart?: (c: Card, e: React.DragEvent) => void;
   /** Today's tasks in plan order, null for a finished one; undefined when there's no plan. */
   today?: Array<DailyTask | null>;
   /** Opens the tasks, starting at this one. */
   onToday: (start: number) => void;
   /** Three more once today's are done; undefined when there's nothing else. */
   onTodayMore?: () => void;
+  /** "Check links": the last results; undefined where links can't be fetched (then no block). */
+  links?: ReturnType<typeof linkCounts>;
+  /** Something is already running (a load, the AI, a check): the button waits. */
+  checking?: boolean;
+  onCheckLinks?: () => void;
+  onShowBroken?: () => void;
+  onJunkBroken?: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [outer, setWidth] = useState(1000);
@@ -91,6 +102,10 @@ export function Overview(props: {
         </div>
       )}
 
+      {props.links && props.onCheckLinks && props.links.links > 0 && (
+        <LinkCheck counts={props.links} busy={!!props.checking} onRun={props.onCheckLinks} onShow={props.onShowBroken} onJunk={props.onJunkBroken} />
+      )}
+
       {sections.map((s) => (
         <section key={s.key} className="ov-section">
           <header className="ov-head">
@@ -123,6 +138,7 @@ export function Overview(props: {
                 onMove={(t) => props.onMove(c, t)}
                 onSource={props.onSource}
                 onOpenLink={props.onOpenLink}
+                onDragStart={props.onDragStart && ((e) => props.onDragStart!(c, e))}
               />
             ))}
           </div>
@@ -207,6 +223,63 @@ function TodayBanner(props: { tasks: Array<DailyTask | null>; onOpen: (start: nu
           );
         })}
       </ul>
+    </section>
+  );
+}
+
+/** "Check links" on the overview: a button, then three numbers, and what to do with the gone ones. */
+function LinkCheck(props: { counts: ReturnType<typeof linkCounts>; busy: boolean; onRun: () => void; onShow?: () => void; onJunk?: () => void }) {
+  const L = T.linkCheck;
+  const { counts } = props;
+  const checked = counts.checked > 0;
+  // Junking every gone link is one step from a mistake: the first press asks, the second does it.
+  const [sure, setSure] = useState(false);
+  return (
+    <section className="link-check" aria-labelledby="link-check-h">
+      <header>
+        <Icon name="link" />
+        <div className="link-check-titles">
+          <h2 id="link-check-h">{L.title}</h2>
+          <span className="hint">{platform.kind === "web" ? L.hintWeb : L.hint}</span>
+        </div>
+        <button className="secondary small-btn" onClick={props.onRun} disabled={props.busy}>
+          {checked ? L.again : L.run(counts.links)}
+        </button>
+      </header>
+      {checked && (
+        <div className="link-check-stats">
+          <div className="stat ok">
+            <b>{formatNumber(counts.ok)}</b>
+            <span>{L.ok}</span>
+          </div>
+          <div className="stat broken">
+            <b>{formatNumber(counts.broken.length)}</b>
+            <span>{L.broken}</span>
+            {counts.broken.length > 0 && (
+              <span className="stat-actions">
+                <button className="link-btn" onClick={props.onShow}>
+                  {L.show}
+                </button>
+                <button
+                  className="link-btn"
+                  onClick={() => {
+                    if (!sure) return setSure(true);
+                    setSure(false);
+                    props.onJunk?.();
+                  }}
+                  onBlur={() => setSure(false)}
+                >
+                  {sure ? L.junkSure : L.junk(counts.broken.length)}
+                </button>
+              </span>
+            )}
+          </div>
+          <div className="stat unknown" title={L.unknownHint}>
+            <b>{formatNumber(counts.unknown)}</b>
+            <span>{L.unknown}</span>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

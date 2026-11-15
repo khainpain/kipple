@@ -1,11 +1,13 @@
 import { useId, useState } from "react";
 import { publicAssetUrl } from "../lib/assetUrl";
-import { siteMarkOf } from "../lib/siteMarks";
+import { hostChain, siteLetter, siteMarkOf } from "../lib/siteMarks";
+import { hueOf } from "./nav";
 import { Icon } from "./Icon";
 
 /**
  * Small site mark next to a link's site name: a built-in brand icon for common sites,
- * otherwise the favicon the page itself declared, otherwise a neutral globe.
+ * otherwise the favicon the page itself declared, otherwise the site's first letter on a muted
+ * tile (one colour per site), otherwise a neutral globe.
  */
 export function SiteIcon({ url, favicon, size = 14 }: { url?: string; favicon?: string; size?: number }) {
   const [broken, setBroken] = useState(false);
@@ -32,5 +34,13 @@ export function SiteIcon({ url, favicon, size = 14 }: { url?: string; favicon?: 
   }
   const icon = publicAssetUrl(favicon);
   if (icon && !broken) return <img src={icon} alt="" className="favicon" width={size} height={size} onError={() => setBroken(true)} />;
+  const letter = siteLetter(url);
+  if (letter) {
+    return (
+      <span className="site-letter" aria-hidden="true" style={{ "--h": hueOf(hostChain(url)[0]!.replace(/^www\./, "")), "--sz": `${size}px` } as React.CSSProperties}>
+        {letter}
+      </span>
+    );
+  }
   return <Icon name="globe" size={size} className="site-icon generic" />;
 }

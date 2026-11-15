@@ -39,6 +39,8 @@ export type CardHandlers = {
   /** Show every card from this channel (a click on the name on a card). */
   onSource?: (name: string) => void;
   onOpenLink: (url: string) => void;
+  /** Dragging a card (onto a topic in the sidebar). */
+  onDragStart?: (c: Card, e: React.DragEvent) => void;
 };
 
 /**
@@ -126,6 +128,7 @@ export function Grid(props: CardHandlers & { cards: Card[]; view: ViewKey; look?
       suggest={props.suggest}
       onSource={props.onSource}
       onOpenLink={props.onOpenLink}
+      onDragStart={props.onDragStart && ((e) => props.onDragStart!(c, e))}
     />
   );
 
