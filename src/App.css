@@ -3723,7 +3723,6 @@ kbd {
   border-radius: var(--radius);
   background: var(--panel);
   box-shadow: var(--shadow);
-  max-width: 760px;
 }
 .link-check header {
   display: flex;
