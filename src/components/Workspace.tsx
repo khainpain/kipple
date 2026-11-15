@@ -9,11 +9,14 @@ import { TopicMenu } from "./TopicMenu";
 import { TodayDialog } from "./TodayDialog";
 import { Cleanup, NEW_SESSION, pileTitle, type CleanupSession } from "./Cleanup";
 import { breakdown, type Pile } from "../lib/cleanup";
-import { learnTopics, suggestTopic, type TopicModel } from "../lib/suggest";
+import { learnTopics, suggestTopic, suggestedFor, type TopicModel } from "../lib/suggest";
 import { candidates, localDate, makePlan, planFor, resolvePlan, withSkip, type DailyTask, type Skips, type TodayState } from "../lib/today";
 import { suggestMerges } from "../lib/tidy";
 import type { Aliases } from "../lib/library";
 import { buildIndex } from "../lib/search";
+import { linkCounts } from "../lib/linkcheck";
+import { QuickFind } from "./QuickFind";
+import { SuggestBanner } from "./SuggestBanner";
 import { Grid } from "./Grid";
 import { Detail } from "./Detail";
 import { Sidebar } from "./Sidebar";
@@ -32,6 +35,8 @@ import {
   SORTS,
   TYPES,
   cardKey,
+  CARDS_MIME,
+  dragIds,
   loadPref,
   matchesScope,
   matchesSource,
@@ -59,6 +64,9 @@ function markEdges(el: HTMLElement | null) {
   if (el.scrollLeft + el.clientWidth < el.scrollWidth - 1) el.dataset.right = "";
   else delete el.dataset.right;
 }
+
+/** "Looks like these belong here" stops counting here: enough to act on, and cheap on big libraries. */
+const SUGGEST_MAX = 50;
 
 /** Topics smaller than this aren't worth splitting into subgroups. */
 const GROUP_MIN = 12;
@@ -111,6 +119,8 @@ export function Workspace(props: {
   today?: TodayState;
   taskSkips: Skips;
   onToday: (p: { today?: TodayState; skips?: Skips }) => void;
+  /** "Check links": asks every saved link whether it still opens; undefined where links can't be fetched. */
+  onCheckLinks?: () => void;
 }) {
   const { lib, rev, onEdit } = props;
   const [scope, setScope] = useState<Scope>({ kind: props.firstCleanup ? "cleanup" : "home" });
@@ -154,6 +164,10 @@ export function Workspace(props: {
   /** The open "Three for today" dialog: the tasks it started with and where. */
   const [todayOpen, setTodayOpen] = useState<{ tasks: DailyTask[]; start: number; n: number } | null>(null);
   const [bulkMoveAt, setBulkMoveAt] = useState<HTMLElement | null>(null);
+  /** Ctrl+K search over every card. */
+  const [quickOpen, setQuickOpen] = useState(false);
+  /** Topics whose "Looks like these belong here" was hidden, until the app restarts. */
+  const [hiddenSuggest, setHiddenSuggest] = useState<Set<string>>(new Set());
   /** The open subgroup of the topic, by name, and whether the AI is grouping right now. */
   const [sub, setSub] = useState<string | null>(null);
   const [grouping, setGrouping] = useState(false);
@@ -312,6 +326,13 @@ export function Workspace(props: {
     return (c: Card) => (effectiveTopic(c) ? undefined : suggestTopic((model ??= learnTopics(lib.cards)), c));
   }, [lib, rev]); // eslint-disable-line react-hooks/exhaustive-deps
   const cleanupLeft = useMemo(() => piles.piles.reduce((n, p) => n + p.cards.length, 0), [piles]);
+  /** "Looks like these belong here" on an open topic: unsorted cards the person's own sorting points to it. */
+  const topicSuggest = useMemo(
+    () => (scope.kind === "topic" && !query.trim() && !hiddenSuggest.has(scope.name) ? suggestedFor(lib.cards, scope.name, suggest, SUGGEST_MAX) : []),
+    // `suggest` already follows lib and rev; the scope is compared by its topic name.
+    [scope.kind === "topic" ? scope.name : null, query, hiddenSuggest, suggest], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const links = useMemo(() => linkCounts(lib.cards), [lib, rev]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     // After a load from Telegram this comes when everything is in: someone already busy on the board stays there.
     if (props.firstCleanup && scope.kind === "home" && !query.trim() && openId == null) pickScope({ kind: "cleanup" });
@@ -494,6 +515,11 @@ export function Workspace(props: {
     function onKey(e: KeyboardEvent) {
       // A dialog (Settings, Telegram, Tidy…) is on top: the board behind it doesn't react.
       if (e.defaultPrevented || document.querySelector(".modal-backdrop")) return;
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.code === "KeyK" && !todayOpen && !tidy) {
+        e.preventDefault();
+        setQuickOpen(true);
+        return;
+      }
       // "Three for today" and "Tidy up" have keys of their own.
       if (todayOpen || tidy) return;
       const el = e.target as HTMLElement;
@@ -562,6 +588,7 @@ export function Workspace(props: {
             const name = await props.onRenameTopic(from, to);
             if (scope.kind === "topic" && scope.name === from) pickScope({ kind: "topic", name });
           }}
+          onDropCards={narrow ? undefined : (ids, t) => onEdit(ids, { topic: t })}
           onDeleteTopic={async (name) => {
             await props.onDeleteTopic(name);
             if (scope.kind === "topic" && scope.name === name) pickScope({ kind: "home" });
@@ -595,6 +622,10 @@ export function Workspace(props: {
             )}
           </label>
           <div className="toolbar-end">
+            <span className="local-badge" title={platform.kind === "web" ? T.toolbar.localHintWeb : T.toolbar.localHint}>
+              <Icon name="lock" size={13} />
+              <span>{T.toolbar.local}</span>
+            </span>
             {props.job ? (
               <span className="job">
                 <span className="progress" style={{ "--p": `${Math.round((props.job.done / Math.max(props.job.total, 1)) * 100)}%` } as React.CSSProperties} />
@@ -650,6 +681,14 @@ export function Workspace(props: {
             onMove={moveTo}
             onSource={pickSource}
             onOpenLink={(u) => void platform.openUrl(u)}
+            links={props.onCheckLinks ? links : undefined}
+            checking={!!props.job}
+            onCheckLinks={props.onCheckLinks}
+            onShowBroken={() => {
+              pickScope({ kind: "list", key: "all" });
+              setPile({ title: T.linkCheck.pile, ids: new Set(links.broken) });
+            }}
+            onJunkBroken={() => onEdit(links.broken, { action: "junk" })}
           />
         ) : cleanup ? (
           <Cleanup
@@ -760,6 +799,14 @@ export function Workspace(props: {
           {FEATURES.views && <ViewMenu view={view} onView={setView} look={look} onLook={setLook} />}
         </div>
 
+        {topicSuggest.length > 0 && scope.kind === "topic" && (
+          <SuggestBanner
+            cards={topicSuggest}
+            onAdd={(ids) => onEdit(ids, { topic: scope.name })}
+            onOpen={(c) => setOpenId(c.id)}
+            onHide={() => setHiddenSuggest(new Set([...hiddenSuggest, scope.name]))}
+          />
+        )}
         <Grid
           key={`${boardKey}|${query}`}
           seen={seen}
@@ -778,6 +825,16 @@ export function Workspace(props: {
           suggest={suggest}
           onSource={pickSource}
           onOpenLink={(u) => void platform.openUrl(u)}
+          onDragStart={
+            narrow
+              ? undefined
+              : (c, e) => {
+                  // Only what's on screen: a selection kept across searches may hold cards the board hides.
+                  const shownSel = new Set(visible.filter((x) => selected.has(x.id)).map((x) => x.id));
+                  e.dataTransfer.setData(CARDS_MIME, JSON.stringify(dragIds(shownSel, c.id)));
+                  e.dataTransfer.effectAllowed = "move";
+                }
+          }
           empty={shown.kind === "topic" && !inScope.length && !query.trim() ? { title: T.topics.emptyTitle, hint: T.topics.emptyHint } : undefined}
         />
         </>
@@ -815,6 +872,8 @@ export function Workspace(props: {
           onClose={() => setTodayOpen(null)}
         />
       )}
+
+      {quickOpen && <QuickFind cards={lib.cards} index={index} onOpen={(c) => setOpenId(c.id)} onClose={() => setQuickOpen(false)} />}
 
       {openCard && (
         <Detail

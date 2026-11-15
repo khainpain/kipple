@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { siteMarkOf } from "./siteMarks";
+import { siteLetter, siteMarkOf } from "./siteMarks";
 
 describe("siteMarkOf", () => {
   it("finds known sites and their subdomains", () => {
@@ -16,5 +16,19 @@ describe("siteMarkOf", () => {
     expect(siteMarkOf("https://instagram.com.evil.io/x")).toBeUndefined();
     expect(siteMarkOf("not a url")).toBeUndefined();
     expect(siteMarkOf(undefined)).toBeUndefined();
+  });
+});
+
+describe("siteLetter", () => {
+  it("is the first letter of the site's name, without www", () => {
+    expect(siteLetter("https://www.coolors.co/palette")).toBe("C");
+    expect(siteLetter("https://habr.com/ru/articles/1")).toBe("H");
+  });
+  it("is undefined where the name can't be read back (punycode), so the globe shows", () => {
+    expect(siteLetter("https://пример.рф/")).toBeUndefined();
+  });
+  it("is undefined for a bad link", () => {
+    expect(siteLetter("not a url")).toBeUndefined();
+    expect(siteLetter(undefined)).toBeUndefined();
   });
 });

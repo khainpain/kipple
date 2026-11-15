@@ -23,6 +23,10 @@ export const changelog = [
       "Topics without AI: send everything from a channel or site to a topic, and links to well-known sites sort themselves",
       "Search understands word forms in English and Russian: “study” also finds “studies”",
       "Topic suggestions from your own sorting: put a few cards in a topic, and Kipple offers it for similar ones in the topic menu and on the Cleanup screen",
+      "Ctrl+K: find any card from anywhere, open it with Enter",
+      "Check links: one button on the overview shows which saved links no longer open, and sends them to the junk if you want",
+      "Drag cards (or a whole selection) onto a topic in the sidebar",
+      "An open topic suggests unsorted cards that look like they belong there",
     ],
     ru: [
       "«Открыть в Telegram»: переход от карточки к её сообщению в Избранном",
@@ -40,6 +44,10 @@ export const changelog = [
       "Темы без ИИ: всё из канала или с сайта попадает в нужную тему, а ссылки на известные сайты раскладываются сами",
       "Поиск понимает формы слов по-русски и по-английски: «кошка» находит и «кошки», и «кошкой»",
       "Подсказки тем по твоей раскладке: положи пару карточек в тему, и Kipple предложит её для похожих в меню темы и на экране «Уборка»",
+      "Ctrl+K: найти любую карточку откуда угодно и открыть по Enter",
+      "Проверка ссылок: одна кнопка на обзоре показывает, какие ссылки больше не открываются, и по желанию убирает их в мусор",
+      "Карточки (и всё выделенное) можно перетащить на тему в боковой панели",
+      "Открытая тема подсказывает карточки без темы, которые на неё похожи",
     ],
   },
   {

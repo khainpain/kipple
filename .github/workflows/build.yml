@@ -58,9 +58,13 @@ jobs:
       - name: Build Kipple Setup (branded first-install window)
         shell: bash
         run: setup-app/build.sh
+      # Each test build gets its own name, e.g. kipple-test-2026-11-15-build267-abdee49, so archives can be told apart.
+      - name: Name the build
+        shell: bash
+        run: echo "ARTIFACT=kipple-test-$(date -u +%F)-build${GITHUB_RUN_NUMBER}-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
       - uses: actions/upload-artifact@v7
         with:
-          name: kipple-windows
+          name: ${{ env.ARTIFACT }}
           path: |
             src-tauri/target/release/bundle/nsis/*.exe
             src-tauri/target/release/bundle/msi/*.msi

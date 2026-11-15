@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { buildIndex } from "./search";
+import { buildIndex, quickFind } from "./search";
 import { NO_ALIASES, setAliases } from "./library";
 import type { Card } from "./types";
 import { T } from "../i18n";
@@ -69,5 +69,22 @@ describe("search", () => {
     expect(ix.search("котом").map((h) => h.id)).toEqual([1]);
     expect(ix.search("нет").map((h) => h.id)).toEqual([]);
     expect(ix.search("buying").map((h) => h.id)).toEqual([5]);
+  });
+});
+
+describe("quickFind", () => {
+  const c = (id: number, text: string, removed?: boolean): Card => ({ id, date: "2026-01-01", kind: "text", text, urls: [], hashtags: [], removed });
+  it("returns live cards that match, best first, at most limit", () => {
+    const cards = [c(1, "рецепт борща"), c(2, "борщ"), c(3, "погода"), c(4, "борщ старый", true)];
+    const found = quickFind(cards, buildIndex(cards), "борщ", 8).map((x) => x.id);
+    expect(found).toContain(1);
+    expect(found).toContain(2);
+    expect(found).not.toContain(3);
+    expect(found).not.toContain(4);
+    expect(quickFind(cards, buildIndex(cards), "борщ", 1)).toHaveLength(1);
+  });
+  it("finds nothing for a blank query", () => {
+    const cards = [c(1, "борщ")];
+    expect(quickFind(cards, buildIndex(cards), "  ", 8)).toEqual([]);
   });
 });

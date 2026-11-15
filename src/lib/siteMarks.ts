@@ -135,3 +135,14 @@ export function siteMarkOf(url: string | undefined): SiteMark | undefined {
   const slug = hostChain(url).map((h) => SITE_DOMAINS[h]).find(Boolean);
   return slug ? SITE_MARKS[slug] : undefined;
 }
+
+/**
+ * The first letter of a link's site, for a lettered tile when there's no mark and no favicon.
+ * Undefined for a bad link or a punycode name, whose letter would be an "x".
+ */
+export function siteLetter(url: string | undefined): string | undefined {
+  const host = hostChain(url)[0]?.replace(/^www\./, "");
+  if (!host || host.startsWith("xn--")) return undefined;
+  const ch = [...host][0];
+  return /[\p{L}\p{N}]/u.test(ch) ? ch.toUpperCase() : undefined;
+}

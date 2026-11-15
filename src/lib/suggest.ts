@@ -1,5 +1,5 @@
 import type { Card } from "./types";
-import { effectiveTitle, topicName } from "./library";
+import { effectiveTitle, effectiveTopic, matchesFilter, topicName } from "./library";
 import { domainOf } from "./rules";
 import { stem } from "./stem";
 
@@ -142,4 +142,15 @@ export function suggestTopic(m: TopicModel, c: Card, opts: SuggestOptions = {}):
   const centre = m.topics.get(best)!;
   const shared = [...v.keys()].filter((f) => centre.has(f));
   return shared.length >= 2 || shared.some((f) => f.startsWith("@") || f.startsWith("site:")) ? best : undefined;
+}
+
+/** Live cards without a topic that would be offered this one, for "Looks like these belong here". */
+export function suggestedFor(cards: Card[], topic: string, suggest: (c: Card) => string | undefined, limit = Infinity): Card[] {
+  const out: Card[] = [];
+  for (const c of cards) {
+    if (out.length >= limit) break;
+    if (c.removed || effectiveTopic(c) || !matchesFilter(c, "all")) continue;
+    if (suggest(c) === topic) out.push(c);
+  }
+  return out;
 }

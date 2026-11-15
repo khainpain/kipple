@@ -257,3 +257,21 @@ export function cardKey(e: { code: string; key: string; ctrlKey: boolean; metaKe
 export function matchesSource(c: Card, source: string | null): boolean {
   return !source || c.forwardedFrom === source;
 }
+
+/** Dragging a selected card carries the whole selection; any other card goes alone. */
+export function dragIds(selected: Set<number>, id: number): number[] {
+  return selected.has(id) ? [...selected] : [id];
+}
+
+/** What a dragged card carries: the ids of the cards, only understood inside Kipple. */
+export const CARDS_MIME = "application/x-kipple-cards";
+
+/** The ids out of a drop; anything else (another app's drop, a broken payload) gives none. */
+export function readDragIds(data: string): number[] {
+  try {
+    const v: unknown = JSON.parse(data);
+    return Array.isArray(v) ? v.filter((x): x is number => Number.isInteger(x) && x >= 0) : [];
+  } catch {
+    return [];
+  }
+}
