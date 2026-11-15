@@ -418,6 +418,12 @@ export function Workspace(props: {
   const openIdx = openId == null ? -1 : visible.findIndex((c) => c.id === openId);
   const openCard = openId == null ? null : lib.cards.find((c) => c.id === openId) ?? null;
 
+  /** Cards dragged toward a sidebar topic. On the board, only what's on screen: a selection kept across searches may hold cards it hides. */
+  function dragCards(ids: number[], e: React.DragEvent) {
+    e.dataTransfer.setData(CARDS_MIME, JSON.stringify(ids));
+    e.dataTransfer.effectAllowed = "move";
+  }
+
   function pickScope(s: Scope) {
     setDrawer(false);
     setScope(s);
@@ -681,6 +687,7 @@ export function Workspace(props: {
             onMove={moveTo}
             onSource={pickSource}
             onOpenLink={(u) => void platform.openUrl(u)}
+            onDragStart={narrow ? undefined : (c, e) => dragCards([c.id], e)}
             links={props.onCheckLinks ? links : undefined}
             checking={!!props.job}
             onCheckLinks={props.onCheckLinks}
@@ -825,16 +832,7 @@ export function Workspace(props: {
           suggest={suggest}
           onSource={pickSource}
           onOpenLink={(u) => void platform.openUrl(u)}
-          onDragStart={
-            narrow
-              ? undefined
-              : (c, e) => {
-                  // Only what's on screen: a selection kept across searches may hold cards the board hides.
-                  const shownSel = new Set(visible.filter((x) => selected.has(x.id)).map((x) => x.id));
-                  e.dataTransfer.setData(CARDS_MIME, JSON.stringify(dragIds(shownSel, c.id)));
-                  e.dataTransfer.effectAllowed = "move";
-                }
-          }
+          onDragStart={narrow ? undefined : (c, e) => dragCards(dragIds(new Set(visible.filter((x) => selected.has(x.id)).map((x) => x.id)), c.id), e)}
           empty={shown.kind === "topic" && !inScope.length && !query.trim() ? { title: T.topics.emptyTitle, hint: T.topics.emptyHint } : undefined}
         />
         </>

@@ -48,6 +48,8 @@ export function Overview(props: {
   /** Show every card from this channel (a click on the name on a card). */
   onSource?: (name: string) => void;
   onOpenLink: (url: string) => void;
+  /** Drag a card onto a sidebar topic (left out on a phone). */
+  onDragStart?: (c: Card, e: React.DragEvent) => void;
   /** Today's tasks in plan order, null for a finished one; undefined when there's no plan. */
   today?: Array<DailyTask | null>;
   /** Opens the tasks, starting at this one. */
@@ -136,6 +138,7 @@ export function Overview(props: {
                 onMove={(t) => props.onMove(c, t)}
                 onSource={props.onSource}
                 onOpenLink={props.onOpenLink}
+                onDragStart={props.onDragStart && ((e) => props.onDragStart!(c, e))}
               />
             ))}
           </div>
