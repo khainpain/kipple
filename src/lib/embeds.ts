@@ -45,7 +45,7 @@ export function instantImage(url: string | undefined): string | undefined {
 
 /** Links worth fetching again when an earlier attempt left them without a picture. */
 export function wantsImage(url: string): boolean {
-  return !!(youtubeId(url) || instagramCode(url));
+  return !!(youtubeId(url) || instagramCode(url) || tiktokId(url) || tiktokShort(url));
 }
 
 /** Vimeo video id from vimeo.com/123 or player.vimeo.com/video/123. */
@@ -70,7 +70,55 @@ export function tiktokId(url: string): string | undefined {
   }
 }
 
-export type EmbedProvider = "youtube" | "instagram" | "vimeo" | "tiktok";
+/** TikTok's share links (vm.tiktok.com/…, vt.tiktok.com/…, tiktok.com/t/…): the video id appears only after the redirect. */
+export function tiktokShort(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return /^(vm|vt)\.tiktok\.com$/.test(u.hostname) || (/(^|\.)tiktok\.com$/.test(u.hostname) && /^\/t\/[\w-]+/.test(u.pathname));
+  } catch {
+    return false;
+  }
+}
+
+/** Rutube video id (32 hex) from rutube.ru/video/…, /shorts/…, /video/private/…; the private key from ?p=. */
+export function rutubeVideo(url: string): { id: string; key?: string; short: boolean } | undefined {
+  try {
+    const u = new URL(url);
+    if (!/(^|\.)rutube\.ru$/.test(u.hostname)) return undefined;
+    const m = u.pathname.match(/^\/(video(?:\/private)?|shorts)\/([0-9a-f]{32})\b/);
+    if (!m) return undefined;
+    const key = u.searchParams.get("p");
+    return { id: m[2], key: key && /^[\w-]+$/.test(key) ? key : undefined, short: m[1] === "shorts" };
+  } catch {
+    return undefined;
+  }
+}
+
+/** VK video or clip from vk.com / vkvideo.ru: /video-1_2, /clip-1_2, or ?z=video-1_2 on a wall or a group page. */
+export function vkVideo(url: string): { oid: string; id: string; clip: boolean } | undefined {
+  try {
+    const u = new URL(url);
+    if (!/(^|\.)(vk\.com|vk\.ru|vkvideo\.ru)$/.test(u.hostname)) return undefined;
+    const m = `${u.pathname} ${u.searchParams.get("z") ?? ""}`.match(/(video|clip)(-?\d+)_(\d+)/);
+    return m ? { oid: m[2], id: m[3], clip: m[1] === "clip" } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Dailymotion video id from dailymotion.com/video/x… or dai.ly/x…. */
+export function dailymotionId(url: string): string | undefined {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace(/^www\./, "");
+    const m = host === "dai.ly" ? u.pathname.match(/^\/([a-z0-9]{5,})/i) : /(^|\.)dailymotion\.com$/.test(host) ? u.pathname.match(/\/video\/([a-z0-9]{5,})/i) : null;
+    return m?.[1];
+  } catch {
+    return undefined;
+  }
+}
+
+export type EmbedProvider = "youtube" | "instagram" | "vimeo" | "tiktok" | "rutube" | "vk" | "dailymotion";
 
 export interface Embed {
   provider: EmbedProvider;
@@ -82,6 +130,12 @@ export interface Embed {
   measures?: boolean;
   /** Known to be a video; an Instagram /p/ post may be just photos. */
   video: boolean;
+  /**
+   * Pixels of the provider's page above the video to hide: the frame is shifted up by this much
+   * and clipped to `ratio`, so only the video shows (Instagram's reel embed: a 54px header, then
+   * a 4:5 media area, then likes and a comment box).
+   */
+  cropTop?: number;
 }
 
 /** A player the card can show in place of the link's picture, for video sites that allow embedding. */
@@ -94,14 +148,26 @@ export function embedOf(url: string | undefined): Embed | undefined {
   }
   const ig = instagramCode(url);
   if (ig) {
-    const video = /\/(?:reels?|tv)\//.test(new URL(url).pathname);
-    return { provider: "instagram", src: `https://www.instagram.com/p/${ig}/embed/`, ratio: video ? 9 / 16 : 4 / 5, measures: true, video };
+    const src = `https://www.instagram.com/p/${ig}/embed/`;
+    if (/\/(?:reels?|tv)\//.test(new URL(url).pathname)) return { provider: "instagram", src, ratio: 4 / 5, cropTop: 54, video: true };
+    return { provider: "instagram", src, ratio: 4 / 5, measures: true, video: false };
   }
   const vm = vimeoId(url);
   if (vm) return { provider: "vimeo", src: `https://player.vimeo.com/video/${vm}?autoplay=1&dnt=1`, ratio: 16 / 9, video: true };
   const tt = tiktokId(url);
   if (tt) return { provider: "tiktok", src: `https://www.tiktok.com/player/v1/${tt}?autoplay=1&rel=0`, ratio: 9 / 16, video: true };
+  const rt = rutubeVideo(url);
+  if (rt) return { provider: "rutube", src: `https://rutube.ru/play/embed/${rt.id}${rt.key ? `?p=${rt.key}` : ""}`, ratio: rt.short ? 9 / 16 : 16 / 9, video: true };
+  const vk = vkVideo(url);
+  if (vk) return { provider: "vk", src: `https://vkvideo.ru/video_ext.php?oid=${vk.oid}&id=${vk.id}&hd=2&autoplay=1`, ratio: vk.clip ? 9 / 16 : 16 / 9, video: true };
+  const dm = dailymotionId(url);
+  if (dm) return { provider: "dailymotion", src: `https://geo.dailymotion.com/player.html?video=${dm}`, ratio: 16 / 9, video: true };
   return undefined;
+}
+
+/** A card's player: from its own link, or from where a short link led when the preview was fetched. */
+export function cardEmbed(card: { urls: string[]; link?: { url: string } }): Embed | undefined {
+  return embedOf(card.urls[0]) ?? embedOf(card.link?.url);
 }
 
 /** Links that are a video (or a post that may be one): the card gets a play mark and an in-card player. */
@@ -137,8 +203,8 @@ export function headline(text: string, max = 90): string {
 /** Title, description and author to show for a link preview; Instagram's run-on title is split up. */
 export function linkText(link: { url: string; title?: string; description?: string } | undefined): { title?: string; description?: string; author?: string } {
   if (!link) return {};
-  // The app stores the channel name as a YouTube video's description (that's all oEmbed gives).
-  if (youtubeId(link.url)) return { title: link.title, author: link.description };
+  // YouTube and TikTok: the app stores the channel name as the description (that's all oEmbed gives).
+  if (youtubeId(link.url) || tiktokId(link.url)) return { title: link.title, author: link.description };
   if (!instagramCode(link.url)) return { title: link.title, description: link.description };
   const { author, caption } = splitInstagram(link.title, link.description);
   if (caption) {

@@ -807,6 +807,7 @@ export const ru = {
     showPost: "Показать пост",
     hint: (site: string) => `Смотреть здесь · загрузится с ${site}`,
     post: (site: string) => `Показать пост · загрузится с ${site}`,
+    vk: "VK Видео",
   },
 
   demo: {

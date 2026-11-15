@@ -9,7 +9,7 @@ import { coverOf, displayTitle, siteOf } from "./CardView";
 import { SiteIcon } from "./SiteIcon";
 import { Preview } from "./Preview";
 import { LinkPlayer } from "./LinkPlayer";
-import { embedOf, linkText } from "../lib/embeds";
+import { cardEmbed, linkText } from "../lib/embeds";
 import { Gallery } from "./Gallery";
 import { isImportant } from "../lib/smart";
 import { OPEN_MODES, PANEL_WIDTH, clampPanelWidth, hueOf, loadPanelWidth, savePref, type OpenMode } from "./nav";
@@ -58,7 +58,7 @@ export function Detail(props: {
   const photos = card.kind === "photo" ? [card.media, ...(card.album ?? [])].filter((m): m is MediaRef => !!m?.path) : [];
   const cover = card.kind !== "photo" ? coverOf(lib, card).src : undefined;
   const site = siteOf(card);
-  const embed = card.kind === "link" ? embedOf(card.urls[0]) : undefined;
+  const embed = card.kind === "link" ? cardEmbed(card) : undefined;
   const linked = linkText(card.link);
   // The page's own description (an Instagram caption, a video blurb), unless it just repeats the heading.
   const description = linked.description && linked.description.trim() !== (title || linked.title || "").trim() ? linked.description : undefined;

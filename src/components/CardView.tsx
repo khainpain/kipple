@@ -7,7 +7,7 @@ import { mediaUrl } from "../lib/importer";
 import { FEATURES } from "../lib/features";
 import { effectiveAction, effectiveTags, effectiveTitle, effectiveTopic } from "../lib/library";
 import { domainOf, isUnreadable } from "../lib/rules";
-import { instantImage, isVideoLink, linkText } from "../lib/embeds";
+import { cardEmbed, instantImage, linkText } from "../lib/embeds";
 import { isImportant } from "../lib/smart";
 import { TopicMenu } from "./TopicMenu";
 import { Icon } from "./Icon";
@@ -138,7 +138,7 @@ function Cover({ lib, card, view }: { lib: Library; card: Card; view: ViewKey })
         style={!fixed && c.ratio ? { aspectRatio: String(Math.max(c.ratio, 1 / 1.6)) } : undefined}
         onError={() => setFailed(true)}
       />
-      {card.kind === "link" && isVideoLink(card.urls[0]) && (
+      {card.kind === "link" && cardEmbed(card)?.video && (
         <span className="play-mark" aria-hidden="true">
           <Icon name="play" size={view === "list" ? 14 : 20} />
         </span>
