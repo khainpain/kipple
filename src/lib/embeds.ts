@@ -130,6 +130,12 @@ export interface Embed {
   measures?: boolean;
   /** Known to be a video; an Instagram /p/ post may be just photos. */
   video: boolean;
+  /**
+   * Pixels of the provider's page above the video to hide: the frame is shifted up by this much
+   * and clipped to `ratio`, so only the video shows (Instagram's reel embed: a 54px header, then
+   * a 4:5 media area, then likes and a comment box).
+   */
+  cropTop?: number;
 }
 
 /** A player the card can show in place of the link's picture, for video sites that allow embedding. */
@@ -142,8 +148,9 @@ export function embedOf(url: string | undefined): Embed | undefined {
   }
   const ig = instagramCode(url);
   if (ig) {
-    const video = /\/(?:reels?|tv)\//.test(new URL(url).pathname);
-    return { provider: "instagram", src: `https://www.instagram.com/p/${ig}/embed/`, ratio: video ? 9 / 16 : 4 / 5, measures: true, video };
+    const src = `https://www.instagram.com/p/${ig}/embed/`;
+    if (/\/(?:reels?|tv)\//.test(new URL(url).pathname)) return { provider: "instagram", src, ratio: 4 / 5, cropTop: 54, video: true };
+    return { provider: "instagram", src, ratio: 4 / 5, measures: true, video: false };
   }
   const vm = vimeoId(url);
   if (vm) return { provider: "vimeo", src: `https://player.vimeo.com/video/${vm}?autoplay=1&dnt=1`, ratio: 16 / 9, video: true };

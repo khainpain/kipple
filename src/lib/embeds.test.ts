@@ -31,7 +31,8 @@ describe("embedOf", () => {
     expect(embedOf("https://youtu.be/dQw4w9WgXcQ")?.src).toMatch(/^https:\/\/www\.youtube-nocookie\.com\/embed\/dQw4w9WgXcQ\?/);
   });
   it("uses Instagram's embed page; reels are videos, /p/ posts may not be", () => {
-    expect(embedOf("https://www.instagram.com/reel/DAbc-12/?igsh=x")).toMatchObject({ provider: "instagram", src: "https://www.instagram.com/p/DAbc-12/embed/", video: true, measures: true });
+    expect(embedOf("https://www.instagram.com/reel/DAbc-12/?igsh=x")).toMatchObject({ provider: "instagram", src: "https://www.instagram.com/p/DAbc-12/embed/", video: true });
+    expect(embedOf("https://www.instagram.com/p/C8vE3mJsQ5_/")?.measures).toBe(true);
     expect(embedOf("https://www.instagram.com/p/C8vE3mJsQ5_/")?.video).toBe(false);
     expect(isVideoLink("https://www.instagram.com/p/C8vE3mJsQ5_/")).toBe(false);
     expect(isVideoLink("https://instagram.com/reels/DAbc-12/")).toBe(true);
@@ -40,6 +41,12 @@ describe("embedOf", () => {
     expect(vimeoId("https://vimeo.com/76979871")).toBe("76979871");
     expect(tiktokId("https://www.tiktok.com/@someone/video/7234567890123456789")).toBe("7234567890123456789");
     expect(tiktokId("https://vm.tiktok.com/ZMabc/")).toBeUndefined();
+  });
+  it("shows only the video of an Instagram reel: the box is its 4:5 media area, the header is cut off", () => {
+    const reel = embedOf("https://www.instagram.com/reel/DAbc-12/")!;
+    expect(reel).toMatchObject({ ratio: 4 / 5, cropTop: 54 });
+    expect(reel.measures).toBeFalsy();
+    expect(embedOf("https://www.instagram.com/p/C8vE3mJsQ5_/")?.cropTop).toBeUndefined();
   });
   it("recognises TikTok's short share links", () => {
     expect(tiktokShort("https://vm.tiktok.com/ZMabc/")).toBe(true);

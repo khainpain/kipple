@@ -43,7 +43,7 @@ export function LinkPlayer({ embed, cover }: { embed: Embed; cover?: string }) {
   }, [playing, embed.measures]);
 
   const vertical = embed.ratio < 1;
-  const cls = `link-player provider-${embed.provider}${vertical ? " vertical" : ""}`;
+  const cls = `link-player provider-${embed.provider}${vertical ? " vertical" : ""}${embed.cropTop ? " cropped" : ""}`;
 
   if (!playing) {
     return (
@@ -57,7 +57,7 @@ export function LinkPlayer({ embed, cover }: { embed: Embed; cover?: string }) {
     );
   }
   return (
-    <div className={cls} style={height ? { height } : { aspectRatio: String(embed.ratio) }}>
+    <div className={cls} style={height ? { height } : { aspectRatio: String(embed.ratio), ["--crop-top" as string]: embed.cropTop ? `${embed.cropTop}px` : undefined }}>
       <iframe
         ref={frame}
         src={embed.src}
