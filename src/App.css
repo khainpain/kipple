@@ -2549,11 +2549,6 @@ button.ov-title:hover {
 .cleanup {
   padding: 4px 16px 32px;
 }
-.cl-top,
-.cl-piles,
-.cl-later-list {
-  max-width: 920px;
-}
 .cl-top {
   padding-top: 12px;
 }
@@ -2593,7 +2588,6 @@ button.ov-title:hover {
 }
 /* What the screen is, until the first decision. */
 .cl-intro {
-  max-width: 920px;
   margin-top: 16px;
   display: flex;
   align-items: center;
