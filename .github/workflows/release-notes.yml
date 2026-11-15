@@ -1,4 +1,5 @@
 name: release-notes
+run-name: "Release notes: rewrite all releases · ${{ github.ref_name }}"
 
 # Runs only on demand: Actions -> release-notes -> Run workflow.
 # Rewrites the older Russian release descriptions in English (scripts/release-notes.mjs),
