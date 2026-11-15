@@ -19,13 +19,19 @@ Run the phases in order and stop at the first FAIL to fix it. These mirror `.git
    - no `console.log` of user content or secrets;
    - AI calls still gated by consent (`aiAllowed()`).
 6. **i18n:** any new UI text exists in both `src/i18n/ru.ts` and `en.ts` (see the `i18n-sync` skill).
-7. **Diff review:** read the full diff once; if `src/lib/prompts.ts` changed, flag it loudly (it breaks older app versions on the built-in key).
+7. **No weakened checks** (idea from addyosmani/agent-skills `constraint-driven-development`, MIT). Scan the added lines of the diff:
+   ```
+   git diff origin/main... -U0 | grep -nE '^\+.*(@ts-ignore|@ts-expect-error|@ts-nocheck|eslint-disable|\b(it|test|describe)\.(skip|only|todo)\b|\bx(it|describe)\(|#\[ignore\]|allow\(clippy)'
+   git diff origin/main... --diff-filter=D --name-only | grep -E '\.test\.tsx?$'
+   ```
+   Any hit is a FAIL unless the PR says why. Also look by eye for deleted or loosened `expect(...)` assertions and for `continue-on-error` or removed steps in `.github/workflows/`. Never get to green by skipping a test or silencing a check.
+8. **Diff review:** read the full diff once; if `src/lib/prompts.ts` changed, flag it loudly (it breaks older app versions on the built-in key).
 
 ## Report
 
 ```
 VERIFICATION: PASS | FAIL
 Types   ✓/✗   Tests ✓/✗ (n passed)   Build ✓/✗   Web ✓/✗   Rust ✓/✗/skipped
-Privacy ✓/✗   i18n ✓/✗   prompts.ts changed: yes/no
+Privacy ✓/✗   i18n ✓/✗   Checks not weakened ✓/✗   prompts.ts changed: yes/no
 Notes: …
 ```
