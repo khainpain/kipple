@@ -28,6 +28,7 @@ export const changelog = [
       "Drag cards (or a whole selection) onto a topic in the sidebar",
       "An open topic suggests unsorted cards that look like they belong there",
       "Videos play right in the card for more sites: TikTok (short links too), Rutube, VK Video and Dailymotion; Instagram Reels show just the video",
+      "With link previews off, cards no longer load video covers or site icons from the web",
     ],
     ru: [
       "«Открыть в Telegram»: переход от карточки к её сообщению в Избранном",
@@ -50,6 +51,7 @@ export const changelog = [
       "Карточки (и всё выделенное) можно перетащить на тему в боковой панели",
       "Открытая тема подсказывает карточки без темы, которые на неё похожи",
       "Видео прямо в карточке ещё с нескольких сайтов: TikTok (и короткие ссылки), Rutube, VK Видео и Dailymotion; у Reels из Instagram видно только само видео",
+      "Когда превью ссылок выключены, карточки больше не грузят из интернета обложки видео и значки сайтов",
     ],
   },
   {

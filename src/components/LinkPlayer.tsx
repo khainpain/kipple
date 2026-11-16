@@ -48,7 +48,7 @@ export function LinkPlayer({ embed, cover }: { embed: Embed; cover?: string }) {
   if (!playing) {
     return (
       <button type="button" className={`${cls} facade`} style={{ aspectRatio: String(embed.ratio) }} onClick={() => setPlaying(true)} aria-label={embed.video ? T.player.play : T.player.showPost}>
-        {cover && !coverFailed ? <img src={cover} alt="" onError={() => setCoverFailed(true)} /> : <span className="facade-blank" />}
+        {cover && !coverFailed ? <img src={cover} alt="" referrerPolicy="no-referrer" onError={() => setCoverFailed(true)} /> : <span className="facade-blank" />}
         <span className="play-btn">
           <Icon name="play" size={26} />
         </span>

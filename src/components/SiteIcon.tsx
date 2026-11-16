@@ -33,7 +33,7 @@ export function SiteIcon({ url, favicon, size = 14 }: { url?: string; favicon?: 
     );
   }
   const icon = shownAssetUrl(favicon);
-  if (icon && !broken) return <img src={icon} alt="" className="favicon" width={size} height={size} onError={() => setBroken(true)} />;
+  if (icon && !broken) return <img src={icon} alt="" className="favicon" width={size} height={size} referrerPolicy="no-referrer" onError={() => setBroken(true)} />;
   const letter = siteLetter(url);
   if (letter) {
     return (

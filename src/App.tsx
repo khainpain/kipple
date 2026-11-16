@@ -708,7 +708,7 @@ export default function App() {
     setTelemetryEnabled(s.telemetry);
     await saveSettings(s);
     setLang(resolveLang(s.language));
-    setRemoteAssets(s.fetchLinks && platform.canFetchLinks);
+    setRemoteAssets(s.fetchLinks && platform.canFetchLinks); // with previews off, cards ask no other site for pictures
     settingsRef.current = s;
     setSettings(s);
   }
