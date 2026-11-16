@@ -1,5 +1,7 @@
 // Russian interface strings: the reference dictionary. en.ts must have the same keys.
 
+import { DEMO_CARDS_RU } from "./demo.ru.js";
+
 const pr = new Intl.PluralRules("ru");
 /** plural(5, "карточка", "карточки", "карточек") → "карточек" */
 function plural(n: number, one: string, few: string, many: string): string {
@@ -8,17 +10,6 @@ function plural(n: number, one: string, few: string, many: string): string {
 }
 const num = (n: number) => n.toLocaleString("ru-RU");
 const cards = (n: number) => `${num(n)} ${plural(n, "карточка", "карточки", "карточек")}`;
-
-// Titles for the demo's sample cards, so it reads like a real library.
-const DEMO_ARTICLES = ["Как наконец разобрать закладки", "Почему мы сохраняем больше, чем читаем", "Зачем нужен еженедельный обзор", "Сравнение приложений «прочитать позже»", "Заметки, которые ссылаются друг на друга", "Меньше вкладок, больше фокуса"];
-/** By topic (in the order of demo.topics), six titles each. */
-const DEMO_TITLES = [
-  ["Палитры, которые работают в тёмной теме", "Шпаргалка по сочетанию шрифтов", "Шкала отступов: почему 4 и 8 px", "Референсы для лендинга", "Набор иконок с мягкой линией", "Модульные сетки в печати и на экране"],
-  ["Индексы в Postgres простыми словами", "Команды git, которые я вечно забываю", "Как на самом деле работает event loop", "Владение в Rust за десять минут", "Аккуратный шаблон README", "Регулярки для дат и телефонов"],
-  ["Шакшука за десять минут", "Закваска для хлеба по дням", "План заготовок на неделю", "Бульон для рамена без скороварки", "Лимонный кекс на оливковом масле", "Смеси специй, которые стоит собрать самому"],
-  ["Лиссабон за три дня", "Ночные поезда по Европе", "Что взять на неделю с ручной кладью", "Дешёвые билеты: что реально работает", "Тихие пляжи рядом со Сплитом", "Районы Токио для прогулок"],
-  ["Индексные фонды или отдельные акции", "Бюджет по трём конвертам", "Как читать расчётный лист", "Вычеты, о которых забывают фрилансеры", "Подушка безопасности: сколько нужно", "Подписки, которые пора отменить"],
-];
 
 export const ru = {
   common: {
@@ -810,31 +801,12 @@ export const ru = {
     vk: "VK Видео",
   },
 
+  /** The demo archive: its messages are in demo.ru.ts and demo.en.ts, built into cards by src/lib/demo.ts. */
   demo: {
     chatName: "Избранное (демо)",
-    topics: ["Дизайн", "Программирование", "Еда", "Путешествия", "Финансы"],
-    article: (i: number) => DEMO_ARTICLES[i % DEMO_ARTICLES.length],
-    // Instagram writes its page title like this whatever the language; the app splits it up.
-    reelTitle: "Анна готовит on Instagram: \"Паста за 10 минут 🍝\nСоус готов, пока закипает вода. Нужны всего три вещи: томаты, чеснок и хорошее оливковое масло. Рецепт в описании, сохраняйте!\"",
-    reelDescription: "12K likes, 340 comments - anna.gotovit on May 1, 2026: \"Паста за 10 минут 🍝\nСоус готов, пока закипает вода. Нужны всего три вещи: томаты, чеснок и хорошее оливковое масло. Рецепт в описании, сохраняйте!\". ",
-    videoTitle: "Как устроен Telegram изнутри",
-    card: (i: number, _kind: string) => DEMO_TITLES[i % 5][Math.floor(i / 5) % 6],
-    summary: "Короткое описание того, что здесь сохранено и зачем к этому вернуться.",
-    groups: ["Цвет и шрифты", "Сетки и вёрстка"],
-    tags: ["css", "идеи", "референсы"],
-    /** The sample messages' own text, by message id in fixtures/saved_messages.json, and the channel they're forwarded from. */
-    messages: {
-      2: "Смотри статью про masonry #design",
-      4: "Референсы для лендинга",
-      6: "Как делать анимации",
-      10: "wifi дома пароль: correct-horse-battery",
-      11: "Идея: бот, который раз в неделю присылает три случайные сохранёнки",
-    } as Record<number, string>,
-    channel: "Дизайн-канал",
-    textFile: "покупки.txt",
+    cards: DEMO_CARDS_RU,
+    /** What the demo's text file says when opened in the card. */
     textBody: "Список покупок\n\n- кофе\n- хлеб\n- лампочка E27\n\nТекстовые файлы видны прямо в карточке.",
-    // A one-line message whose AI title and summary are longer than the message itself.
-    short: { text: "Важно, безопасность", title: "Напоминание: важна безопасность", summary: "Короткая заметка о том, что безопасность важна; вероятно, напоминание что-то сделать.", topic: "Безопасность", tags: ["безопасность", "напоминание", "важное"] },
   },
 };
 
