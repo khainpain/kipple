@@ -4,7 +4,7 @@ import { ru } from "../i18n/ru";
 import { en } from "../i18n/en";
 import { demoLibrary } from "./demo";
 import { breakdown } from "./cleanup";
-import { effectiveTopic, matchesFilter } from "./library";
+import { effectiveTitle, effectiveTopic, matchesFilter } from "./library";
 import { linkCounts } from "./linkcheck";
 import { countDuplicateGroups, findDuplicates } from "./smart";
 import type { CardKind } from "./types";
@@ -45,6 +45,12 @@ describe.each<Lang>(["en", "ru"])("the demo archive (%s)", (l) => {
     // The notes about money look like the topic the person sorted three cards into.
     expect(pile("like").length).toBe(1);
     expect(pile("like")[0].cards.length).toBe(3);
+  });
+
+  it("shows a reel by its caption, not by Instagram's page title", () => {
+    const reel = lib.cards.find((c) => c.urls[0]?.includes("instagram.com"))!;
+    expect(effectiveTitle(reel)).not.toContain("Instagram");
+    expect(effectiveTitle(reel)).toContain("🍝");
   });
 
   it("keeps passwords apart and finds the copies and the dead links", () => {

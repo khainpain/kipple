@@ -3,7 +3,7 @@
 // site, piles on the cleanup screen, copies, junk, passwords kept apart, dead links).
 import { annotateContext, effectiveTopic } from "./library";
 import { isAutoJunk, isSensitive } from "./rules";
-import { cardEmbed } from "./embeds";
+import { cardEmbed, linkText } from "./embeds";
 import type { Card, Library, MediaRef } from "./types";
 import type { DemoScene, DemoSpec } from "./demoSpec";
 import { T } from "../i18n";
@@ -172,9 +172,10 @@ function cardOf(s: DemoSpec, i: number, now: number, txt: string): Card {
   if (isSensitive(text)) c.sensitive = true;
   else if (isAutoJunk(c)) c.autoJunk = true;
   if (s.topic || s.pin) c.user = { ...(s.topic && { topic: s.topic }), ...(s.pin && { pinned: true }) };
-  // What the AI would have added, for the features that are frozen now: tags and a status.
+  // What the AI would have added, for the features that are frozen now: tags and a status. Its title is the page's
+  // own (an Instagram one already cut down to the caption), so the card reads as it does without AI.
   const topic = effectiveTopic(c);
-  if (topic && !c.sensitive) c.ai = { title: s.title ?? "", summary: "", topic, tags: s.tags ?? [topic.toLocaleLowerCase()], action: s.status ?? "reference", priority: 2, model: "demo", at: "" };
+  if (topic && !c.sensitive) c.ai = { title: linkText(c.link).title ?? "", summary: "", topic, tags: s.tags ?? [topic.toLocaleLowerCase()], action: s.status ?? "reference", priority: 2, model: "demo", at: "" };
   return c;
 }
 
