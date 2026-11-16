@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { publicAssetUrl } from "../lib/assetUrl";
+import { shownAssetUrl } from "../lib/assetUrl";
 import { hostChain, siteLetter, siteMarkOf } from "../lib/siteMarks";
 import { hueOf } from "./nav";
 import { Icon } from "./Icon";
@@ -32,7 +32,7 @@ export function SiteIcon({ url, favicon, size = 14 }: { url?: string; favicon?: 
       </svg>
     );
   }
-  const icon = publicAssetUrl(favicon);
+  const icon = shownAssetUrl(favicon);
   if (icon && !broken) return <img src={icon} alt="" className="favicon" width={size} height={size} onError={() => setBroken(true)} />;
   const letter = siteLetter(url);
   if (letter) {
