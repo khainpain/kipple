@@ -38,4 +38,9 @@ describe("croppedRatio", () => {
     expect(croppedRatio(ig, 220, 260)).toBeUndefined();
     expect(croppedRatio(ig, 533, 0)).toBeUndefined();
   });
+  it("keeps a wide 1.91:1 photo, but ignores shapes Instagram never uses (an error page's height)", () => {
+    expect(croppedRatio(ig, 344, 260)).toBeCloseTo(1.91, 2);
+    expect(croppedRatio(ig, 280, 260)).toBeUndefined();
+    expect(croppedRatio(ig, 4000, 260)).toBeUndefined();
+  });
 });

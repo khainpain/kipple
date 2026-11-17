@@ -44,7 +44,7 @@ export function LinkPlayer({ embed, cover }: { embed: Embed; cover?: string }) {
     };
     window.addEventListener("message", on);
     return () => window.removeEventListener("message", on);
-  }, [playing, embed]);
+  }, [playing, embed.measures, embed.src, embed.cropTop, embed.cropBottom]);
 
   const shown = ratio ?? embed.ratio;
   const vertical = shown < 1;
@@ -103,7 +103,9 @@ export function frameAttrs(embed: Embed): { scrolling?: "no" } {
  */
 export function croppedRatio(embed: Embed, pageHeight: number, width: number): number | undefined {
   const media = pageHeight - (embed.cropTop ?? 0) - (embed.cropBottom ?? 0);
-  return width > 0 && media > 40 ? width / media : undefined;
+  const r = width / media;
+  // Instagram's shapes run from 4:5 to 1.91:1; anything far outside is not a post (an error page).
+  return width > 0 && media > 0 && r >= 0.5 && r <= 2 ? r : undefined;
 }
 
 /** VK's player is called differently in each language; the others are brand names. */
