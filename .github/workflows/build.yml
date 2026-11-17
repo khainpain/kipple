@@ -27,6 +27,17 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run build:web
+      # Smoke tests of the main flows in the browser build with the sample library (e2e/, playwright.config.ts).
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --project=web
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: smoke-web-report
+          path: |
+            e2e-report
+            e2e-results
+          retention-days: 7
 
   # The Windows installer is slow, so it is built only on a manual run (Actions -> build -> Run workflow).
   windows:

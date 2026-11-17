@@ -758,14 +758,14 @@ export function Workspace(props: {
               )}
               {TYPES.map((t) =>
                 typeCounts[t.key] ? (
-                  <button key={t.key} className={`pill${type === t.key ? " active" : ""}`} onClick={() => setType(type === t.key ? null : t.key)}>
+                  <button key={t.key} className={`pill${type === t.key ? " active" : ""}`} aria-pressed={type === t.key} onClick={() => setType(type === t.key ? null : t.key)}>
                     <Icon name={t.icon} size={13} /> {t.label}
                   </button>
                 ) : null,
               )}
               {scope.kind === "topic" && (groups.length > 0 || props.onGroupTopic) && <span className="quick-sep" />}
               {groups.map((g) => (
-                <button key={g.name} className={`pill${sub === g.name ? " active" : ""}`} onClick={() => setSub(sub === g.name ? null : g.name)}>
+                <button key={g.name} className={`pill${sub === g.name ? " active" : ""}`} aria-pressed={sub === g.name} onClick={() => setSub(sub === g.name ? null : g.name)}>
                   {g.name} <small>{formatNumber(g.ids.size)}</small>
                 </button>
               ))}
