@@ -61,12 +61,21 @@ if ($Build) {
   if (-not $Installer) { throw "No Kipple_*-setup.exe in $name" }
 }
 
+# Kipple's WebView2 processes (they run with its data folder). A new Kipple joins them if they are
+# still alive and then ignores the DevTools flag, so they must be gone before the start.
+function Get-KippleWebView {
+  @(Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -match "io\.getkipple\.app" })
+}
+
 # Closes Kipple the way the window's close button does, so it can finish writing; forces it only if it hangs.
 function Close-Kipple {
   foreach ($p in @(Get-Process kipple -ErrorAction SilentlyContinue)) {
     if ($p.CloseMainWindow()) { [void]$p.WaitForExit(10000) }
     if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue }
   }
+  $until = (Get-Date).AddSeconds(15)
+  while ((Get-KippleWebView).Count -and (Get-Date) -lt $until) { Start-Sleep -Milliseconds 500 }
 }
 
 if ($Installer) {
@@ -79,6 +88,7 @@ if ($Installer) {
   Close-Kipple
 }
 if (-not (Test-Path $exe)) { throw "Kipple is not installed at $exe" }
+if ((Get-KippleWebView).Count) { throw "Kipple's web view is still running from an earlier start. Wait a moment and try again." }
 Write-Host "Kipple $((Get-Item $exe).VersionInfo.FileVersion), $((Get-Item $exe).LastWriteTime)"
 
 # A test build opens the real library and may update its files on start, so they are copied aside first
@@ -106,7 +116,7 @@ try {
   $psi.Environment["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = "--remote-debugging-port=$Port"
   $app = [Diagnostics.Process]::Start($psi)
 
-  $deadline = (Get-Date).AddSeconds(30)
+  $deadline = (Get-Date).AddSeconds(60) # the first start on a fresh machine is slow
   $last = $null
   while ($true) {
     try {
@@ -115,7 +125,10 @@ try {
       $last = "no Kipple window among: $(($pages | ForEach-Object url) -join ', ')"
     } catch { $last = $_.Exception.Message }
     if ($app.HasExited) { throw "Kipple exited on start (code $($app.ExitCode))" }
-    if ((Get-Date) -gt $deadline) { throw "No Kipple window on $cdp after 30 s: $last" }
+    if ((Get-Date) -gt $deadline) {
+      $views = Get-KippleWebView | ForEach-Object { $_.CommandLine -replace "^.*?(--remote-debugging-port=\d+|--type=\S+).*$", '$1' }
+      throw "No Kipple window on $cdp after 60 s: $last. Kipple web view processes: $($views -join '; ')"
+    }
     Start-Sleep -Milliseconds 500
   }
 
