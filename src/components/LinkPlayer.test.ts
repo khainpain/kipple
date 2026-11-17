@@ -47,11 +47,13 @@ describe("croppedRatio", () => {
 
 describe("nextRatio", () => {
   const ig = embedOf("https://www.instagram.com/p/C8vE3mJsQ5_/")!;
-  it("takes the shape from the first height Instagram reports", () => {
+  it("takes the shape from the height Instagram reports", () => {
     expect(nextRatio(undefined, ig, 468, 260)).toBe(1);
   });
-  it("keeps that shape afterwards: resizing the box makes Instagram measure again, and a height measured at the old width would resize it again, so the player would jitter", () => {
-    // Square post: the box grew from 400 to 500px wide, then the height measured at 400px arrived.
-    expect(nextRatio(1, ig, 608, 500)).toBe(1);
+  it("follows the latest height: an early one can be off (the page still loading), and keeping it showed the white strip again", () => {
+    expect(nextRatio(1, ig, 533, 260)).toBeCloseTo(0.8, 2);
+  });
+  it("keeps the shape it has when a height makes no sense", () => {
+    expect(nextRatio(1, ig, 220, 260)).toBe(1);
   });
 });

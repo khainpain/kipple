@@ -52,7 +52,7 @@ export function LinkPlayer({ embed, cover }: { embed: Embed; cover?: string }) {
 
   if (!playing) {
     return (
-      <button type="button" className={`${cls} facade`} style={{ aspectRatio: String(embed.ratio), ["--ratio" as string]: String(embed.ratio) }} onClick={() => setPlaying(true)} aria-label={embed.video ? T.player.play : T.player.showPost}>
+      <button type="button" className={`${cls} facade`} style={{ aspectRatio: String(embed.ratio) }} onClick={() => setPlaying(true)} aria-label={embed.video ? T.player.play : T.player.showPost}>
         {cover && !coverFailed ? <img src={cover} alt="" referrerPolicy="no-referrer" onError={() => setCoverFailed(true)} /> : <span className="facade-blank" />}
         <span className="play-btn">
           <Icon name="play" size={26} />
@@ -62,7 +62,7 @@ export function LinkPlayer({ embed, cover }: { embed: Embed; cover?: string }) {
     );
   }
   return (
-    <div className={cls} style={{ aspectRatio: String(shown), ["--ratio" as string]: String(shown), ["--crop-top" as string]: embed.cropTop ? `${embed.cropTop}px` : undefined }}>
+    <div className={cls} style={{ aspectRatio: String(shown), ["--crop-top" as string]: embed.cropTop ? `${embed.cropTop}px` : undefined }}>
       <iframe
         ref={frame}
         src={embed.src}
@@ -109,12 +109,12 @@ export function croppedRatio(embed: Embed, pageHeight: number, width: number): n
 }
 
 /**
- * The shape is taken once, from the first height reported. A post's shape doesn't change, while
- * every resize of the box makes Instagram measure again; a height measured at the old width
- * would give a wrong shape, resize the box again, and the player would jitter.
+ * The shape follows the latest height Instagram reports; an early one can be off while its page
+ * loads. This can't loop: the box's width doesn't depend on the shape (see .link-player.cropped),
+ * so a new shape never makes Instagram measure again.
  */
 export function nextRatio(prev: number | undefined, embed: Embed, pageHeight: number, width: number): number | undefined {
-  return prev ?? croppedRatio(embed, pageHeight, width);
+  return croppedRatio(embed, pageHeight, width) ?? prev;
 }
 
 /** VK's player is called differently in each language; the others are brand names. */

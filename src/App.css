@@ -1744,10 +1744,14 @@ code {
 .link-player.cropped:not(.facade) {
   background: #000;
 }
-/* The crop needs the box at exactly the media's shape even when the panel is narrow, so it is sized from its width. */
+/*
+ * The crop needs the box at exactly the media's shape, so its height comes from its width. The width
+ * never depends on that shape: Instagram measures its page again whenever the frame's width changes,
+ * and a width that followed the shape would keep resizing the player (it jittered).
+ */
 .link-player.cropped {
   --player-h: min(62vh, 560px);
-  width: min(100%, calc(var(--player-h) * var(--ratio)));
+  width: min(100%, calc(var(--player-h) * 0.8));
   height: auto;
   max-height: none;
   align-self: center;
