@@ -26,6 +26,7 @@ const telegram: TelegramApi = {
   savedPage: (offsetId, minId) => invoke("tg_saved_page", { offsetId, minId }),
   quoteSaved: (id, text) => invoke("tg_quote_saved", { id, text }),
   deleteSaved: (ids, owner) => invoke("tg_delete_saved", { ids, owner }),
+  findReplies: () => invoke("tg_find_replies"),
   deleteCards: (items, whole, owner) => invoke("tg_delete_cards", { items, whole, owner: owner ?? null }),
   pinSaved: (id, date, pin) => invoke("tg_pin_saved", { id, date, pin }),
   backupStep: () => invoke("tg_backup_step"),

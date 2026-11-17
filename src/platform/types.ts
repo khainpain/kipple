@@ -133,9 +133,13 @@ export interface TelegramApi {
    * original is gone.
    */
   quoteSaved(id: number, text: string): Promise<{ id: number; open: string | null; owner: number | null }>;
-  /** Deletes these messages from Saved Messages, on all devices. Rejects with "OTHER_ACCOUNT"
-   *  (and deletes nothing) when the signed-in account isn't `owner`. */
-  deleteSaved(ids: number[], owner: number): Promise<void>;
+  /** Deletes these helper replies from Saved Messages, on all devices. Rejects with "OTHER_ACCOUNT"
+   *  (and deletes nothing) when the signed-in account isn't `owner`. Resolves with the ids that are
+   *  still there but aren't helper replies (left alone). */
+  deleteSaved(ids: number[], owner: number): Promise<number[]>;
+  /** Kipple's helper replies still in Saved Messages (newest first) and the signed-in account's
+   *  user id. Only messages that pass the same check as deleteSaved. Rejects when offline. */
+  findReplies(): Promise<{ owner: number; messages: SavedMessage[] }>;
   /**
    * Deletes these messages of the user's cards from Saved Messages, on all devices (up to 100).
    * Each is checked first: still there, in the signed-in account's Saved Messages, with this

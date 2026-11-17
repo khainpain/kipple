@@ -9,7 +9,7 @@ import { cleanRules, effectiveTags, effectiveTopic, findTopic, getOwnTopics, mak
 import { renameInRules, ruleOffer, withoutRulesTo } from "./lib/topicRules";
 import { FEATURES } from "./lib/features";
 import { aiAllowed, appendEdits, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadPendingReplies, loadSettings, loadPinState, loadTagSyncState, saveBoardState, savePinState, saveLibrary, savePendingReplies, saveSettings, saveTagSyncState, wipeAll, type Settings } from "./lib/store";
-import { dueReplies, nextDue, replyText, scheduleLeftovers, scheduleReply, withoutReplies, type PendingReply } from "./lib/tgReplies";
+import { dueReplies, findLeftovers, nextDue, replyText, scheduleLeftovers, scheduleReply, withoutReplies, type PendingReply } from "./lib/tgReplies";
 import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type SendOptions } from "./lib/telegram";
 import { NoPremiumError, syncTags, type TagMode } from "./lib/tgTags";
 import { applyToTelegram, type ApplyOptions, type ApplyProgress } from "./lib/tgApply";
@@ -120,7 +120,9 @@ export default function App() {
     let failed = false;
     for (const [owner, ids] of dueReplies(await loadPendingReplies(), new Date())) {
       try {
-        await tg.deleteSaved(ids, owner);
+        const kept = await tg.deleteSaved(ids, owner);
+        // Still there but no longer a helper reply (e.g. edited into a note): left alone, not retried.
+        if (kept.length) console.warn(`Open in Telegram: ${kept.length} message(s) left in Saved Messages, not Kipple's replies`);
         await updateReplies((l) => withoutReplies(l, owner, ids));
       } catch (e) {
         // Another account is signed in: its messages have other ids, so these are left alone and
@@ -142,6 +144,28 @@ export default function App() {
       window.clearTimeout(cleanupTimer.current);
     };
   }, [tgAccount, cleanReplies]);
+  // Once per start: replies an earlier run left in Saved Messages (closed too early, or an older
+  // version that failed to delete them) are found and deleted like new ones. Offline, it tries
+  // again a minute later while signed in.
+  const leftoversChecked = useRef(false);
+  const leftoversTimer = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    const tg = platform.telegram;
+    if (!tgAccount || !tg || demoRef.current || leftoversChecked.current) return;
+    const scan = () => {
+      if (!cleanupOn.current) return;
+      leftoversChecked.current = true;
+      findLeftovers({ tg, update: updateReplies, cleanup: settingsRef.current.replyCleanup, now: new Date() })
+        .then((n) => (n ? cleanReplies() : undefined))
+        .catch((e) => {
+          console.warn("Open in Telegram: looking for leftover replies failed", e);
+          leftoversChecked.current = false;
+          leftoversTimer.current = window.setTimeout(scan, 60_000);
+        });
+    };
+    scan();
+    return () => window.clearTimeout(leftoversTimer.current);
+  }, [tgAccount, updateReplies, cleanReplies]);
 
   useEffect(() => {
     (async () => {
