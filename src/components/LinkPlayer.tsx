@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Embed } from "../lib/embeds";
 import { T } from "../i18n";
 import { Icon } from "./Icon";
+import { remoteAssetsOn } from "../lib/assetUrl";
 
 /** Instagram's embed page reports its height as {"type":"MEASURE","details":{"height":N}}. */
 function measuredHeight(data: unknown): number | undefined {
@@ -21,15 +22,17 @@ function measuredHeight(data: unknown): number | undefined {
 /**
  * The video site's own player, shown in the card in place of the link picture.
  * Nothing loads from the site until the play button is pressed: the cover is a
- * picture the app already has, so opening a card doesn't call Instagram or YouTube.
+ * picture the app already has, so opening a card doesn't call YouTube. Instagram is
+ * the exception while link previews are on (see opensDirectly).
  */
 export function LinkPlayer({ embed, cover }: { embed: Embed; cover?: string }) {
-  const [playing, setPlaying] = useState(false);
+  const direct = opensDirectly(embed, remoteAssetsOn());
+  const [playing, setPlaying] = useState(direct);
   const [height, setHeight] = useState<number>();
   const [coverFailed, setCoverFailed] = useState(false);
   const frame = useRef<HTMLIFrameElement>(null);
 
-  useEffect(() => setPlaying(false), [embed.src]);
+  useEffect(() => setPlaying(direct), [embed.src, direct]);
 
   useEffect(() => {
     if (!playing || !embed.measures) return;
@@ -70,6 +73,16 @@ export function LinkPlayer({ embed, cover }: { embed: Embed; cover?: string }) {
       />
     </div>
   );
+}
+
+/**
+ * Instagram's player can't be started from outside and shows its own cover with a play button,
+ * so our cover in front of it would cost a second click. While link previews are on (the card
+ * already loads pictures from the web) it is shown at once; with them off, our cover stays and
+ * nothing reaches Instagram until play is pressed.
+ */
+export function opensDirectly(embed: Embed, previewsOn: boolean): boolean {
+  return previewsOn && embed.provider === "instagram";
 }
 
 /**
