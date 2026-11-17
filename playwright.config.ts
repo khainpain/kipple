@@ -17,23 +17,26 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"], ["html", { open: "never", outputFolder: "e2e-report" }]],
   use: { trace: "retain-on-failure" },
-  projects: [
-    {
-      name: "web",
-      use: {
-        baseURL: `http://localhost:${PORT}/app/`,
-        viewport: { width: 1400, height: 900 },
-        channel: process.platform === "win32" && !process.env.CI ? "msedge" : undefined,
-      },
-    },
-    { name: "desktop", use: { trace: "off" } },
-  ],
+  // Only the target that matches the environment, so a plain `npx playwright test` does the right thing.
+  projects: desktop
+    ? [{ name: "desktop", use: { trace: "off" } }]
+    : [
+        {
+          name: "web",
+          use: {
+            baseURL: `http://localhost:${PORT}/app/`,
+            viewport: { width: 1400, height: 900 },
+            channel: process.platform === "win32" && !process.env.CI ? "msedge" : undefined,
+          },
+        },
+      ],
   webServer: desktop
     ? undefined
     : {
-        command: `npm run build:web && npx vite preview --mode web --port ${PORT} --strictPort`,
+        // CI has just built the web app in an earlier step.
+        command: `${process.env.CI ? "" : "npm run build:web && "}npx vite preview --mode web --port ${PORT} --strictPort`,
         url: `http://localhost:${PORT}/app/`,
-        reuseExistingServer: !process.env.CI,
+        reuseExistingServer: false,
         timeout: 180_000,
       },
 });
