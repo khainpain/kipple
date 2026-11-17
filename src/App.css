@@ -1744,10 +1744,13 @@ code {
 .link-player.cropped:not(.facade) {
   background: #000;
 }
-/* The crop needs the box at exactly 4:5 even when the panel is narrow, so it is sized from its width. */
-.link-player.vertical.cropped {
-  width: min(100%, calc(var(--player-h) * 0.8));
+/* The crop needs the box at exactly the media's shape even when the panel is narrow, so it is sized from its width. */
+.link-player.cropped {
+  --player-h: min(62vh, 560px);
+  width: min(100%, calc(var(--player-h) * var(--ratio)));
   height: auto;
+  max-height: none;
+  align-self: center;
 }
 .link-player.cropped iframe {
   position: absolute;
@@ -1755,22 +1758,11 @@ code {
   top: calc(-1 * var(--crop-top));
   height: calc(100% + var(--crop-top) + 200px);
 }
-.link-player.provider-instagram:not(.facade):not(.cropped) {
-  max-height: none;
-  width: min(100%, 420px);
-  height: auto;
-  min-height: 480px;
-  align-self: center;
-  border: 1px solid var(--line);
-}
 .link-player iframe {
   display: block;
   width: 100%;
   height: 100%;
   border: 0;
-}
-.link-player.provider-instagram:not(.facade):not(.cropped) iframe {
-  min-height: inherit;
 }
 .link-player.facade {
   display: block;
@@ -1996,7 +1988,8 @@ code {
     align-items: flex-start;
   }
   /* Keep the heading of an upright video in view next to the properties. */
-  .link-player.vertical {
+  .link-player.vertical,
+  .link-player.cropped {
     --player-h: min(52vh, 460px);
   }
 }

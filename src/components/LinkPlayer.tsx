@@ -28,7 +28,7 @@ function measuredHeight(data: unknown): number | undefined {
 export function LinkPlayer({ embed, cover }: { embed: Embed; cover?: string }) {
   const direct = opensDirectly(embed, remoteAssetsOn());
   const [playing, setPlaying] = useState(direct);
-  const [height, setHeight] = useState<number>();
+  const [ratio, setRatio] = useState<number>();
   const [coverFailed, setCoverFailed] = useState(false);
   const frame = useRef<HTMLIFrameElement>(null);
 
@@ -39,18 +39,20 @@ export function LinkPlayer({ embed, cover }: { embed: Embed; cover?: string }) {
     const on = (e: MessageEvent) => {
       if (e.source !== frame.current?.contentWindow) return;
       const h = measuredHeight(e.data);
-      if (h) setHeight(h);
+      const r = h && croppedRatio(embed, h, frame.current?.clientWidth ?? 0);
+      if (r) setRatio(r);
     };
     window.addEventListener("message", on);
     return () => window.removeEventListener("message", on);
-  }, [playing, embed.measures]);
+  }, [playing, embed]);
 
-  const vertical = embed.ratio < 1;
+  const shown = ratio ?? embed.ratio;
+  const vertical = shown < 1;
   const cls = `link-player provider-${embed.provider}${vertical ? " vertical" : ""}${embed.cropTop ? " cropped" : ""}`;
 
   if (!playing) {
     return (
-      <button type="button" className={`${cls} facade`} style={{ aspectRatio: String(embed.ratio) }} onClick={() => setPlaying(true)} aria-label={embed.video ? T.player.play : T.player.showPost}>
+      <button type="button" className={`${cls} facade`} style={{ aspectRatio: String(embed.ratio), ["--ratio" as string]: String(embed.ratio) }} onClick={() => setPlaying(true)} aria-label={embed.video ? T.player.play : T.player.showPost}>
         {cover && !coverFailed ? <img src={cover} alt="" referrerPolicy="no-referrer" onError={() => setCoverFailed(true)} /> : <span className="facade-blank" />}
         <span className="play-btn">
           <Icon name="play" size={26} />
@@ -60,7 +62,7 @@ export function LinkPlayer({ embed, cover }: { embed: Embed; cover?: string }) {
     );
   }
   return (
-    <div className={cls} style={height ? { height } : { aspectRatio: String(embed.ratio), ["--crop-top" as string]: embed.cropTop ? `${embed.cropTop}px` : undefined }}>
+    <div className={cls} style={{ aspectRatio: String(shown), ["--ratio" as string]: String(shown), ["--crop-top" as string]: embed.cropTop ? `${embed.cropTop}px` : undefined }}>
       <iframe
         ref={frame}
         src={embed.src}
@@ -92,6 +94,16 @@ export function opensDirectly(embed: Embed, previewsOn: boolean): boolean {
  */
 export function frameAttrs(embed: Embed): { scrolling?: "no" } {
   return embed.cropTop ? { scrolling: "no" } : {};
+}
+
+/**
+ * Shape of the media inside a cropped page, from the page height it reported at a given frame
+ * width. Instagram's media takes each post's own shape (4:5, square, wide), so a fixed 4:5 box
+ * would show the white profile strip under a square video.
+ */
+export function croppedRatio(embed: Embed, pageHeight: number, width: number): number | undefined {
+  const media = pageHeight - (embed.cropTop ?? 0) - (embed.cropBottom ?? 0);
+  return width > 0 && media > 40 ? width / media : undefined;
 }
 
 /** VK's player is called differently in each language; the others are brand names. */
