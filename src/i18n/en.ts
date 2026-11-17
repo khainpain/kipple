@@ -1,20 +1,10 @@
 // English interface strings. Same keys as ru.ts; the type makes the build fail on a missing one.
 import type { Dict } from "./ru.js";
+import { DEMO_CARDS_EN } from "./demo.en.js";
 
 const num = (n: number) => n.toLocaleString("en-US");
 const s = (n: number) => (n === 1 ? "" : "s");
 const cards = (n: number) => `${num(n)} card${s(n)}`;
-
-// Titles for the demo's sample cards, so it reads like a real library.
-const DEMO_ARTICLES = ["How to finally organise your bookmarks", "Why we save more than we read", "The case for a weekly review", "Read-later apps, compared", "Notes that link to each other", "Fewer tabs, more focus"];
-/** By topic (in the order of demo.topics), six titles each. */
-const DEMO_TITLES = [
-  ["Colour palettes that work in dark mode", "A type pairing cheat sheet", "Spacing scale: why 4 and 8 px", "Landing page references", "Icon set with a soft line", "Grid systems in print and on screen"],
-  ["Postgres indexes, explained simply", "Git commands I always forget", "How the event loop really works", "Rust ownership in ten minutes", "A tidy README template", "Regex for dates and phone numbers"],
-  ["Ten-minute shakshuka", "Sourdough starter, day by day", "Weekly meal prep plan", "Ramen broth without a pressure cooker", "Lemon olive oil cake", "Spice blends worth mixing yourself"],
-  ["Lisbon in three days", "Night trains across Europe", "Packing list for a week with a carry-on", "Cheap flights: what actually works", "Hidden beaches near Split", "Tokyo neighbourhoods to walk"],
-  ["Index funds vs. picking stocks", "Budget template with three envelopes", "How to read a payslip", "Tax deductions freelancers miss", "Emergency fund: how much is enough", "Subscriptions to cancel this month"],
-];
 
 export const en: Dict = {
   common: {
@@ -793,26 +783,7 @@ export const en: Dict = {
 
   demo: {
     chatName: "Saved Messages (demo)",
-    topics: ["Design", "Programming", "Food", "Travel", "Finance"],
-    article: (i) => DEMO_ARTICLES[i % DEMO_ARTICLES.length],
-    reelTitle: "Anna Cooks on Instagram: \"10-minute pasta 🍝\nThe sauce is ready before the water boils. You only need three things: tomatoes, garlic and good olive oil. Recipe below, save it!\"",
-    reelDescription: "12K likes, 340 comments - anna.cooks on May 1, 2026: \"10-minute pasta 🍝\nThe sauce is ready before the water boils. You only need three things: tomatoes, garlic and good olive oil. Recipe below, save it!\". ",
-    videoTitle: "How Telegram works inside",
-    card: (i, _kind) => DEMO_TITLES[i % 5][Math.floor(i / 5) % 6],
-    summary: "A short note on what's saved here and why you'd come back to it.",
-    groups: ["Color and type", "Grids and layout"],
-    tags: ["css", "ideas", "references"],
-    messages: {
-      2: "Check out this article on masonry #design",
-      4: "References for the landing page",
-      6: "How to make animations",
-      10: "home wifi password: correct-horse-battery",
-      11: "Idea: a bot that sends three random saved messages once a week",
-    },
-    channel: "Design channel",
-    textFile: "shopping.txt",
+    cards: DEMO_CARDS_EN,
     textBody: "Shopping list\n\n- coffee\n- bread\n- E27 light bulb\n\nText files show right inside the card.",
-    // A one-line message whose AI title and summary are longer than the message itself.
-    short: { text: "Important, safety", title: "Reminder: important safety", summary: "A short note saying safety is important, probably a reminder to act on it.", topic: "Security", tags: ["safety", "reminder", "important"] },
   },
 };

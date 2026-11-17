@@ -1,8 +1,11 @@
-// Sample library for the browser build's demo button: lets you see the grid without an export.
-import fixture from "../../fixtures/saved_messages.json";
-import { parseExport } from "./parser";
-import { annotateContext } from "./library";
-import type { Library } from "./types";
+// Sample library for the demo: a made-up Saved Messages archive that looks like a real one, with
+// every kind of message Kipple reads and something for each thing it does without AI (topics by
+// site, piles on the cleanup screen, copies, junk, passwords kept apart, dead links).
+import { annotateContext, effectiveTopic } from "./library";
+import { isAutoJunk, isSensitive } from "./rules";
+import { cardEmbed, linkText } from "./embeds";
+import type { Card, Library, MediaRef } from "./types";
+import type { DemoScene, DemoSpec } from "./demoSpec";
 import { T } from "../i18n";
 
 const xml = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/'/g, "&apos;");
@@ -51,115 +54,139 @@ function ogImage(seed: number, title: string, site: string): string {
   )}`;
 }
 
-/** A made-up picture for the demo's photos and video frames: a landscape with a sun. */
-function videoFrame(seed: number, w: number, h: number): string {
-  const hue = hueAt(seed);
-  return `data:image/svg+xml;utf8,${encodeURIComponent(
-    `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' viewBox='0 0 ${w} ${h}'>` +
-      `<defs><linearGradient id='s' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='hsl(${hue},28%,74%)'/><stop offset='1' stop-color='hsl(${(hue + 20) % 360},35%,88%)'/></linearGradient></defs>` +
-      `<rect width='100%' height='100%' fill='url(#s)'/>` +
-      `<circle cx='${w * 0.68}' cy='${h * 0.42}' r='${h * 0.14}' fill='hsl(36,60%,94%)'/>` +
-      `<path d='M0 ${h * 0.62} Q ${w * 0.25} ${h * 0.5} ${w * 0.5} ${h * 0.6} T ${w} ${h * 0.56} V ${h} H 0 Z' fill='hsl(${(hue + 160) % 360},16%,40%)'/>` +
-      `<path d='M0 ${h * 0.76} Q ${w * 0.3} ${h * 0.68} ${w * 0.6} ${h * 0.78} T ${w} ${h * 0.74} V ${h} H 0 Z' fill='hsl(${(hue + 170) % 360},18%,27%)'/>` +
-      `</svg>`,
-  )}`;
+const svg = (w: number, h: number, body: string) => `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' viewBox='0 0 ${w} ${h}'>${body}</svg>`)}`;
+
+/** Made-up pictures for the demo's photos and video frames, one painter per scene. */
+const SCENES: Record<DemoScene, (hue: number, w: number, h: number, seed: number) => string> = {
+  // A landscape with a sun.
+  hills: (hue, w, h) =>
+    `<defs><linearGradient id='s' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='hsl(${hue},28%,74%)'/><stop offset='1' stop-color='hsl(${(hue + 20) % 360},35%,88%)'/></linearGradient></defs>` +
+    `<rect width='100%' height='100%' fill='url(#s)'/>` +
+    `<circle cx='${w * 0.68}' cy='${h * 0.42}' r='${h * 0.14}' fill='hsl(36,60%,94%)'/>` +
+    `<path d='M0 ${h * 0.62} Q ${w * 0.25} ${h * 0.5} ${w * 0.5} ${h * 0.6} T ${w} ${h * 0.56} V ${h} H 0 Z' fill='hsl(${(hue + 160) % 360},16%,40%)'/>` +
+    `<path d='M0 ${h * 0.76} Q ${w * 0.3} ${h * 0.68} ${w * 0.6} ${h * 0.78} T ${w} ${h * 0.74} V ${h} H 0 Z' fill='hsl(${(hue + 170) % 360},18%,27%)'/>`,
+  // Rooftops at dusk.
+  city: (hue, w, h, seed) => {
+    const n = 9;
+    const houses = Array.from({ length: n }, (_, k) => {
+      const bw = w / n;
+      const bh = h * (0.22 + (((seed + 3) * (k + 2) * 37) % 30) / 100);
+      const lit = (seed + k) % 3 === 0;
+      return (
+        `<rect x='${k * bw}' y='${h - bh}' width='${bw + 1}' height='${bh}' fill='hsl(${(hue + 190 + k * 5) % 360},18%,${24 + ((k * 7) % 12)}%)'/>` +
+        `<rect x='${k * bw + bw * 0.3}' y='${h - bh + bw * 0.3}' width='${bw * 0.16}' height='${bw * 0.22}' fill='hsl(40,70%,${lit ? 78 : 40}%)' opacity='.8'/>` +
+        `<rect x='${k * bw + bw * 0.58}' y='${h - bh + bw * 0.7}' width='${bw * 0.16}' height='${bw * 0.22}' fill='hsl(40,70%,${lit ? 46 : 74}%)' opacity='.8'/>`
+      );
+    }).join("");
+    return (
+      `<defs><linearGradient id='s' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='hsl(${(hue + 200) % 360},30%,52%)'/><stop offset='1' stop-color='hsl(${hue},55%,80%)'/></linearGradient></defs>` +
+      `<rect width='100%' height='100%' fill='url(#s)'/><circle cx='${w * 0.24}' cy='${h * 0.3}' r='${h * 0.07}' fill='hsl(36,70%,92%)'/>${houses}`
+    );
+  },
+  // Sea, sand and a parasol.
+  sea: (hue, w, h) =>
+    `<rect width='100%' height='100%' fill='hsl(${(hue + 180) % 360},38%,82%)'/>` +
+    `<rect y='${h * 0.38}' width='100%' height='${h * 0.34}' fill='hsl(${(hue + 170) % 360},36%,52%)'/>` +
+    `<path d='M0 ${h * 0.5} q ${w * 0.08} ${-h * 0.02} ${w * 0.16} 0 t ${w * 0.16} 0 t ${w * 0.16} 0 t ${w * 0.16} 0 t ${w * 0.16} 0 t ${w * 0.16} 0 t ${w * 0.16} 0' fill='none' stroke='white' stroke-width='${h * 0.008}' opacity='.5'/>` +
+    `<path d='M0 ${h * 0.7} Q ${w * 0.4} ${h * 0.64} ${w} ${h * 0.72} V ${h} H 0 Z' fill='hsl(38,48%,82%)'/>` +
+    `<path d='M${w * 0.3} ${h * 0.6} a ${h * 0.16} ${h * 0.16} 0 0 1 ${h * 0.32} 0 Z' fill='hsl(${hue},62%,58%)'/><rect x='${w * 0.3 + h * 0.155}' y='${h * 0.6}' width='${h * 0.01}' height='${h * 0.24}' fill='hsl(30,20%,30%)'/>`,
+  // A plate from above, on a table.
+  plate: (hue, w, h, seed) => {
+    const r = Math.min(w, h) * 0.34;
+    const [cx, cy] = [w * 0.5, h * 0.52];
+    const bits = Array.from({ length: 7 }, (_, k) => {
+      const a = (k * 0.9 + seed) % 6.28;
+      const d = r * 0.42 * (((k * 5 + seed) % 7) / 7);
+      return `<circle cx='${cx + Math.cos(a) * d}' cy='${cy + Math.sin(a) * d}' r='${r * (0.1 + (k % 3) * 0.04)}' fill='hsl(${(hue + k * 23) % 360},55%,${48 + (k % 3) * 9}%)'/>`;
+    }).join("");
+    return (
+      `<rect width='100%' height='100%' fill='hsl(${(hue + 20) % 360},24%,34%)'/>` +
+      `<rect x='${w * 0.06}' y='${h * 0.1}' width='${w * 0.2}' height='${h * 0.26}' rx='${w * 0.01}' fill='hsl(${(hue + 150) % 360},22%,62%)' transform='rotate(-8 ${w * 0.16} ${h * 0.23})'/>` +
+      `<circle cx='${cx}' cy='${cy}' r='${r}' fill='hsl(40,30%,95%)'/><circle cx='${cx}' cy='${cy}' r='${r * 0.74}' fill='hsl(40,24%,89%)'/>${bits}`
+    );
+  },
+  // A sheet of paper with handwriting, photographed on a desk.
+  paper: (hue, w, h, seed) => {
+    const lines = Array.from({ length: 9 }, (_, k) => `<rect x='${w * 0.26}' y='${h * (0.26 + k * 0.058)}' width='${w * (0.26 + (((seed + k) * 13) % 22) / 100)}' height='${h * 0.012}' rx='${h * 0.006}' fill='hsl(${(hue + 200) % 360},25%,34%)' opacity='.7'/>`).join("");
+    return (
+      `<rect width='100%' height='100%' fill='hsl(${(hue + 10) % 360},20%,42%)'/>` +
+      `<g transform='rotate(-4 ${w / 2} ${h / 2})'><rect x='${w * 0.2}' y='${h * 0.12}' width='${w * 0.6}' height='${h * 0.76}' rx='${w * 0.008}' fill='hsl(44,45%,94%)'/>` +
+      `<rect x='${w * 0.26}' y='${h * 0.18}' width='${w * 0.3}' height='${h * 0.028}' rx='${h * 0.014}' fill='hsl(${hue},55%,50%)'/>${lines}</g>`
+    );
+  },
+  // A phone screenshot: a header, a picture, lines of text.
+  screen: (hue, w, h, seed) => {
+    const rows = Array.from({ length: 6 }, (_, k) => `<rect x='${w * 0.08}' y='${h * (0.5 + k * 0.07)}' width='${w * (0.5 + (((seed + k) * 17) % 34) / 100)}' height='${h * 0.022}' rx='${h * 0.011}' fill='hsl(${hue},12%,${k ? 78 : 40}%)'/>`).join("");
+    return (
+      `<rect width='100%' height='100%' fill='hsl(${hue},20%,97%)'/><rect width='100%' height='${h * 0.09}' fill='hsl(${hue},30%,90%)'/>` +
+      `<circle cx='${w * 0.14}' cy='${h * 0.045}' r='${h * 0.022}' fill='hsl(${hue},40%,62%)'/><rect x='${w * 0.24}' y='${h * 0.034}' width='${w * 0.34}' height='${h * 0.022}' rx='${h * 0.011}' fill='hsl(${hue},18%,48%)'/>` +
+      `<rect x='${w * 0.08}' y='${h * 0.14}' width='${w * 0.84}' height='${h * 0.3}' rx='${w * 0.04}' fill='hsl(${(hue + 150) % 360},30%,70%)'/><circle cx='${w * 0.72}' cy='${h * 0.24}' r='${h * 0.05}' fill='hsl(40,60%,92%)'/>${rows}`
+    );
+  },
+};
+
+function picture(scene: DemoScene, seed: number, w: number, h: number): string {
+  return svg(w, h, SCENES[scene](hueAt(seed), w, h, seed));
 }
 
 // A one-page PDF and a text file, so the in-card previews can be tried in the browser build.
 const DEMO_PDF = "data:application/pdf;base64,JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA0MjAgMjk3XSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4gPj4gPj4KZW5kb2JqCjQgMCBvYmoKPDwgL0xlbmd0aCAxMDQgPj4Kc3RyZWFtCkJUIC9GMSAyMiBUZiA0MCAyMjAgVGQgKERlbW8gcmVwb3J0KSBUaiAwIC0zNiBUZCAvRjEgMTIgVGYgKFRoaXMgUERGIG9wZW5zIHJpZ2h0IGluc2lkZSB0aGUgY2FyZC4pIFRqIEVUCmVuZHN0cmVhbQplbmRvYmoKNSAwIG9iago8PCAvVHlwZSAvRm9udCAvU3VidHlwZSAvVHlwZTEgL0Jhc2VGb250IC9IZWx2ZXRpY2EgPj4KZW5kb2JqCnhyZWYKMCA2CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAwOSAwMDAwMCBuIAowMDAwMDAwMDU4IDAwMDAwIG4gCjAwMDAwMDAxMTUgMDAwMDAgbiAKMDAwMDAwMDI0MSAwMDAwMCBuIAowMDAwMDAwMzk2IDAwMDAwIG4gCnRyYWlsZXIKPDwgL1NpemUgNiAvUm9vdCAxIDAgUiA+PgpzdGFydHhyZWYKNDY2CiUlRU9GCg==";
 
+const MIME: Record<string, string> = { pdf: "application/pdf", txt: "text/plain", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", zip: "application/zip", mp3: "audio/mpeg", mp4: "video/mp4", ogg: "audio/ogg" };
+const mimeOf = (file: string | undefined) => MIME[file?.split(".").pop() ?? ""];
+
+function mediaOf(s: DemoSpec, kind: Card["kind"], i: number, txt: string): MediaRef | undefined {
+  // No two sizes alike, or the cards would look like copies of one file.
+  const size = (s.kb ?? 180 + i * 7) * 1024 + i;
+  if (kind === "photo") {
+    const [w, h] = s.pic === "screen" ? [390, 844] : s.tall ? [900, 1200] : [1200, 800];
+    return { path: picture(s.pic ?? "hills", i, w, h), width: w, height: h, size, missing: false };
+  }
+  if (kind === "video" || kind === "animation") return { thumb: picture(s.pic ?? "hills", i, 1280, 720), width: 1280, height: 720, duration: s.dur, size, mime: "video/mp4", fileName: s.file, missing: false };
+  if (kind === "document") return { path: s.file?.endsWith(".pdf") ? DEMO_PDF : s.file?.endsWith(".txt") ? txt : undefined, fileName: s.file, mime: mimeOf(s.file), size, missing: false };
+  if (kind === "voice" || kind === "video_note") return { duration: s.dur, size, mime: kind === "voice" ? "audio/ogg" : "video/mp4" };
+  if (kind === "audio") return { fileName: s.file, duration: s.dur, size, mime: mimeOf(s.file) };
+  return undefined;
+}
+
+function cardOf(s: DemoSpec, i: number, now: number, txt: string): Card {
+  const kind = s.k ?? (s.url ? "link" : "text");
+  const text = s.t ?? s.url ?? "";
+  const c: Card = {
+    id: 0,
+    date: new Date(now - s.d * 864e5 - (i % 9) * 2_520_000).toISOString(),
+    kind,
+    text,
+    urls: s.url ? [s.url] : [],
+    hashtags: (text.match(/#[\p{L}\d_]{2,}/gu) ?? []).map((t) => t.slice(1).toLowerCase()),
+    media: mediaOf(s, kind, i, txt),
+    forwardedFrom: s.from,
+  };
+  if (kind === "photo" && s.album) c.album = Array.from({ length: s.album }, (_, k) => ({ path: picture(s.pic ?? "hills", i + k + 1, c.media!.width!, c.media!.height!), width: c.media!.width, height: c.media!.height }));
+  if (kind === "link") {
+    c.link = { url: s.url!, title: s.title, description: s.desc, siteName: s.site, fetchedAt: "", health: s.broken ? "broken" : "ok", checkedAt: new Date(now - 864e5).toISOString() };
+    // A video keeps a frame for its cover, any other page a preview drawn from its title; nothing is asked of the network.
+    const [w, h] = s.tall ? [720, 1280] : [1280, 720];
+    c.link.image = s.pic ? picture(s.pic, i, w, h) : cardEmbed(c)?.video ? picture("hills", i, w, h) : ogImage(i, s.title?.split(/ [|:·] | - /)[0] ?? "", s.site ?? "");
+  }
+  if (isSensitive(text)) c.sensitive = true;
+  else if (isAutoJunk(c)) c.autoJunk = true;
+  if (s.topic || s.pin) c.user = { ...(s.topic && { topic: s.topic }), ...(s.pin && { pinned: true }) };
+  // What the AI would have added, for the features that are frozen now: tags and a status. Its title is the page's
+  // own (an Instagram one already cut down to the caption), so the card reads as it does without AI.
+  const topic = effectiveTopic(c);
+  if (topic && !c.sensitive) c.ai = { title: linkText(c.link).title ?? "", summary: "", topic, tags: s.tags ?? [topic.toLocaleLowerCase()], action: s.status ?? "reference", priority: 2, model: "demo", at: "" };
+  return c;
+}
+
 export function demoLibrary(): Library {
   const D = T.demo;
-  // The sample export is in Russian; its texts come from the dictionary, so the English demo reads in English.
-  const base = parseExport(fixture).cards.map((c) => ({
-    ...c,
-    text: D.messages[c.id] ?? c.text,
-    forwardedFrom: c.forwardedFrom ? D.channel : c.forwardedFrom,
-  }));
-  const DEMO_BLOG = "blog.example.org";
-  const DEMO_TXT = `data:text/plain;charset=utf-8,${encodeURIComponent(D.textBody)}`;
-  const topics = D.topics;
-  const cards = Array.from({ length: 60 }, (_, i) => {
-    const c = structuredClone(base[i % base.length]);
-    c.id = i + 1;
-    // The sample repeats; make the repeats distinct so only one pair shows up as a duplicate.
-    if (i >= base.length && i !== base.length) {
-      if (c.urls.length) c.urls = [`https://example.com/article-${i}`];
-      if (c.media?.size) c.media = { ...c.media, size: c.media.size + i };
-      else if (c.text) c.text += "\u200b".repeat(i); // invisible, but the texts no longer match
-    }
-    if (c.kind === "link") c.link = { url: c.urls[0], title: D.article(i), siteName: "example.com", fetchedAt: "" };
-    if (c.kind === "photo") {
-      c.link = undefined;
-      const [w, h] = i % 2 ? [800, 1000] : [1200, 800];
-      c.media = { ...c.media, path: videoFrame(i * 3, w, h), width: w, height: h, missing: false };
-      // Some photos are albums of phone screenshots, to show the carousel.
-      c.album = i % 18 === 2 ? [1, 2, 3, 4].map((k) => ({ path: videoFrame(i * 3 + k, 390, 844), width: 390, height: 844 })) : undefined;
-      if (c.album) c.media = { ...c.media, path: videoFrame(i * 3, 390, 844), width: 390, height: 844 };
-    }
-    if (c.kind === "video") c.media = { ...c.media, thumb: videoFrame(i, 1280, 720), width: 1280, height: 720, missing: false };
-    if (c.kind === "document") {
-      const txt = i % 2 === 1;
-      c.media = { ...c.media, path: txt ? DEMO_TXT : DEMO_PDF, fileName: txt ? D.textFile : "report.pdf", mime: txt ? "text/plain" : "application/pdf", missing: false };
-    }
-    // Some photos stay without a caption and AI name, to show the fallback titles.
-    const uncaptioned = c.kind === "photo" && i % 2 === 0;
-    if (uncaptioned) c.text = "";
-    if (!c.autoJunk && !c.sensitive && !uncaptioned)
-      c.ai = {
-        title: D.card(i, c.kind),
-        summary: D.summary,
-        // …and a topic written in lower case, so there's a topic to tidy too.
-        topic: i % 20 === 7 ? topics[i % 5].toLocaleLowerCase() : topics[i % 5],
-        // A few cards carry a near-copy of a tag ("reference" next to "references"), for "Tidy up" to find.
-        tags: i % 10 === 3 ? [D.tags[0], D.tags[2].slice(0, -1)] : D.tags.slice(0, (i % 3) + 1),
-        action: (["read_later", "idea", "reference", "todo"] as const)[i % 4],
-        priority: i % 6 === 0 ? 1 : 2,
-        model: "demo",
-        at: "",
-      };
-    // A saved Instagram reel and a YouTube video, to show the in-card player.
-    if (i === 2) {
-      c.kind = "link";
-      c.media = undefined;
-      c.album = undefined;
-      c.urls = ["https://www.instagram.com/reel/C9demoReel1/"];
-      c.text = c.urls[0];
-      c.link = { url: c.urls[0], title: D.reelTitle, description: D.reelDescription, siteName: "Instagram", image: videoFrame(17, 720, 1280), fetchedAt: "" };
-      c.ai = undefined; // not tagged yet: the heading comes from the caption
-    }
-    if (i === 13) {
-      c.kind = "link";
-      c.media = undefined;
-      c.album = undefined;
-      c.urls = ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"];
-      c.text = c.urls[0];
-      c.link = { url: c.urls[0], title: D.videoTitle, description: "Kipple Lab", siteName: "YouTube", fetchedAt: "" };
-    }
-    // Every site gives a preview picture here; the placeholder is for pages that don't.
-    if (c.kind === "link" && c.link && !c.link.image && !c.urls[0].includes("youtube.com")) c.link.image = ogImage(i, c.ai?.title ?? c.link.title ?? "", c.link.siteName ?? "");
-    // Spread over the last two months, so "Recent" has something but not everything.
-    c.date = new Date(Date.now() - 60 * 864e5 + i * 864e5 + (i % 5) * 3_600_000).toISOString();
-    // …except a few "read later" saved months ago, for "Still worth reading?" in "Three for today".
-    if (i < 12 && i % 4 === 0) c.date = new Date(Date.now() - (200 - i * 8) * 864e5).toISOString();
-    return c;
-  });
-  // A one-line note, like most real Saved Messages: the AI title and summary say more than the message.
-  const short = structuredClone(base.find((c) => c.kind === "text" && !c.urls.length) ?? base[0]);
-  Object.assign(short, { id: 61, text: D.short.text, urls: [], link: undefined, media: undefined, forwardedFrom: undefined, sensitive: false, autoJunk: false, date: new Date(Date.now() - 3_600_000).toISOString() });
-  short.ai = { title: D.short.title, summary: D.short.summary, topic: D.short.topic, tags: D.short.tags, action: "todo", priority: 2, model: "claude-haiku-5-5", at: "" };
-  cards.push(short);
-  // Four articles from one blog still without a topic, so "Three for today" has a site to sort.
-  for (const c of cards.filter((c) => c.kind === "link" && c.id > base.length + 1 && c.ai && !c.urls[0].includes("youtube")).slice(0, 4)) {
-    c.urls = [`https://${DEMO_BLOG}/post-${c.id}`];
-    c.link = { ...c.link!, url: c.urls[0], siteName: DEMO_BLOG };
-    c.ai = { ...c.ai!, topic: "" };
-  }
-  cards.reverse(); // the library is kept newest first
+  const now = Date.now();
+  const txt = `data:text/plain;charset=utf-8,${encodeURIComponent(D.textBody)}`;
+  const cards = D.cards.map((s, i) => cardOf(s, i, now, txt));
+  // Message ids grow with time, as in Telegram; the library is kept newest first.
+  cards.sort((a, b) => (a.date < b.date ? -1 : 1)).forEach((c, i) => (c.id = 1200 + i * 3));
+  cards.reverse();
   annotateContext(cards);
-  // The first topic comes already split into AI subgroups, to show how that looks.
-  const first = cards.filter((c) => c.ai?.topic === topics[0]).map((c) => c.id);
-  const half = Math.ceil(first.length / 2);
-  const subgroups = { [topics[0]]: { at: "", groups: D.groups.map((name, i) => ({ name, ids: first.slice(i * half, (i + 1) * half) })) } };
-  return { version: 1, chatName: D.chatName, sourceDir: "demo", importedAt: new Date().toISOString(), cards, subgroups };
+  return { version: 1, chatName: D.chatName, sourceDir: "demo", importedAt: new Date().toISOString(), cards };
 }
