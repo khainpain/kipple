@@ -1445,6 +1445,8 @@ code {
 .detail-scroll {
   flex: 1;
   overflow-y: auto;
+  /* A scrollbar appearing would narrow an Instagram player, which then re-measures and resizes. */
+  scrollbar-gutter: stable;
   padding: 16px 18px 24px;
   display: flex;
   flex-direction: column;

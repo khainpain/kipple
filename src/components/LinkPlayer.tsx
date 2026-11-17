@@ -105,7 +105,8 @@ export function croppedRatio(embed: Embed, pageHeight: number, width: number): n
   const media = pageHeight - (embed.cropTop ?? 0) - (embed.cropBottom ?? 0);
   const r = width / media;
   // Instagram's shapes run from 4:5 to 1.91:1; anything far outside is not a post (an error page).
-  return width > 0 && media > 0 && r >= 0.5 && r <= 2 ? r : undefined;
+  // Never taller than 4:5: the box's width is set for that shape, so taller would overflow its height cap.
+  return width > 0 && media > 0 && r >= 0.5 && r <= 2 ? Math.max(r, 0.8) : undefined;
 }
 
 /**

@@ -38,6 +38,9 @@ describe("croppedRatio", () => {
     expect(croppedRatio(ig, 220, 260)).toBeUndefined();
     expect(croppedRatio(ig, 533, 0)).toBeUndefined();
   });
+  it("never makes the box taller than 4:5, Instagram's tallest shape: a slightly off height would push the player past its height cap", () => {
+    expect(croppedRatio(ig, 560, 260)).toBe(0.8);
+  });
   it("keeps a wide 1.91:1 photo, but ignores shapes Instagram never uses (an error page's height)", () => {
     expect(croppedRatio(ig, 344, 260)).toBeCloseTo(1.91, 2);
     expect(croppedRatio(ig, 280, 260)).toBeUndefined();
