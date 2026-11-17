@@ -91,6 +91,7 @@ function fakeTg(opts: { floodOnce?: boolean; missing?: number[] } = {}) {
     savedPage: async () => ({ messages: [], nextOffset: null, total: 0 }),
     quoteSaved: async () => ({ id: 1, open: null, owner: null }),
     deleteSaved: async () => undefined,
+    findReplies: async () => ({ owner: null, messages: [] }),
     deleteCards: async () => [],
     pinSaved: async () => "ok",
     backupStep: async () => ({ done: true, saved: 0 }),

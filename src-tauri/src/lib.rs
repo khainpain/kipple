@@ -79,6 +79,7 @@ pub fn run() {
             telegram::tg_saved_page,
             telegram::tg_quote_saved,
             telegram::tg_delete_saved,
+            telegram::tg_find_replies,
             telegram::tg_backup_step,
             telegram::tg_backup_info,
             telegram::tg_tags_setup,

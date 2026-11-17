@@ -1,7 +1,7 @@
 import { T } from "../i18n";
 import { en } from "../i18n/en";
 import { ru } from "../i18n/ru";
-import type { SavedMessage } from "../platform/types";
+import type { SavedMessage, TelegramApi } from "../platform/types";
 
 /**
  * "Open in Telegram". Telegram can't link to a message inside Saved Messages (desktop apps only
@@ -66,6 +66,31 @@ export function scheduleLeftovers(list: PendingReply[], ids: number[], owner: nu
   const fresh = ids.filter((id) => !list.some((p) => p.id === id && p.owner === owner));
   if (!fresh.length || DELAY[cleanup] === null) return list;
   return fresh.reduce((l, id) => scheduleReply(l, id, owner, now, cleanup), list);
+}
+
+/**
+ * On start: looks for helper replies still in Saved Messages (the app was closed before their
+ * deletion, or an older version failed to delete them) and schedules them like new ones.
+ * Returns how many were added. Replies the user keeps ("never") aren't looked for at all.
+ */
+export async function findLeftovers(deps: {
+  tg: Pick<TelegramApi, "findReplies">;
+  update: (change: (list: PendingReply[]) => PendingReply[]) => Promise<unknown>;
+  cleanup: ReplyCleanup;
+  now: Date;
+}): Promise<number> {
+  if (DELAY[deps.cleanup] === null) return 0;
+  const { owner, messages } = await deps.tg.findReplies();
+  if (owner == null) return 0;
+  const ids = leftoverReplies(messages);
+  let added = 0;
+  if (ids.length)
+    await deps.update((list) => {
+      const next = scheduleLeftovers(list, ids, owner, deps.now, deps.cleanup);
+      added = next.length - list.length;
+      return next;
+    });
+  return added;
 }
 
 /** The pending list with this reply added, or unchanged when replies are kept. */

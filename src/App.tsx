@@ -9,7 +9,7 @@ import { cleanRules, effectiveTags, effectiveTopic, findTopic, getOwnTopics, mak
 import { renameInRules, ruleOffer, withoutRulesTo } from "./lib/topicRules";
 import { FEATURES } from "./lib/features";
 import { aiAllowed, appendEdits, DEFAULT_SETTINGS, loadBoardState, loadLibrary, loadPendingReplies, loadSettings, loadPinState, loadTagSyncState, saveBoardState, savePinState, saveLibrary, savePendingReplies, saveSettings, saveTagSyncState, wipeAll, type Settings } from "./lib/store";
-import { dueReplies, nextDue, replyText, scheduleLeftovers, scheduleReply, withoutReplies, type PendingReply } from "./lib/tgReplies";
+import { dueReplies, findLeftovers, nextDue, replyText, scheduleLeftovers, scheduleReply, withoutReplies, type PendingReply } from "./lib/tgReplies";
 import { BOARD_TITLE, sendToTelegram, TelegramAuthError, telegramErrorText, type SendOptions } from "./lib/telegram";
 import { NoPremiumError, syncTags, type TagMode } from "./lib/tgTags";
 import { applyToTelegram, type ApplyOptions, type ApplyProgress } from "./lib/tgApply";
@@ -142,6 +142,20 @@ export default function App() {
       window.clearTimeout(cleanupTimer.current);
     };
   }, [tgAccount, cleanReplies]);
+  // Once per start: replies an earlier run left in Saved Messages (closed too early, or an older
+  // version that failed to delete them) are found and deleted like new ones. Tried again on the
+  // next sign-in check if Telegram couldn't be reached.
+  const leftoversChecked = useRef(false);
+  useEffect(() => {
+    const tg = platform.telegram;
+    if (!tgAccount || !tg || demoRef.current || leftoversChecked.current) return;
+    leftoversChecked.current = true;
+    findLeftovers({ tg, update: updateReplies, cleanup: settingsRef.current.replyCleanup, now: new Date() })
+      .then((n) => (n ? cleanReplies() : undefined))
+      .catch(() => {
+        leftoversChecked.current = false;
+      });
+  }, [tgAccount, updateReplies, cleanReplies]);
 
   useEffect(() => {
     (async () => {

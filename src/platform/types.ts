@@ -136,6 +136,9 @@ export interface TelegramApi {
   /** Deletes these messages from Saved Messages, on all devices. Rejects with "OTHER_ACCOUNT"
    *  (and deletes nothing) when the signed-in account isn't `owner`. */
   deleteSaved(ids: number[], owner: number): Promise<void>;
+  /** Kipple's helper replies still in Saved Messages (up to 100, newest first) and the account's
+   *  user id (null when it couldn't be read). Only messages that pass the same check as deleteSaved. */
+  findReplies(): Promise<{ owner: number | null; messages: SavedMessage[] }>;
   /**
    * Deletes these messages of the user's cards from Saved Messages, on all devices (up to 100).
    * Each is checked first: still there, in the signed-in account's Saved Messages, with this

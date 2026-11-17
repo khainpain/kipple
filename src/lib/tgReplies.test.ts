@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dueReplies, isKippleReply, leftoverReplies, nextDue, replyText, scheduleLeftovers, scheduleReply, validReplies, withoutReplies } from "./tgReplies";
+import { dueReplies, findLeftovers, isKippleReply, leftoverReplies, nextDue, replyText, scheduleLeftovers, scheduleReply, validReplies, withoutReplies, type PendingReply } from "./tgReplies";
 import { messageToCard } from "./parser";
 
 const now = new Date("2026-11-07T20:00:00Z");
@@ -62,5 +62,34 @@ describe("helper replies", () => {
     expect(scheduleLeftovers(waiting, [1, 2], 7, now, "1m")).toEqual([...waiting, { id: 2, owner: 7, at: "2026-11-07T20:01:00.000Z" }]);
     expect(scheduleLeftovers(waiting, [2], 7, now, "never")).toBe(waiting);
     expect(scheduleLeftovers(waiting, [], 7, now, "1m")).toBe(waiting);
+  });
+
+  const msg = (id: number, text: string, over: object = {}) => ({ id, date: 0, text, entities: [], ...over });
+
+  it("finds replies left in Saved Messages on start and schedules them", async () => {
+    let list: PendingReply[] = [{ id: 1, owner: 7, at: "2026-11-07T19:59:00.000Z" }];
+    const update = async (change: (l: PendingReply[]) => PendingReply[]) => {
+      list = change(list);
+    };
+    const tg = { findReplies: async () => ({ owner: 7, messages: [msg(1, replyText()), msg(2, replyText()), msg(3, "↑ Kipple ideas"), msg(4, replyText(), { forwardedFrom: "Someone" })] }) };
+    expect(await findLeftovers({ tg, update, cleanup: "1m", now })).toBe(1);
+    expect(list).toEqual([{ id: 1, owner: 7, at: "2026-11-07T19:59:00.000Z" }, { id: 2, owner: 7, at: "2026-11-07T20:01:00.000Z" }]);
+  });
+
+  it("doesn't look in Telegram when replies are kept or the account is unknown", async () => {
+    let asked = 0;
+    const tg = {
+      findReplies: async () => {
+        asked++;
+        return { owner: null, messages: [msg(2, replyText())] };
+      },
+    };
+    const update = async () => {
+      throw new Error("must not change the list");
+    };
+    expect(await findLeftovers({ tg, update, cleanup: "never", now })).toBe(0);
+    expect(asked).toBe(0);
+    expect(await findLeftovers({ tg, update, cleanup: "1m", now })).toBe(0);
+    expect(asked).toBe(1);
   });
 });

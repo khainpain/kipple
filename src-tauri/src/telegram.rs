@@ -963,8 +963,7 @@ pub async fn tg_delete_saved(app: tauri::AppHandle, state: tauri::State<'_, TgSt
     // can never remove a message in someone else's chat (for both sides).
     let mine: Vec<tl::enums::Message> = messages
         .into_iter()
-        // Only Kipple's own helper replies (src/lib/tgReplies.ts REPLY_MARK): one edited into a note since is kept.
-        .filter(|m| matches!(m, tl::enums::Message::Message(m) if m.out && m.message.starts_with(REPLY_MARK) && matches!(&m.peer_id, tl::enums::Peer::User(p) if p.user_id == owner)))
+        .filter(|m| matches!(m, tl::enums::Message::Message(m) if is_helper_reply(m, owner)))
         .collect();
     if mine.is_empty() {
         return Ok(());
@@ -979,8 +978,64 @@ pub async fn tg_delete_saved(app: tauri::AppHandle, state: tauri::State<'_, TgSt
     Ok(())
 }
 
+#[derive(Serialize)]
+pub struct FoundReplies {
+    owner: Option<i64>,
+    messages: Vec<SavedMessage>,
+}
+
+/// Kipple's helper replies still in Saved Messages (up to 100, newest first), so ones an earlier
+/// run left behind get deleted too: found by text search, then only those is_helper_reply keeps.
+/// Nothing is changed here. `owner` is None when the account can't be read.
+#[tauri::command]
+pub async fn tg_find_replies(state: tauri::State<'_, TgState>) -> Result<FoundReplies, String> {
+    let mut c = conn(&state).await?;
+    let Some(owner) = owner_id(&mut c).await else {
+        return Ok(FoundReplies { owner: None, messages: vec![] });
+    };
+    let req = tl::functions::messages::Search {
+        peer: tl::enums::InputPeer::PeerSelf,
+        q: "Kipple".into(),
+        from_id: None,
+        saved_peer_id: None,
+        saved_reaction: None,
+        top_msg_id: None,
+        filter: tl::enums::MessagesFilter::InputMessagesFilterEmpty,
+        min_date: 0,
+        max_date: 0,
+        offset_id: 0,
+        add_offset: 0,
+        limit: 100,
+        max_id: 0,
+        min_id: 0,
+        hash: 0,
+    };
+    use tl::enums::messages::Messages as R;
+    let (messages, users, chats) = match c.client.invoke(&req).await.map_err(err)? {
+        R::Messages(m) => (m.messages, m.users, m.chats),
+        R::Slice(m) => (m.messages, m.users, m.chats),
+        R::ChannelMessages(m) => (m.messages, m.users, m.chats),
+        R::NotModified(_) => (vec![], vec![], vec![]),
+    };
+    let mine: Vec<tl::enums::Message> = messages.into_iter().filter(|m| matches!(m, tl::enums::Message::Message(m) if is_helper_reply(m, owner))).collect();
+    Ok(FoundReplies { owner: Some(owner), messages: to_saved(&mine, &users, &chats) })
+}
+
 /// The start of every "Open in Telegram" helper reply (src/lib/tgReplies.ts).
 const REPLY_MARK: &str = "\u{2191} Kipple";
+
+/// Only Kipple's own helper replies (src/lib/tgReplies.ts REPLY_MARK): in the owner's Saved
+/// Messages, written there (not forwarded or via a bot), still starting with the mark (one edited
+/// into a note since is kept). Not `out`: Telegram sends messages in your own chat as incoming,
+/// so checking it skipped every reply and none was ever deleted.
+fn is_helper_reply(m: &tl::types::Message, owner: i64) -> bool {
+    let is_owner = |p: &tl::enums::Peer| matches!(p, tl::enums::Peer::User(u) if u.user_id == owner);
+    m.message.starts_with(REPLY_MARK)
+        && is_owner(&m.peer_id)
+        && m.from_id.as_ref().is_none_or(is_owner)
+        && m.fwd_from.is_none()
+        && m.via_bot_id.is_none()
+}
 
 /// Telegram takes at most 100 message ids per messages.getMessages / messages.deleteMessages.
 const IDS_PER_CALL: usize = 100;
@@ -2215,5 +2270,96 @@ mod tests {
         assert!(text.ends_with("\n\n#design"));
         let (text, _, _) = with_hashtags("", &["#a".into(), "#b".into()]).unwrap();
         assert_eq!(text, "#a #b");
+    }
+
+    /// A synthetic message in the account's (id 7) Saved Messages, as Telegram sends it back:
+    /// messages in your own chat come without the `out` flag.
+    fn saved(id: i32, text: &str) -> tl::types::Message {
+        tl::types::Message {
+            out: false,
+            mentioned: false,
+            media_unread: false,
+            silent: false,
+            post: false,
+            from_scheduled: false,
+            legacy: false,
+            edit_hide: false,
+            pinned: false,
+            noforwards: false,
+            invert_media: false,
+            offline: false,
+            video_processing_pending: false,
+            paid_suggested_post_stars: false,
+            paid_suggested_post_ton: false,
+            id,
+            from_id: None,
+            from_boosts_applied: None,
+            from_rank: None,
+            peer_id: tl::types::PeerUser { user_id: 7 }.into(),
+            saved_peer_id: None,
+            fwd_from: None,
+            via_bot_id: None,
+            via_business_bot_id: None,
+            guestchat_via_from: None,
+            reply_to: None,
+            date: 1_700_000_000,
+            message: text.into(),
+            media: None,
+            reply_markup: None,
+            entities: None,
+            views: None,
+            forwards: None,
+            replies: None,
+            edit_date: None,
+            post_author: None,
+            grouped_id: None,
+            reactions: None,
+            restriction_reason: None,
+            ttl_period: None,
+            quick_reply_shortcut_id: None,
+            effect: None,
+            factcheck: None,
+            report_delivery_until_date: None,
+            paid_message_stars: None,
+            suggested_post: None,
+            schedule_repeat_period: None,
+            summary_from_language: None,
+            rich_message: None,
+        }
+    }
+
+    const REPLY: &str = "\u{2191} Kipple \u{1F5C2}\u{FE0F} \u{00B7} tap the quote to jump to the message";
+
+    #[test]
+    fn helper_reply_in_saved_messages_is_ours_although_telegram_says_incoming() {
+        assert!(is_helper_reply(&saved(5, REPLY), 7));
+        assert!(is_helper_reply(&tl::types::Message { out: true, from_id: Some(tl::types::PeerUser { user_id: 7 }.into()), ..saved(5, REPLY) }, 7));
+    }
+
+    #[test]
+    fn helper_reply_check_leaves_other_messages_alone() {
+        // Another account, another chat, the user's own note, a forward, a bot's message.
+        assert!(!is_helper_reply(&saved(5, REPLY), 8));
+        assert!(!is_helper_reply(&tl::types::Message { peer_id: tl::types::PeerUser { user_id: 9 }.into(), ..saved(5, REPLY) }, 7));
+        assert!(!is_helper_reply(&tl::types::Message { peer_id: tl::types::PeerChat { chat_id: 7 }.into(), ..saved(5, REPLY) }, 7));
+        assert!(!is_helper_reply(&saved(5, "my note about Kipple"), 7));
+        assert!(!is_helper_reply(&tl::types::Message { from_id: Some(tl::types::PeerUser { user_id: 9 }.into()), ..saved(5, REPLY) }, 7));
+        assert!(!is_helper_reply(&tl::types::Message { via_bot_id: Some(3), ..saved(5, REPLY) }, 7));
+        let fwd = tl::types::MessageFwdHeader {
+            imported: false,
+            saved_out: false,
+            from_id: None,
+            from_name: Some("Someone".into()),
+            date: 1_600_000_000,
+            channel_post: None,
+            post_author: None,
+            saved_from_peer: None,
+            saved_from_msg_id: None,
+            saved_from_id: None,
+            saved_from_name: None,
+            saved_date: None,
+            psa_type: None,
+        };
+        assert!(!is_helper_reply(&tl::types::Message { fwd_from: Some(fwd.into()), ..saved(5, REPLY) }, 7));
     }
 }
