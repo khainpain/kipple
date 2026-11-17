@@ -39,8 +39,8 @@ export function LinkPlayer({ embed, cover }: { embed: Embed; cover?: string }) {
     const on = (e: MessageEvent) => {
       if (e.source !== frame.current?.contentWindow) return;
       const h = measuredHeight(e.data);
-      const r = h && croppedRatio(embed, h, frame.current?.clientWidth ?? 0);
-      if (r) setRatio(r);
+      const width = frame.current?.clientWidth ?? 0;
+      if (h) setRatio((prev) => nextRatio(prev, embed, h, width));
     };
     window.addEventListener("message", on);
     return () => window.removeEventListener("message", on);
@@ -106,6 +106,15 @@ export function croppedRatio(embed: Embed, pageHeight: number, width: number): n
   const r = width / media;
   // Instagram's shapes run from 4:5 to 1.91:1; anything far outside is not a post (an error page).
   return width > 0 && media > 0 && r >= 0.5 && r <= 2 ? r : undefined;
+}
+
+/**
+ * The shape is taken once, from the first height reported. A post's shape doesn't change, while
+ * every resize of the box makes Instagram measure again; a height measured at the old width
+ * would give a wrong shape, resize the box again, and the player would jitter.
+ */
+export function nextRatio(prev: number | undefined, embed: Embed, pageHeight: number, width: number): number | undefined {
+  return prev ?? croppedRatio(embed, pageHeight, width);
 }
 
 /** VK's player is called differently in each language; the others are brand names. */
