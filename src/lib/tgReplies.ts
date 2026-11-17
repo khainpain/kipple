@@ -81,7 +81,6 @@ export async function findLeftovers(deps: {
 }): Promise<number> {
   if (DELAY[deps.cleanup] === null) return 0;
   const { owner, messages } = await deps.tg.findReplies();
-  if (owner == null) return 0;
   const ids = leftoverReplies(messages);
   let added = 0;
   if (ids.length)

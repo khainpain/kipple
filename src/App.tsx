@@ -120,7 +120,9 @@ export default function App() {
     let failed = false;
     for (const [owner, ids] of dueReplies(await loadPendingReplies(), new Date())) {
       try {
-        await tg.deleteSaved(ids, owner);
+        const kept = await tg.deleteSaved(ids, owner);
+        // Still there but no longer a helper reply (e.g. edited into a note): left alone, not retried.
+        if (kept.length) console.warn(`Open in Telegram: ${kept.length} message(s) left in Saved Messages, not Kipple's replies`);
         await updateReplies((l) => withoutReplies(l, owner, ids));
       } catch (e) {
         // Another account is signed in: its messages have other ids, so these are left alone and
@@ -143,18 +145,26 @@ export default function App() {
     };
   }, [tgAccount, cleanReplies]);
   // Once per start: replies an earlier run left in Saved Messages (closed too early, or an older
-  // version that failed to delete them) are found and deleted like new ones. Tried again on the
-  // next sign-in check if Telegram couldn't be reached.
+  // version that failed to delete them) are found and deleted like new ones. Offline, it tries
+  // again a minute later while signed in.
   const leftoversChecked = useRef(false);
+  const leftoversTimer = useRef<number | undefined>(undefined);
   useEffect(() => {
     const tg = platform.telegram;
     if (!tgAccount || !tg || demoRef.current || leftoversChecked.current) return;
-    leftoversChecked.current = true;
-    findLeftovers({ tg, update: updateReplies, cleanup: settingsRef.current.replyCleanup, now: new Date() })
-      .then((n) => (n ? cleanReplies() : undefined))
-      .catch(() => {
-        leftoversChecked.current = false;
-      });
+    const scan = () => {
+      if (!cleanupOn.current) return;
+      leftoversChecked.current = true;
+      findLeftovers({ tg, update: updateReplies, cleanup: settingsRef.current.replyCleanup, now: new Date() })
+        .then((n) => (n ? cleanReplies() : undefined))
+        .catch((e) => {
+          console.warn("Open in Telegram: looking for leftover replies failed", e);
+          leftoversChecked.current = false;
+          leftoversTimer.current = window.setTimeout(scan, 60_000);
+        });
+    };
+    scan();
+    return () => window.clearTimeout(leftoversTimer.current);
   }, [tgAccount, updateReplies, cleanReplies]);
 
   useEffect(() => {

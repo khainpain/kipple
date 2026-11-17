@@ -76,12 +76,12 @@ describe("helper replies", () => {
     expect(list).toEqual([{ id: 1, owner: 7, at: "2026-11-07T19:59:00.000Z" }, { id: 2, owner: 7, at: "2026-11-07T20:01:00.000Z" }]);
   });
 
-  it("doesn't look in Telegram when replies are kept or the account is unknown", async () => {
+  it("doesn't look in Telegram when replies are kept", async () => {
     let asked = 0;
     const tg = {
       findReplies: async () => {
         asked++;
-        return { owner: null, messages: [msg(2, replyText())] };
+        return { owner: 7, messages: [msg(2, replyText())] };
       },
     };
     const update = async () => {
@@ -89,7 +89,5 @@ describe("helper replies", () => {
     };
     expect(await findLeftovers({ tg, update, cleanup: "never", now })).toBe(0);
     expect(asked).toBe(0);
-    expect(await findLeftovers({ tg, update, cleanup: "1m", now })).toBe(0);
-    expect(asked).toBe(1);
   });
 });

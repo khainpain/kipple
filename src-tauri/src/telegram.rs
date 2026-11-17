@@ -939,10 +939,11 @@ fn saved_chat_link(username: Option<&str>, phone: Option<&str>) -> Option<String
 /// Deletes Kipple's own replies from Saved Messages (for everyone, i.e. on all devices).
 /// Ids that are already gone are fine. `owner` is the account that posted them: message ids are
 /// per account, so with another account signed in nothing is deleted ("OTHER_ACCOUNT").
+/// Returns the ids that are still there but aren't helper replies: those stay (see split_replies).
 #[tauri::command]
-pub async fn tg_delete_saved(app: tauri::AppHandle, state: tauri::State<'_, TgState>, ids: Vec<i32>, owner: i64) -> Result<(), String> {
+pub async fn tg_delete_saved(app: tauri::AppHandle, state: tauri::State<'_, TgState>, ids: Vec<i32>, owner: i64) -> Result<Vec<i32>, String> {
     if ids.is_empty() {
-        return Ok(());
+        return Ok(vec![]);
     }
     let c = conn(&state).await?;
     match self_user(&c).await {
@@ -961,12 +962,9 @@ pub async fn tg_delete_saved(app: tauri::AppHandle, state: tauri::State<'_, TgSt
     // Message ids in private chats are shared by all of the account's chats, and DeleteMessages
     // takes no chat. Only delete what really is our own message in Saved Messages, so a stale id
     // can never remove a message in someone else's chat (for both sides).
-    let mine: Vec<tl::enums::Message> = messages
-        .into_iter()
-        .filter(|m| matches!(m, tl::enums::Message::Message(m) if is_helper_reply(m, owner)))
-        .collect();
+    let (mine, kept) = split_replies(messages, owner);
     if mine.is_empty() {
-        return Ok(());
+        return Ok(kept);
     }
     let found = to_saved(&mine, &users, &chats);
     append_backup(&backup_dir(&app)?, owner, &found, "before_delete")?;
@@ -975,50 +973,62 @@ pub async fn tg_delete_saved(app: tauri::AppHandle, state: tauri::State<'_, TgSt
         let req = tl::functions::messages::DeleteMessages { revoke: true, id: chunk.to_vec() };
         c.client.invoke(&req).await.map_err(err)?;
     }
-    Ok(())
+    Ok(kept)
 }
 
 #[derive(Serialize)]
 pub struct FoundReplies {
-    owner: Option<i64>,
+    owner: i64,
     messages: Vec<SavedMessage>,
 }
 
-/// Kipple's helper replies still in Saved Messages (up to 100, newest first), so ones an earlier
-/// run left behind get deleted too: found by text search, then only those is_helper_reply keeps.
-/// Nothing is changed here. `owner` is None when the account can't be read.
+/// Search pages tg_find_replies reads at most (100 hits each; notes mentioning Kipple count too).
+const FIND_PAGES: usize = 5;
+
+/// Kipple's helper replies still in Saved Messages, newest first, so ones an earlier run left
+/// behind get deleted too: found by text search, then only those is_helper_reply keeps. Nothing
+/// is changed here. Telegram's errors come through (offline, no account), so the app retries.
 #[tauri::command]
 pub async fn tg_find_replies(state: tauri::State<'_, TgState>) -> Result<FoundReplies, String> {
-    let mut c = conn(&state).await?;
-    let Some(owner) = owner_id(&mut c).await else {
-        return Ok(FoundReplies { owner: None, messages: vec![] });
-    };
-    let req = tl::functions::messages::Search {
-        peer: tl::enums::InputPeer::PeerSelf,
-        q: "Kipple".into(),
-        from_id: None,
-        saved_peer_id: None,
-        saved_reaction: None,
-        top_msg_id: None,
-        filter: tl::enums::MessagesFilter::InputMessagesFilterEmpty,
-        min_date: 0,
-        max_date: 0,
-        offset_id: 0,
-        add_offset: 0,
-        limit: 100,
-        max_id: 0,
-        min_id: 0,
-        hash: 0,
-    };
-    use tl::enums::messages::Messages as R;
-    let (messages, users, chats) = match c.client.invoke(&req).await.map_err(err)? {
-        R::Messages(m) => (m.messages, m.users, m.chats),
-        R::Slice(m) => (m.messages, m.users, m.chats),
-        R::ChannelMessages(m) => (m.messages, m.users, m.chats),
-        R::NotModified(_) => (vec![], vec![], vec![]),
-    };
-    let mine: Vec<tl::enums::Message> = messages.into_iter().filter(|m| matches!(m, tl::enums::Message::Message(m) if is_helper_reply(m, owner))).collect();
-    Ok(FoundReplies { owner: Some(owner), messages: to_saved(&mine, &users, &chats) })
+    let c = conn(&state).await?;
+    let owner = signed_in_user(&c).await?.id;
+    let mut found = vec![];
+    let mut offset_id = 0;
+    for _ in 0..FIND_PAGES {
+        let req = tl::functions::messages::Search {
+            peer: tl::enums::InputPeer::PeerSelf,
+            q: "Kipple".into(),
+            from_id: None,
+            saved_peer_id: None,
+            saved_reaction: None,
+            top_msg_id: None,
+            filter: tl::enums::MessagesFilter::InputMessagesFilterEmpty,
+            min_date: 0,
+            max_date: 0,
+            offset_id,
+            add_offset: 0,
+            limit: IDS_PER_CALL as i32,
+            max_id: 0,
+            min_id: 0,
+            hash: 0,
+        };
+        use tl::enums::messages::Messages as R;
+        let (messages, users, chats) = match c.client.invoke(&req).await.map_err(err)? {
+            R::Messages(m) => (m.messages, m.users, m.chats),
+            R::Slice(m) => (m.messages, m.users, m.chats),
+            R::ChannelMessages(m) => (m.messages, m.users, m.chats),
+            R::NotModified(_) => (vec![], vec![], vec![]),
+        };
+        let full = messages.len() >= IDS_PER_CALL;
+        let Some(oldest) = messages.iter().map(|m| m.id()).min() else { break };
+        offset_id = oldest;
+        let (mine, _) = split_replies(messages, owner);
+        found.extend(to_saved(&mine, &users, &chats));
+        if !full {
+            break;
+        }
+    }
+    Ok(FoundReplies { owner, messages: found })
 }
 
 /// The start of every "Open in Telegram" helper reply (src/lib/tgReplies.ts).
@@ -1035,6 +1045,26 @@ fn is_helper_reply(m: &tl::types::Message, owner: i64) -> bool {
         && m.from_id.as_ref().is_none_or(is_owner)
         && m.fwd_from.is_none()
         && m.via_bot_id.is_none()
+        && m.media.as_ref().is_none_or(|x| matches!(x, tl::enums::MessageMedia::Empty))
+}
+
+/// Helper replies among these messages, and the ids of the others that are still there (not a
+/// helper reply any more, or never were): those are left alone, but reported, so a check that
+/// stops matching can't again look like a successful deletion.
+fn split_replies(messages: Vec<tl::enums::Message>, owner: i64) -> (Vec<tl::enums::Message>, Vec<i32>) {
+    let mut kept = vec![];
+    let mine = messages
+        .into_iter()
+        .filter(|m| match m {
+            tl::enums::Message::Message(x) if is_helper_reply(x, owner) => true,
+            tl::enums::Message::Empty(_) => false,
+            other => {
+                kept.push(other.id());
+                false
+            }
+        })
+        .collect();
+    (mine, kept)
 }
 
 /// Telegram takes at most 100 message ids per messages.getMessages / messages.deleteMessages.
@@ -2345,6 +2375,8 @@ mod tests {
         assert!(!is_helper_reply(&saved(5, "my note about Kipple"), 7));
         assert!(!is_helper_reply(&tl::types::Message { from_id: Some(tl::types::PeerUser { user_id: 9 }.into()), ..saved(5, REPLY) }, 7));
         assert!(!is_helper_reply(&tl::types::Message { via_bot_id: Some(3), ..saved(5, REPLY) }, 7));
+        let geo = tl::types::MessageMediaGeo { geo: tl::types::GeoPointEmpty {}.into() };
+        assert!(!is_helper_reply(&tl::types::Message { media: Some(geo.into()), ..saved(5, REPLY) }, 7));
         let fwd = tl::types::MessageFwdHeader {
             imported: false,
             saved_out: false,
@@ -2361,5 +2393,18 @@ mod tests {
             psa_type: None,
         };
         assert!(!is_helper_reply(&tl::types::Message { fwd_from: Some(fwd.into()), ..saved(5, REPLY) }, 7));
+    }
+
+    #[test]
+    fn messages_that_are_not_helper_replies_are_reported_not_skipped_silently() {
+        let messages: Vec<tl::enums::Message> = vec![
+            saved(1, REPLY).into(),
+            saved(2, "a note").into(),
+            tl::types::MessageEmpty { id: 3, peer_id: None }.into(),
+        ];
+        let (mine, kept) = split_replies(messages, 7);
+        assert_eq!(mine.iter().map(|m| m.id()).collect::<Vec<_>>(), vec![1]);
+        // Gone (3) is fine; there but not a helper reply (2) is reported.
+        assert_eq!(kept, vec![2]);
     }
 }
