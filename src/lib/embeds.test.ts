@@ -42,11 +42,10 @@ describe("embedOf", () => {
     expect(tiktokId("https://www.tiktok.com/@someone/video/7234567890123456789")).toBe("7234567890123456789");
     expect(tiktokId("https://vm.tiktok.com/ZMabc/")).toBeUndefined();
   });
-  it("shows only the video of an Instagram reel: the box is its 4:5 media area, the header is cut off", () => {
-    const reel = embedOf("https://www.instagram.com/reel/DAbc-12/")!;
-    expect(reel).toMatchObject({ ratio: 4 / 5, cropTop: 54 });
-    expect(reel.measures).toBeFalsy();
-    expect(embedOf("https://www.instagram.com/p/C8vE3mJsQ5_/")?.cropTop).toBeUndefined();
+  it("shows only the media of an Instagram reel or post: the header above and the likes below are cut off, the box takes the media's own shape", () => {
+    for (const url of ["https://www.instagram.com/reel/DAbc-12/", "https://www.instagram.com/p/C8vE3mJsQ5_/"]) {
+      expect(embedOf(url)).toMatchObject({ ratio: 4 / 5, cropTop: 54, cropBottom: 154, measures: true });
+    }
   });
   it("recognises TikTok's short share links", () => {
     expect(tiktokShort("https://vm.tiktok.com/ZMabc/")).toBe(true);

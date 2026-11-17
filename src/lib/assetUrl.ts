@@ -51,6 +51,11 @@ export function setRemoteAssets(on: boolean): void {
   remoteAssets = on;
 }
 
+/** The "Link previews" setting as last applied: whether cards may load anything from the web. */
+export function remoteAssetsOn(): boolean {
+  return remoteAssets;
+}
+
 /** `url` if the app may show it now: always data:/blob:, web addresses only while previews are on. */
 export function shownAssetUrl(url: string | undefined): string | undefined {
   const safe = publicAssetUrl(url);

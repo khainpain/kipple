@@ -1445,6 +1445,8 @@ code {
 .detail-scroll {
   flex: 1;
   overflow-y: auto;
+  /* A scrollbar appearing would narrow an Instagram player, which then re-measures and resizes. */
+  scrollbar-gutter: stable;
   padding: 16px 18px 24px;
   display: flex;
   flex-direction: column;
@@ -1744,10 +1746,17 @@ code {
 .link-player.cropped:not(.facade) {
   background: #000;
 }
-/* The crop needs the box at exactly 4:5 even when the panel is narrow, so it is sized from its width. */
-.link-player.vertical.cropped {
+/*
+ * The crop needs the box at exactly the media's shape, so its height comes from its width. The width
+ * never depends on that shape: Instagram measures its page again whenever the frame's width changes,
+ * and a width that followed the shape would keep resizing the player (it jittered).
+ */
+.link-player.cropped {
+  --player-h: min(62vh, 560px);
   width: min(100%, calc(var(--player-h) * 0.8));
   height: auto;
+  max-height: none;
+  align-self: center;
 }
 .link-player.cropped iframe {
   position: absolute;
@@ -1755,22 +1764,11 @@ code {
   top: calc(-1 * var(--crop-top));
   height: calc(100% + var(--crop-top) + 200px);
 }
-.link-player.provider-instagram:not(.facade):not(.cropped) {
-  max-height: none;
-  width: min(100%, 420px);
-  height: auto;
-  min-height: 480px;
-  align-self: center;
-  border: 1px solid var(--line);
-}
 .link-player iframe {
   display: block;
   width: 100%;
   height: 100%;
   border: 0;
-}
-.link-player.provider-instagram:not(.facade):not(.cropped) iframe {
-  min-height: inherit;
 }
 .link-player.facade {
   display: block;
@@ -1996,7 +1994,8 @@ code {
     align-items: flex-start;
   }
   /* Keep the heading of an upright video in view next to the properties. */
-  .link-player.vertical {
+  .link-player.vertical,
+  .link-player.cropped {
     --player-h: min(52vh, 460px);
   }
 }
