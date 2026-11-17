@@ -38,3 +38,22 @@ export function publicAssetUrl(url: string | undefined): string | undefined {
     return undefined;
   }
 }
+
+/**
+ * Whether pictures may be loaded from the web while the app is drawing cards: the "Link previews"
+ * setting. With it off, a card asks no other site for anything, not even a YouTube cover or a page
+ * picture fetched while the setting was still on. Pictures kept inside the library stay. Off until
+ * the settings are read, so nothing slips out on the first render.
+ */
+let remoteAssets = false;
+
+export function setRemoteAssets(on: boolean): void {
+  remoteAssets = on;
+}
+
+/** `url` if the app may show it now: always data:/blob:, web addresses only while previews are on. */
+export function shownAssetUrl(url: string | undefined): string | undefined {
+  const safe = publicAssetUrl(url);
+  if (!safe || remoteAssets || /^(data:image\/|blob:)/i.test(safe)) return safe;
+  return undefined;
+}

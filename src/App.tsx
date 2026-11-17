@@ -30,6 +30,7 @@ import { backupSaved, emptyTelegramLibrary, syncSaved } from "./lib/tgImport";
 import { T, lang, resolveLang, setLang } from "./i18n";
 import type { AiLang } from "./lib/ai";
 import { Toast, type ToastMsg } from "./components/Motion";
+import { setRemoteAssets } from "./lib/assetUrl";
 import { initTelemetry, markImported, maybeSendPing, setTelemetryEnabled, setTelemetrySuspended, telemetrySupported, track } from "./lib/telemetry";
 
 const isWeb = platform.kind === "web";
@@ -151,6 +152,7 @@ export default function App() {
         const q = new URLSearchParams(location.search);
         const qLang = q.get("lang");
         setLang(resolveLang(s.language === "ru" || s.language === "en" ? s.language : qLang === "ru" || qLang === "en" ? qLang : s.language));
+        setRemoteAssets(s.fetchLinks && platform.canFetchLinks);
         setLib(l);
         setSettings(s);
         setHasKey(!!k);
@@ -706,6 +708,7 @@ export default function App() {
     setTelemetryEnabled(s.telemetry);
     await saveSettings(s);
     setLang(resolveLang(s.language));
+    setRemoteAssets(s.fetchLinks && platform.canFetchLinks); // with previews off, cards ask no other site for pictures
     settingsRef.current = s;
     setSettings(s);
   }

@@ -5,6 +5,7 @@ import type { Card, Library } from "../lib/types";
 import { CardView } from "./CardView";
 import { T } from "../i18n";
 import { instantImage } from "../lib/embeds";
+import { shownAssetUrl } from "../lib/assetUrl";
 import type { CardLook, ViewKey } from "./nav";
 
 const WIDE_GAP = 16;
@@ -21,7 +22,7 @@ function estimate(c: Card, colW: number, view: ViewKey): number {
   if ((c.kind === "photo" || c.kind === "video") && m?.width && m?.height && (m.path || m.thumb)) {
     return Math.min(colW * (m.height / m.width), colW * 1.6) + 80;
   }
-  if (c.kind === "link") return (c.preview?.path || c.link?.image || instantImage(c.urls[0]) ? colW * 0.52 : 0) + 130;
+  if (c.kind === "link") return (c.preview?.path || shownAssetUrl(c.link?.image) || shownAssetUrl(instantImage(c.urls[0])) ? colW * 0.52 : 0) + 130;
   return 100 + Math.min(c.text.length, 320) * 0.45;
 }
 
