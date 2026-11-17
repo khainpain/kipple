@@ -19,10 +19,12 @@ npx tsc --noEmit      # types
 npm run build         # desktop UI build
 npm run build:web     # browser build (Vercel)
 npm run tauri dev     # run the app (Windows)
+npx playwright test --project=web          # smoke tests (e2e/) on the browser build with the sample library
+scripts/test-build.ps1 -Build 307          # Windows: install a test build, run the same smoke tests on it, keep screenshots
 cd src-tauri && cargo check
 ```
 
-CI (`.github/workflows/build.yml`) runs tests and both builds on every PR. Desktop releases are **manual**: Actions → release → Run workflow. Vercel deploys the web build automatically.
+CI (`.github/workflows/build.yml`) runs tests, both builds and the web smoke tests on every PR; a manual test build also runs the smoke tests on the installed app. The smoke tests reach the desktop app through WebView2's DevTools port and must stay read-only: they may run against the owner's real library. Desktop releases are **manual**: Actions → release → Run workflow. Vercel deploys the web build automatically.
 
 ### Releasing a version
 

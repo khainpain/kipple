@@ -27,6 +27,17 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npm run build:web
+      # Smoke tests of the main flows in the browser build with the sample library (e2e/, playwright.config.ts).
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --project=web
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: smoke-web-report
+          path: |
+            e2e-report
+            e2e-results
+          retention-days: 7
 
   # The Windows installer is slow, so it is built only on a manual run (Actions -> build -> Run workflow).
   windows:
@@ -78,3 +89,15 @@ jobs:
             src-tauri/target/release/bundle/msi/*.msi
             Install-Kipple-*.exe
           if-no-files-found: error
+      # The same smoke tests against the real app, after the archive is uploaded so a failure never costs the
+      # test build: installs it, starts it with WebView2's DevTools port and opens the sample library
+      # (a fresh runner has no library of its own).
+      - name: Smoke test the installed app
+        shell: pwsh
+        run: scripts/test-build.ps1 -Installer (Get-Item src-tauri/target/release/bundle/nsis/*-setup.exe).FullName -Out e2e-desktop
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: smoke-desktop-${{ github.run_number }}
+          path: e2e-desktop
+          retention-days: 14

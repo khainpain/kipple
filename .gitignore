@@ -27,3 +27,8 @@ dist-ssr
 src-tauri/target
 src-tauri/gen/schemas
 __pycache__
+
+# Smoke tests (Playwright)
+e2e-results
+e2e-report
+e2e-desktop
