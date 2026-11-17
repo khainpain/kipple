@@ -107,21 +107,10 @@ if (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyCon
 }
 
 $code = 1
-$policySet = $false
 $cdp = "http://127.0.0.1:$Port"
 try {
   # WebView2 reads extra browser flags from this variable. It goes to Kipple only, not to this shell,
   # and the port listens on 127.0.0.1 for as long as this copy of Kipple runs.
-  # An elevated process (a CI runner) gets no flags from that variable, so there the same flag goes through
-  # WebView2's policy key for kipple.exe, removed again at the end.
-  $elevated = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-  if ($elevated) {
-    $policy = "HKCU:\Software\Policies\Microsoft\Edge\WebView2\AdditionalBrowserArguments"
-    if (Get-ItemProperty $policy -Name "kipple.exe" -ErrorAction SilentlyContinue) { throw "A WebView2 policy for kipple.exe already exists in $policy; not touching it." }
-    New-Item -Path $policy -Force | Out-Null
-    New-ItemProperty -Path $policy -Name "kipple.exe" -Value "--remote-debugging-port=$Port" -Force | Out-Null
-    $policySet = $true
-  }
   $psi = New-Object Diagnostics.ProcessStartInfo $exe
   $psi.UseShellExecute = $false
   $psi.Environment["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = "--remote-debugging-port=$Port"
@@ -153,7 +142,6 @@ try {
     Pop-Location
   }
 } finally {
-  if ($policySet) { Remove-ItemProperty -Path $policy -Name "kipple.exe" -ErrorAction SilentlyContinue }
   if ($KeepOpen) {
     Write-Warning "Kipple stays open with the DevTools port ${Port}: any program on this computer can act in the app, including on your Telegram account, until you close Kipple."
   } else {

@@ -24,7 +24,7 @@ scripts/test-build.ps1 -Build 307          # Windows: install a test build, run 
 cd src-tauri && cargo check
 ```
 
-CI (`.github/workflows/build.yml`) runs tests, both builds and the web smoke tests on every PR; a manual test build also runs the smoke tests on the installed app. The smoke tests reach the desktop app through WebView2's DevTools port and must stay read-only: they may run against the owner's real library. Desktop releases are **manual**: Actions → release → Run workflow. Vercel deploys the web build automatically.
+CI (`.github/workflows/build.yml`) runs tests, both builds and the web smoke tests on every PR. The desktop smoke tests run on Windows with `scripts/test-build.ps1` (not in CI yet: on the runner WebView2 starts without the DevTools port). The smoke tests reach the desktop app through WebView2's DevTools port and must stay read-only: they may run against the owner's real library. Desktop releases are **manual**: Actions → release → Run workflow. Vercel deploys the web build automatically.
 
 ### Releasing a version
 
