@@ -1,0 +1,7 @@
+# Paths left out of the public source snapshot (scripts/publish-source.sh). One git pathspec per line.
+# The working setup stays here: agent config, owner notes, CI and release workflows, local test tooling.
+.claude
+CLAUDE.md
+.vscode
+.github/workflows
+scripts/test-build.ps1

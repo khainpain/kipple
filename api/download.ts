@@ -11,7 +11,9 @@ import { clientIp, redis } from "./_lib/quota.js";
 import { withinLimit } from "./_lib/limit.js";
 import { downloadCommands, downloadSource } from "./_lib/stats.js";
 
-const REPO = "khainpain/kipple";
+// The repository whose releases hold the installers. KIPPLE_RELEASE_REPO (Vercel env) moves it, e.g. to
+// getkipple/kipple, without a code change; set it in the same step as release.yml's RELEASE_REPO.
+const REPO = /^[\w.-]+\/[\w.-]+$/.test(process.env.KIPPLE_RELEASE_REPO ?? "") ? process.env.KIPPLE_RELEASE_REPO! : "khainpain/kipple";
 const RELEASES = `https://github.com/${REPO}/releases/latest`;
 
 type Asset = { name: string; browser_download_url: string };

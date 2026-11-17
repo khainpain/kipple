@@ -8,6 +8,12 @@ run-name: >-
 # Runs only on demand: Actions -> release -> Run workflow.
 # Publishes a signed Windows release (v0.1.<run number> unless a version is given).
 # Installed apps find it through latest.json and offer to update themselves.
+#
+# Where the release goes: this repository, unless the Actions variable RELEASE_REPO names another one
+# (getkipple/kipple, the public home). Then the source of this commit, minus the .publicignore paths, is
+# first published there as one commit "Kipple vX.Y.Z" tagged vX.Y.Z (scripts/publish-source.sh), and the
+# release is made from that tag. Needs the secret PUBLIC_REPO_TOKEN: a fine-grained token for that
+# repository with Contents read and write.
 on:
   workflow_dispatch:
     inputs:
@@ -52,6 +58,30 @@ jobs:
           fi
           node -e "const f='src-tauri/tauri.conf.json',fs=require('fs'),c=JSON.parse(fs.readFileSync(f));c.version='$VERSION';fs.writeFileSync(f,JSON.stringify(c,null,2))"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+      - name: Publish the source
+        id: source
+        shell: bash
+        env:
+          RELEASE_REPO: ${{ vars.RELEASE_REPO }}
+          PUBLIC_REPO_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+        run: |
+          repo="${RELEASE_REPO:-$GITHUB_REPOSITORY}"
+          echo "owner=${repo%%/*}" >> "$GITHUB_OUTPUT"
+          echo "name=${repo#*/}" >> "$GITHUB_OUTPUT"
+          if [ "$repo" = "$GITHUB_REPOSITORY" ]; then
+            echo "repo=$GITHUB_REPOSITORY" >> "$GITHUB_OUTPUT"
+            echo "sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+            echo "token=github" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ -z "$PUBLIC_REPO_TOKEN" ]; then
+            echo "::error::RELEASE_REPO is $RELEASE_REPO but the PUBLIC_REPO_TOKEN secret is missing"; exit 1
+          fi
+          sha="$(scripts/publish-source.sh "$RELEASE_REPO" "$VERSION")"
+          echo "repo=$RELEASE_REPO" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "token=public" >> "$GITHUB_OUTPUT"
+          echo "::notice title=Source::Published to https://github.com/$RELEASE_REPO/commit/$sha"
       # English notes: "What's new" from scripts/changelog.mjs (this version's entry, else "next").
       - name: Release notes
         id: notes
@@ -59,18 +89,21 @@ jobs:
         run: |
           {
             echo "body<<RELEASE_NOTES_EOF"
-            node scripts/release-notes.mjs body "$VERSION" "${{ github.ref_name }}" "${{ github.sha }}"
+            node scripts/release-notes.mjs body "$VERSION" "${{ steps.source.outputs.token == 'public' && 'main' || github.ref_name }}" "${{ steps.source.outputs.sha }}"
             echo "RELEASE_NOTES_EOF"
           } >> "$GITHUB_OUTPUT"
       - uses: tauri-apps/tauri-action@v0
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.source.outputs.token == 'public' && secrets.PUBLIC_REPO_TOKEN || secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           # Optional: Telegram app credentials from my.telegram.org, so users don't enter their own.
           TG_API_ID: ${{ secrets.TG_API_ID }}
           TG_API_HASH: ${{ secrets.TG_API_HASH }}
         with:
+          owner: ${{ steps.source.outputs.owner }}
+          repo: ${{ steps.source.outputs.name }}
+          releaseCommitish: ${{ steps.source.outputs.token == 'public' && steps.source.outputs.sha || '' }}
           tagName: v__VERSION__
           releaseName: Kipple v__VERSION__
           releaseBody: ${{ steps.notes.outputs.body }}
@@ -84,10 +117,11 @@ jobs:
       - name: Build and attach Kipple Setup
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.source.outputs.token == 'public' && secrets.PUBLIC_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+          RELEASE_REPO: ${{ steps.source.outputs.owner }}/${{ steps.source.outputs.name }}
         run: |
           setup-app/build.sh
-          gh release upload "v$VERSION" "Install-Kipple-$VERSION.exe" --clobber
+          gh release upload "v$VERSION" "Install-Kipple-$VERSION.exe" --clobber --repo "$RELEASE_REPO"
       # The landing page (its own Vercel project, khainpain/kipple-site) reads the version, installer
       # size and "What's new" when it is built, so rebuild it now that the release exists. Needs that
       # project's deploy hook URL in the VERCEL_DEPLOY_HOOK secret (Vercel → Settings → Git → Deploy
