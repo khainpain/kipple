@@ -66,9 +66,19 @@ export function LinkPlayer({ embed, cover }: { embed: Embed; cover?: string }) {
         allowFullScreen
         referrerPolicy="strict-origin-when-cross-origin"
         sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
+        {...frameAttrs(embed)}
       />
     </div>
   );
+}
+
+/**
+ * Extra iframe attributes. A cropped player must not scroll: Instagram's embed page always
+ * asks for a vertical scrollbar, and on Windows that bar narrows the page, so the video comes
+ * out shorter than the box and the profile strip under it shows (and pops up on hover).
+ */
+export function frameAttrs(embed: Embed): { scrolling?: "no" } {
+  return embed.cropTop ? { scrolling: "no" } : {};
 }
 
 /** VK's player is called differently in each language; the others are brand names. */
