@@ -16,7 +16,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # pinned: Playwright 1.57 has no browsers for ubuntu-latest (26.04) yet
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
