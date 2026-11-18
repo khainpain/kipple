@@ -22,11 +22,7 @@ export const changelog = [
       "Sort the open card from the keyboard: I for important, Delete for junk, Ctrl+Z to undo",
       "Voice messages and audio get their own filter",
       "Videos play right in the card for more sites: TikTok, Rutube, VK Video and Dailymotion; Instagram Reels show just the video",
-      "Loading from Telegram starts only when you press the button",
-      "With link previews off, cards no longer load video covers or site icons from the web",
       "A new installer window, with Kipple tidying up your kipple",
-      "A simpler app for now: AI, tags, extra statuses and board views are switched off, and Markdown/CSV export and the old Send to Telegram group are gone",
-      "Many fixes: your edits no longer get lost, and Kipple never deletes a message it can't read",
     ],
     ru: [
       "«Уборка»: после первой загрузки Kipple раскладывает архив на кучи (очевидный мусор, дубли, по каналам, по сайтам и другие), на каждую одно решение",
@@ -43,11 +39,7 @@ export const changelog = [
       "Открытую карточку можно разобрать с клавиатуры: I — в важное, Delete — в мусор, Ctrl+Z — отменить",
       "Голосовые и аудио получили свой фильтр",
       "Видео прямо в карточке ещё с нескольких сайтов: TikTok, Rutube, VK Видео и Dailymotion; у Reels из Instagram видно только само видео",
-      "Загрузка из Telegram начинается только по твоей кнопке",
-      "Когда превью ссылок выключены, карточки не грузят из интернета обложки видео и значки сайтов",
       "Новое окно установки: Киппл наводит порядок в хламе",
-      "Пока попроще: ИИ, теги, лишние статусы и виды доски выключены, а экспорта в Markdown/CSV и старой отправки в группу Telegram больше нет",
-      "Много исправлений: правки больше не теряются, а сообщения, которые Kipple не смог прочитать, он никогда не удаляет",
     ],
   },
   {
