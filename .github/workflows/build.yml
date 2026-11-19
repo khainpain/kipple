@@ -57,6 +57,13 @@ jobs:
             src-tauri
             setup-app/src-tauri
       - run: npm ci
+      # Shown in Settings instead of 0.1.0: the newest released version from the changelog plus this
+      # build's number, e.g. 0.1.18-test.331. Only the label: the installer and the updater keep 0.1.0.
+      - name: Name the version
+        shell: bash
+        run: |
+          ver=$(node --input-type=module -e "import { changelog } from './scripts/changelog.mjs'; console.log(changelog.find((e) => e.ver)?.ver ?? '0.1.0')")
+          echo "KIPPLE_TEST_VERSION=${ver}-test.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
       # Signs the update bundle when the signing key secret exists; otherwise builds without update artifacts.
       - name: Build installer
         shell: bash
