@@ -1,9 +1,10 @@
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { QrResult, TelegramApi } from "../platform/types";
 import { telegramErrorText } from "../lib/telegram";
 import { track } from "../lib/telemetry";
 import { qrPath } from "../lib/qr";
 import { cleanCode, codeCells } from "../lib/loginCode";
+import { currentLayout, layoutFromKey, type Layout } from "../lib/keyboardHints";
 import { T } from "../i18n";
 import { Icon } from "./Icon";
 import { Done, RiseList, Spark, StepIn } from "./Motion";
@@ -399,7 +400,7 @@ function SignIn(props: { counted: Counted; tg: TelegramApi; showDemo?: boolean; 
             <label htmlFor="w-pass" className="w-sr">
               {L.passwordLabel}
             </label>
-            <input id="w-pass" type="password" autoComplete="current-password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
+            <PasswordInput value={password} onChange={setPassword} />
             {errorLine}
             <button className="w-primary" disabled={busy || !password}>
               {TL.signIn}
@@ -438,6 +439,69 @@ function SignIn(props: { counted: Counted; tg: TelegramApi; showDemo?: boolean; 
         )}
       </StepIn>
     </section>
+  );
+}
+
+/**
+ * The cloud password field: a show/hide button, and two quiet hints under it (the keyboard layout
+ * that types now, a warning while Caps Lock is on), since the field hides what is typed.
+ */
+function PasswordInput(props: { value: string; onChange: (password: string) => void }) {
+  const [caps, setCaps] = useState(false);
+  // Shown on request, also after "wrong password": the typed text stays, so it can be checked.
+  const [show, setShow] = useState(false);
+  const [layout, setLayout] = useState<Layout | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void currentLayout().then((l) => alive && l && setLayout((cur) => cur ?? l));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    setCaps(e.getModifierState("CapsLock"));
+    const l = layoutFromKey(e.key);
+    if (l) setLayout(l);
+  };
+  const W = T.welcome;
+  return (
+    <>
+      <div className="w-pass">
+        <input
+          id="w-pass"
+          type={show ? "text" : "password"}
+          autoComplete="current-password"
+          autoFocus
+          spellCheck={false}
+          autoCapitalize="off"
+          autoCorrect="off"
+          value={props.value}
+          onChange={(e) => props.onChange(e.target.value)}
+          onKeyDown={onKey}
+          onKeyUp={onKey}
+          onBlur={() => setCaps(false)}
+          aria-describedby={caps ? "w-caps" : undefined}
+        />
+        <button
+          type="button"
+          className="w-eye"
+          aria-label={show ? W.hidePassword : W.showPassword}
+          title={show ? W.hidePassword : W.showPassword}
+          aria-pressed={show}
+          onClick={() => setShow((v) => !v)}
+        >
+          <Icon name={show ? "eyeOff" : "eye"} size={18} />
+        </button>
+      </div>
+      <p className="w-keys">
+        {layout && <span>{W.keyboardLayout(layout)}</span>}
+        {caps && (
+          <span className="w-caps" id="w-caps" role="status">
+            {W.capsLock}
+          </span>
+        )}
+      </p>
+    </>
   );
 }
 

@@ -444,8 +444,10 @@ pub async fn tg_check_password(state: tauri::State<'_, TgState>, password: Strin
     };
     match c.client.check_password(token, password.as_bytes()).await {
         Ok(user) => finish_login(&mut c, user.full_name()),
-        Err(SignInError::InvalidPassword(p)) => {
-            c.password = Some(p);
+        Err(SignInError::InvalidPassword(_)) => {
+            // The token that came back still carries the SRP id this try used up: retrying with it
+            // fails with SRP_ID_INVALID. Ask for fresh parameters (or on the next try, if this fails).
+            c.password = fresh_password_token(&c).await.ok();
             Err("PASSWORD_HASH_INVALID".into())
         }
         Err(SignInError::Other(e)) => {
