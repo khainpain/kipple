@@ -159,7 +159,8 @@ export function CardView(props: {
   active: boolean;
   selecting: boolean;
   onOpen: () => void;
-  onToggleSelect: (range: boolean) => void;
+  /** Selecting the card; without it (overview, "Three for today") the card has no Select button. */
+  onToggleSelect?: (range: boolean) => void;
   onJunk: () => void;
   onPin: () => void;
   /** Topics to offer in "Move to topic", and moving there ("" = no topic). */
@@ -213,7 +214,7 @@ export function CardView(props: {
         if (e.target === e.currentTarget && e.animationName === "k-card-in") props.onEntered?.();
       }}
       onClick={(e) => {
-        if (e.ctrlKey || e.metaKey || e.shiftKey || props.selecting) props.onToggleSelect(e.shiftKey);
+        if (props.onToggleSelect && (e.ctrlKey || e.metaKey || e.shiftKey || props.selecting)) props.onToggleSelect(e.shiftKey);
         else props.onOpen();
       }}
     >
@@ -282,9 +283,11 @@ export function CardView(props: {
         )}
       </div>
       <div className="hover-actions" onClick={(e) => e.stopPropagation()}>
-        <button className={`ha sel${props.selected ? " on" : ""}`} title={T.card.select} onClick={() => props.onToggleSelect(false)}>
-          <Icon name="select" size={15} />
-        </button>
+        {props.onToggleSelect && (
+          <button className={`ha sel${props.selected ? " on" : ""}`} title={T.card.select} onClick={() => props.onToggleSelect?.(false)}>
+            <Icon name="select" size={15} />
+          </button>
+        )}
         <button className={`ha${important ? " on" : ""}`} title={important ? T.card.unpin : T.card.pin} onClick={props.onPin}>
           <Icon name="star" size={15} />
         </button>

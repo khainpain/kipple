@@ -250,7 +250,6 @@ export function TodayDialog(props: {
           selecting={false}
           active={false}
           onOpen={noop}
-          onToggleSelect={noop}
           onJunk={noop}
           onPin={noop}
           topics={[]}
