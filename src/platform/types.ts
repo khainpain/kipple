@@ -234,6 +234,8 @@ export interface Platform {
   checkUpdate(): Promise<AvailableUpdate | null>;
   /** Matches the native title bar to the app theme; null follows the OS. Desktop only. */
   setWindowTheme?(theme: "light" | "dark" | null): Promise<void>;
+  /** Desktop only: the window has no system title bar, so the app draws its own (TitleBar.tsx). */
+  windowControls?: WindowControls;
   /** Sending the sorted library back to Telegram; only the desktop app can log in to Telegram. */
   telegram?: TelegramApi;
 }
@@ -288,4 +290,14 @@ export function resolveInside(roots: string[], dir: string, rel: string): string
     if (fold(full).startsWith(fold(prefix)) && full.length > prefix.length) return full;
   }
   return null;
+}
+
+/** Buttons of the app's own title bar. Dragging and double-click-to-maximize come from `data-tauri-drag-region`. */
+export interface WindowControls {
+  minimize(): Promise<void>;
+  toggleMaximize(): Promise<void>;
+  close(): Promise<void>;
+  isMaximized(): Promise<boolean>;
+  /** Calls back after every resize (maximize, restore, snap); returns the unsubscribe. */
+  onResized(cb: () => void): Promise<() => void>;
 }

@@ -33,6 +33,10 @@ export const ru = {
   },
 
   app: {
+    winMinimize: "Свернуть",
+    winMaximize: "Развернуть",
+    winRestore: "Свернуть в окно",
+    winClose: "Закрыть",
     loadFailed: (e: string) => `Не удалось загрузить библиотеку: ${e}`,
     updateFailed: (e: string) => `Не удалось обновиться: ${e}`,
     saveFailed: (e: string) => `Не удалось сохранить: ${e}`,

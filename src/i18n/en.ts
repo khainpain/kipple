@@ -29,6 +29,10 @@ export const en: Dict = {
   },
 
   app: {
+    winMinimize: "Minimize",
+    winMaximize: "Maximize",
+    winRestore: "Restore down",
+    winClose: "Close",
     loadFailed: (e) => `Couldn't load the library: ${e}`,
     updateFailed: (e) => `Couldn't update: ${e}`,
     saveFailed: (e) => `Couldn't save: ${e}`,
