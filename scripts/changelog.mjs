@@ -6,7 +6,7 @@
 export const changelog = [
   {
     ver: "0.1.18",
-    date: "2026-11-17",
+    date: "2026-11-19",
     en: [
       "Cleanup: after the first load Kipple sorts your archive into piles (obvious junk, duplicates, by channel, by site and more), one decision per pile",
       "Topics without AI: send everything from a channel or site to a topic, and links to well-known sites sort themselves",
