@@ -131,7 +131,6 @@ export function Overview(props: {
                 selecting={false}
                 active={props.activeId === c.id}
                 onOpen={() => props.onOpen(c)}
-                onToggleSelect={() => props.onOpen(c)}
                 onJunk={() => props.onJunk(c)}
                 onPin={() => props.onPin(c)}
                 topics={props.topics.map(([t]) => t)}

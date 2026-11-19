@@ -125,3 +125,16 @@ test("Telegram-changing commands are blocked in the desktop app", async ({ kippl
   }, PROBE);
   expect(error).toBe(`smoke tests: ${PROBE} is blocked`);
 });
+
+test("only cards that can be selected offer Select: none on the overview, every one in All cards", async ({ kipple, openAllCards }) => {
+  const select = (scope: Locator) => scope.getByRole("button", { name: ui((d) => d.card.select) });
+  await kipple.getByRole("button", { name: ui((d) => d.nav.home, { prefix: true }) }).first().click();
+  const overviewCard = kipple.locator("article").first();
+  await expect(overviewCard).toBeVisible();
+  await overviewCard.hover();
+  await expect(select(overviewCard)).toHaveCount(0);
+  await openAllCards();
+  const card = kipple.locator("article").first();
+  await card.hover();
+  await expect(select(card)).toHaveCount(1);
+});
