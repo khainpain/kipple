@@ -39,6 +39,9 @@ export function Welcome(props: {
   children?: ReactNode;
 }) {
   const [fromFile, setFromFile] = useState(!props.tg);
+  // Kept here: the sign-in steps unmount while the export steps are shown.
+  const counted = useRef({ started: false, failed: false });
+  useStepFocus(fromFile ? "file" : "signin");
   const L = T.welcome;
 
   return (
@@ -63,7 +66,7 @@ export function Welcome(props: {
               )}
             </div>
             <StepIn id="file">
-              <h1 className="w-h1" id="w-title">
+              <h1 className="w-h1" id="w-title" tabIndex={-1}>
                 {L.importTitle}
               </h1>
               <RiseList className="w-steps" delay={0.1}>
@@ -89,7 +92,7 @@ export function Welcome(props: {
             </StepIn>
           </section>
         ) : (
-          <SignIn tg={props.tg} showDemo={props.showDemo} onDemo={props.onDemo} onSettings={props.onSettings} onFile={() => setFromFile(true)} onLoadSaved={props.onLoadSaved} />
+          <SignIn counted={counted} tg={props.tg} showDemo={props.showDemo} onDemo={props.onDemo} onSettings={props.onSettings} onFile={() => setFromFile(true)} onLoadSaved={props.onLoadSaved} />
         )}
       </main>
 
@@ -112,9 +115,22 @@ export function Welcome(props: {
   );
 }
 
+/**
+ * The link that changed the step unmounts with it; without this, keyboard focus would fall back
+ * to the page. A step whose field took focus (autoFocus) keeps it.
+ */
+function useStepFocus(key: string) {
+  useEffect(() => {
+    if (!document.activeElement || document.activeElement === document.body) document.getElementById("w-title")?.focus({ preventScroll: true });
+  }, [key]);
+}
+
+/** Anonymous statistics: sign-in offered, finished, or failed (each at most once per visit). */
+type Counted = { current: { started: boolean; failed: boolean } };
+
 type Step = "loading" | "noApi" | "qr" | "phone" | "code" | "password" | "done";
 
-function SignIn(props: { tg: TelegramApi; showDemo?: boolean; onDemo: () => void; onSettings: () => void; onFile: () => void; onLoadSaved?: () => void }) {
+function SignIn(props: { counted: Counted; tg: TelegramApi; showDemo?: boolean; onDemo: () => void; onSettings: () => void; onFile: () => void; onLoadSaved?: () => void }) {
   const { tg } = props;
   const L = T.welcome;
   const TL = T.telegram;
@@ -136,10 +152,11 @@ function SignIn(props: { tg: TelegramApi; showDemo?: boolean; onDemo: () => void
     try {
       const s = await tg.status();
       setName(s.name ?? "");
-      setStep(!s.hasApi ? "noApi" : s.authorized ? "done" : mode);
+      // A step the user picked while the first check ran (a link under the QR) stays.
+      setStep((cur) => (!s.hasApi ? "noApi" : s.authorized ? "done" : cur === "loading" ? mode : cur));
     } catch (e) {
       setError(telegramErrorText(e));
-      setStep(mode);
+      setStep((cur) => (cur === "loading" ? mode : cur));
     }
   }
 
@@ -147,8 +164,7 @@ function SignIn(props: { tg: TelegramApi; showDemo?: boolean; onDemo: () => void
     void refresh();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Anonymous statistics: sign-in offered, finished, or failed (each at most once per visit).
-  const counted = useRef({ started: false, failed: false });
+  const { counted } = props;
   useEffect(() => {
     if ((step === "qr" || step === "phone") && !counted.current.started) {
       counted.current.started = true;
@@ -222,6 +238,8 @@ function SignIn(props: { tg: TelegramApi; showDemo?: boolean; onDemo: () => void
     setError(null);
     setQr(null);
     setCode("");
+    setPassword("");
+    setHint(null);
     setStep(next);
   }
 
@@ -271,6 +289,7 @@ function SignIn(props: { tg: TelegramApi; showDemo?: boolean; onDemo: () => void
     ) : null;
 
   const qrScreen = step === "loading" || step === "qr";
+  useStepFocus(qrScreen ? "qr" : step);
 
   return (
     <section className="w-col" aria-labelledby="w-title">
@@ -278,7 +297,7 @@ function SignIn(props: { tg: TelegramApi; showDemo?: boolean; onDemo: () => void
       <StepIn id={qrScreen ? "qr" : step}>
         {qrScreen && (
           <>
-            <h1 className="w-h1" id="w-title">
+            <h1 className="w-h1" id="w-title" tabIndex={-1}>
               {L.qrTitle}
             </h1>
             <div className="w-qr-tile" aria-busy={!qrFresh}>
@@ -289,7 +308,9 @@ function SignIn(props: { tg: TelegramApi; showDemo?: boolean; onDemo: () => void
                   {L.qrRetry}
                 </button>
               ) : (
-                <span className="w-qr-wait" role="status" aria-label={L.qrLoading} />
+                <span className="w-qr-wait" role="status">
+                  <span className="w-sr">{L.qrLoading}</span>
+                </span>
               )}
             </div>
             <p className="w-route">{rich(L.qrRoute)}</p>
@@ -300,7 +321,7 @@ function SignIn(props: { tg: TelegramApi; showDemo?: boolean; onDemo: () => void
 
         {step === "noApi" && (
           <>
-            <h1 className="w-h1" id="w-title">
+            <h1 className="w-h1" id="w-title" tabIndex={-1}>
               {L.qrTitle}
             </h1>
             <div className="w-quiet">
@@ -319,7 +340,7 @@ function SignIn(props: { tg: TelegramApi; showDemo?: boolean; onDemo: () => void
 
         {step === "phone" && (
           <form className="w-form" onSubmit={(e) => (e.preventDefault(), void run(async () => (await tg.requestCode(phone), setCode(""), setStep("code"))))}>
-            <h1 className="w-h1" id="w-title">
+            <h1 className="w-h1" id="w-title" tabIndex={-1}>
               {L.phoneTitle}
             </h1>
             <label htmlFor="w-phone">{L.phoneLabel}</label>
@@ -334,7 +355,7 @@ function SignIn(props: { tg: TelegramApi; showDemo?: boolean; onDemo: () => void
 
         {step === "code" && (
           <form className="w-form" onSubmit={(e) => (e.preventDefault(), void run(async () => signedIn(await tg.signIn(code))))}>
-            <h1 className="w-h1" id="w-title">
+            <h1 className="w-h1" id="w-title" tabIndex={-1}>
               {L.codeTitle}
             </h1>
             <p className="w-lead">{L.codeSent(phone.trim())}</p>
@@ -359,7 +380,7 @@ function SignIn(props: { tg: TelegramApi; showDemo?: boolean; onDemo: () => void
               });
             }}
           >
-            <h1 className="w-h1" id="w-title">
+            <h1 className="w-h1" id="w-title" tabIndex={-1}>
               {L.passwordTitle}
             </h1>
             <p className="w-lead">
@@ -377,7 +398,7 @@ function SignIn(props: { tg: TelegramApi; showDemo?: boolean; onDemo: () => void
 
         {step === "done" && (
           <>
-            <h1 className="w-h1" id="w-title">
+            <h1 className="w-h1" id="w-title" tabIndex={-1}>
               <Done label={L.signedIn(name)} />
             </h1>
             <p className="w-lead">{props.onLoadSaved ? L.signedInLoad : L.signedInNext}</p>
