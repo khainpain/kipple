@@ -207,7 +207,8 @@ export default function App() {
   }, [notify]);
 
   useEffect(() => {
-    platform.appVersion().then(setVersion, () => undefined);
+    // A test build is 0.1.0 inside (so the updater leaves it alone); it shows which build it is instead.
+    platform.appVersion().then((v) => setVersion(__TEST_VERSION__ || v), () => undefined);
   }, []);
 
   /** Anonymous statistics: today's ping on start, then checked every hour and when the window comes back. */
