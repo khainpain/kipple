@@ -1040,8 +1040,6 @@ export default function App() {
         telemetry={telemetrySupported() ? settings.telemetry : undefined}
         onTelemetry={(on) => void applySettings({ ...settingsRef.current, telemetry: on })}
         onSettings={() => setShowSettings(true)}
-        onLanguage={(l) => void onSaveSettings({ ...settingsRef.current, language: l }, null)}
-        openUrl={(u) => void platform.openUrl(u)}
         top={banners}
       >
         {settingsDialog}

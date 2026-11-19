@@ -92,6 +92,25 @@ export function Reveal(props: { children: ReactNode; delay?: number; stagger?: b
 }
 
 /**
+ * AnimatedContent for a step change (sign-in screen): the new step rises 14px and fades in over
+ * 450 ms. A new `id` plays it again.
+ */
+export function StepIn(props: { id: string; children: ReactNode; className?: string }) {
+  const calm = useCalm();
+  return (
+    <motion.div
+      key={props.id}
+      className={props.className}
+      initial={calm ? false : { opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45, ease: EASE_OUT }}
+    >
+      {props.children}
+    </motion.div>
+  );
+}
+
+/**
  * AnimatedList (Kipple variant): list items rise 14px from below with scale .96, 60 ms apart.
  * `play` restarts the entrance, e.g. when the list's screen slides in.
  */

@@ -1,39 +1,30 @@
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { QrResult, TelegramApi } from "../platform/types";
 import { telegramErrorText } from "../lib/telegram";
 import { track } from "../lib/telemetry";
 import { qrPath } from "../lib/qr";
-import { ANGRY_MS, INITIAL_TAPS, SALTO_MS, tapMascot } from "../lib/mascot";
-import { nextThemePref, setThemePref, THEME_ICONS, THEME_LABELS, useThemePref } from "../lib/theme";
-import { LANGS, T, lang, type Lang } from "../i18n";
+import { cleanCode, codeCells } from "../lib/loginCode";
+import { currentLayout, layoutFromKey, type Layout } from "../lib/keyboardHints";
+import { T } from "../i18n";
 import { Icon } from "./Icon";
-import { BounceIn, Done, Reveal, RiseList, Spark, StepBar, Title } from "./Motion";
+import { Done, RiseList, Spark, StepIn } from "./Motion";
 import logoLight from "../../brand/kipple-logo-light.svg";
 import logoDark from "../../brand/kipple-logo-dark.svg";
 import mascot from "../../brand/kipple-mascot-light.svg";
-import mascotNoFace from "../assets/welcome/kipple-mascot-noface-light.svg";
-import shakshuka from "../assets/welcome/shakshuka.svg";
-import containerQueries from "../assets/welcome/container-queries.svg";
 import "./Welcome.css";
 
-/** `**bold**` and `` `code` ``, and desktop.telegram.org as a link, in the export steps. */
-function rich(text: string, openUrl: (url: string) => void): ReactNode[] {
-  return text.split(/(\*\*[^*]+\*\*|`[^`]+`|desktop\.telegram\.org)/).map((part, i) => {
-    if (part.startsWith("**")) return <b key={i}>{part.slice(2, -2)}</b>;
-    if (part.startsWith("`")) return <code key={i}>{part.slice(1, -1)}</code>;
-    if (part === "desktop.telegram.org")
-      return (
-        <a key={i} href="https://desktop.telegram.org" onClick={(e) => (e.preventDefault(), openUrl("https://desktop.telegram.org"))}>
-          {part}
-        </a>
-      );
-    return part;
-  });
+/** `**bold**` in the step texts. */
+function rich(text: string): ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*)/).map((part, i) => (part.startsWith("**") ? <b key={i}>{part.slice(2, -2)}</b> : part));
 }
 
-/** The start screen: sign in to Telegram (QR or phone) or import an export, with an animated collage on the right. */
+/**
+ * The start screen (no library yet), "QR first": it opens on the Telegram QR code, the phone
+ * number, the export file and the demo are quiet links. One column that starts at a fixed height
+ * under a pinned logo, so titles stay on one line from step to step.
+ */
 export function Welcome(props: {
-  /** Undefined in the browser build: no Telegram sign-in there. */
+  /** Undefined in the browser build: no Telegram sign-in there, the screen opens on the export. */
   tg?: TelegramApi;
   showDemo?: boolean;
   onImport: () => void;
@@ -41,137 +32,106 @@ export function Welcome(props: {
   onLoadSaved?: () => void;
   onDemo: () => void;
   onSettings: () => void;
-  onLanguage: (l: Lang) => void;
-  openUrl: (url: string) => void;
   /** Anonymous usage statistics on (desktop only; undefined hides the line). */
   telemetry?: boolean;
   onTelemetry?: (on: boolean) => void;
-  /** Banners above the header (web build, update available). */
+  /** Banners above the screen (web build, update available). */
   top?: ReactNode;
   children?: ReactNode;
 }) {
-  const [screen, setScreen] = useState<0 | 1>(0);
-  const theme = useThemePref();
+  const [fromFile, setFromFile] = useState(!props.tg);
+  // Kept here: the sign-in steps unmount while the export steps are shown.
+  const counted = useRef({ started: false, failed: false });
+  useStepFocus(fromFile ? "file" : "signin");
   const L = T.welcome;
-  const otherLang = LANGS.find((l) => l.key !== lang())!;
 
   return (
     <div className="welcome2">
       {props.top}
-      <header className="w-header">
+      <header className="w-head">
         <span className="w-logo">
           <img src={logoLight} alt="Kipple" className="only-light" />
           <img src={logoDark} alt="Kipple" className="only-dark" />
         </span>
-        <span className="spacer" />
-        <button className="w-lang" onClick={() => props.onLanguage(otherLang.key)} title={L.language(otherLang.name)} aria-label={L.language(otherLang.name)}>
-          {lang().toUpperCase()}
-        </button>
-        <button className="icon-btn" onClick={props.onSettings} title={L.settings} aria-label={L.settings}>
-          <Icon name="settings" size={18} />
-        </button>
-        <button className="icon-btn" onClick={() => setThemePref(nextThemePref(theme))} title={T.theme.toggle(THEME_LABELS[theme])} aria-label={T.theme.toggle(THEME_LABELS[theme])}>
-          <Icon name={THEME_ICONS[theme]} size={18} />
-        </button>
       </header>
 
-      <main className="w-body">
-        <div className="w-left">
-          <div className="w-viewport">
-            <div className="w-track" style={{ transform: `translateX(${screen ? "-50%" : "0"})` }}>
-              <section className={`w-pane${screen === 0 ? " on" : ""}`} inert={screen !== 0} aria-hidden={screen !== 0}>
-                <h1 className="w-h1">
-                  <Title text={L.title} />
-                </h1>
-                <Reveal stagger delay={0.15} className="w-reveal">
-                  <p className="w-lead">{L.lead}</p>
-                  <span className="w-safe">
-                    <span className="w-safe-dot">
-                      <Icon name="lock" size={11} />
-                    </span>
-                    {L.localOnly}
-                  </span>
-                  {props.telemetry !== undefined && props.onTelemetry && (
-                    <p className="w-stats">
-                      {props.telemetry ? L.statsOn : L.statsOff}{" "}
-                      <button className="link-btn" onClick={() => props.onTelemetry!(!props.telemetry)}>
-                        {props.telemetry ? L.statsTurnOff : L.statsTurnOn}
-                      </button>
-                    </p>
-                  )}
-                  {props.tg && <SignInCard tg={props.tg} active={screen === 0} onSettings={props.onSettings} onExport={() => setScreen(1)} onLoadSaved={props.onLoadSaved} />}
-                  {props.tg && <div className="w-or">{L.orWithout}</div>}
-                  <div className="w-tiles">
-                  <button className="w-tile grow" onClick={() => setScreen(1)}>
-                    <span className="w-tile-icon">
-                      <Icon name="folder" size={18} />
-                    </span>
-                    <span className="w-tile-text">
-                      <b>{L.importTitle}</b>
-                      <small>{L.importHint}</small>
-                    </span>
-                    <Icon name="right" size={16} className="w-chev" />
-                  </button>
-                  {props.showDemo && (
-                    <button className="w-tile demo" onClick={props.onDemo}>
-                      <span className="w-tile-icon">
-                        <Icon name="sparkle" size={18} />
-                      </span>
-                      <span className="w-tile-text">
-                        <b>{L.demoTitle}</b>
-                        <small>{L.demoHint}</small>
-                      </span>
-                    </button>
-                  )}
-                  </div>
-                </Reveal>
-              </section>
-
-              <section className={`w-pane${screen === 1 ? " on" : ""}`} inert={screen !== 1} aria-hidden={screen !== 1}>
-                <button className="w-back" onClick={() => setScreen(0)}>
-                  <Icon name="right" size={14} className="flip" />
+      <main className="w-main">
+        {fromFile || !props.tg ? (
+          <section className="w-col" aria-labelledby="w-title">
+            <div className="w-back-slot">
+              {props.tg && (
+                <button className="w-back" onClick={() => setFromFile(false)}>
+                  <Icon name="left" size={14} />
                   {L.back}
                 </button>
-                <h1 className="w-h1 small">{screen === 1 ? <Title text={L.exportTitle} /> : L.exportTitle}</h1>
-                <p className="w-lead">{L.exportLead}</p>
-                {/* Replays its entrance each time the screen slides in. */}
-                <RiseList className="w-steps" play={screen} delay={screen === 1 ? 0.2 : 0}>
-                  {L.steps.map((s, i) => (
-                    <Fragment key={i}>
-                      <span className="w-num">{i + 1}</span>
-                      <span>{rich(s, props.openUrl)}</span>
-                    </Fragment>
-                  ))}
-                </RiseList>
-                <div className="w-actions">
-                  <Spark>
-                    <button className="w-primary" onClick={props.onImport}>
-                      <Icon name="folder" size={18} />
-                      {L.pickFolder}
-                    </button>
-                  </Spark>
-                  {props.showDemo && (
-                    <button className="secondary w-secondary" onClick={props.onDemo}>
-                      {L.demo}
-                    </button>
-                  )}
-                </div>
-              </section>
+              )}
             </div>
-          </div>
-        </div>
-        <div className="w-right">
-          <Collage />
-        </div>
+            <StepIn id="file">
+              <h1 className="w-h1" id="w-title" tabIndex={-1}>
+                {L.importTitle}
+              </h1>
+              <RiseList className="w-steps" delay={0.1}>
+                {L.steps.map((s, i) => (
+                  <Fragment key={i}>
+                    <span className="w-num">{i + 1}</span>
+                    <span>{rich(s)}</span>
+                  </Fragment>
+                ))}
+              </RiseList>
+              <Spark>
+                <button className="w-primary" onClick={props.onImport}>
+                  {L.pickFolder}
+                </button>
+              </Spark>
+              {props.showDemo && !props.tg && (
+                <p className="w-links">
+                  <button className="w-link" onClick={props.onDemo}>
+                    {L.demoTitle}
+                  </button>
+                </p>
+              )}
+            </StepIn>
+          </section>
+        ) : (
+          <SignIn counted={counted} tg={props.tg} showDemo={props.showDemo} onDemo={props.onDemo} onSettings={props.onSettings} onFile={() => setFromFile(true)} onLoadSaved={props.onLoadSaved} />
+        )}
       </main>
+
+      <footer className="w-foot">
+        <span>
+          <Icon name="lock" size={12} />
+          {props.tg ? T.settings.subtitle : T.settings.subtitleWeb}
+        </span>
+        {props.telemetry !== undefined && props.onTelemetry && (
+          <span>
+            {props.telemetry ? L.statsOn : L.statsOff}{" "}
+            <button className="link-btn" onClick={() => props.onTelemetry!(!props.telemetry)}>
+              {props.telemetry ? L.statsTurnOff : L.statsTurnOn}
+            </button>
+          </span>
+        )}
+      </footer>
       {props.children}
     </div>
   );
 }
 
+/**
+ * The link that changed the step unmounts with it; without this, keyboard focus would fall back
+ * to the page. A step whose field took focus (autoFocus) keeps it.
+ */
+function useStepFocus(key: string) {
+  useEffect(() => {
+    if (!document.activeElement || document.activeElement === document.body) document.getElementById("w-title")?.focus({ preventScroll: true });
+  }, [key]);
+}
+
+/** Anonymous statistics: sign-in offered, finished, or failed (each at most once per visit). */
+type Counted = { current: { started: boolean; failed: boolean } };
+
 type Step = "loading" | "noApi" | "qr" | "phone" | "code" | "password" | "done";
 
-function SignInCard(props: { tg: TelegramApi; active: boolean; onSettings: () => void; onExport: () => void; onLoadSaved?: () => void }) {
+function SignIn(props: { counted: Counted; tg: TelegramApi; showDemo?: boolean; onDemo: () => void; onSettings: () => void; onFile: () => void; onLoadSaved?: () => void }) {
   const { tg } = props;
   const L = T.welcome;
   const TL = T.telegram;
@@ -193,10 +153,11 @@ function SignInCard(props: { tg: TelegramApi; active: boolean; onSettings: () =>
     try {
       const s = await tg.status();
       setName(s.name ?? "");
-      setStep(!s.hasApi ? "noApi" : s.authorized ? "done" : mode);
+      // A step the user picked while the first check ran (a link under the QR) stays.
+      setStep((cur) => (!s.hasApi ? "noApi" : s.authorized ? "done" : cur === "loading" ? mode : cur));
     } catch (e) {
       setError(telegramErrorText(e));
-      setStep(mode);
+      setStep((cur) => (cur === "loading" ? mode : cur));
     }
   }
 
@@ -204,8 +165,7 @@ function SignInCard(props: { tg: TelegramApi; active: boolean; onSettings: () =>
     void refresh();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Anonymous statistics: sign-in offered, finished, or failed (each at most once per visit).
-  const counted = useRef({ started: false, failed: false });
+  const { counted } = props;
   useEffect(() => {
     if ((step === "qr" || step === "phone") && !counted.current.started) {
       counted.current.started = true;
@@ -222,7 +182,7 @@ function SignInCard(props: { tg: TelegramApi; active: boolean; onSettings: () =>
 
   // QR: poll while the code is on screen. Each call returns the current code, a fresh one
   // when it expires, or the result once the phone confirmed it.
-  const polling = step === "qr" && props.active;
+  const polling = step === "qr";
   useEffect(() => {
     if (!polling) return;
     let stopped = false;
@@ -279,107 +239,140 @@ function SignInCard(props: { tg: TelegramApi; active: boolean; onSettings: () =>
     setError(null);
     setQr(null);
     setCode("");
+    setPassword("");
+    setHint(null);
     setStep(next);
+  }
+
+  function signedIn(r: Awaited<ReturnType<TelegramApi["signIn"]>>) {
+    if (r.status === "password") {
+      setHint(r.hint ?? null);
+      setStep("password");
+    } else {
+      setName(r.name);
+      setStep("done");
+    }
   }
 
   // Never show an expired code, even if a poll is late.
   const qrFresh = qr && qr.expires * 1000 > Date.now() ? qr : null;
-  const phoneIdx = step === "code" ? 1 : step === "password" ? 2 : 0;
-  const showPhoneSteps = mode === "phone" && (step === "phone" || step === "code" || step === "password");
+  const errorLine = error && (
+    <p className="w-error" role="alert">
+      {error}
+    </p>
+  );
+  const links = (items: { label: string; run: () => void }[]) => (
+    <p className="w-links">
+      {items.map((it, i) => (
+        <span key={it.label}>
+          {i > 0 && <span className="w-dot" aria-hidden>·</span>}
+          <button className="w-link" onClick={it.run}>
+            {it.label}
+          </button>
+        </span>
+      ))}
+    </p>
+  );
+  const fileAndDemo = [{ label: L.fromFile, run: props.onFile }, ...(props.showDemo ? [{ label: L.demoTitle, run: props.onDemo }] : [])];
+
+  // The link above the column: never moves the title, the slot is there on every step.
+  const back =
+    step === "phone" ? (
+      <button className="w-back" onClick={() => switchMode("qr")}>
+        <Icon name="left" size={14} />
+        {L.back}
+      </button>
+    ) : step === "password" && mode === "qr" ? (
+      // After a QR scan no number was typed: back to the code, not to a "different number".
+      <button className="w-back" onClick={() => switchMode("qr")}>
+        <Icon name="left" size={14} />
+        {L.back}
+      </button>
+    ) : step === "code" || step === "password" ? (
+      <button className="w-back" onClick={() => switchMode("phone")}>
+        <Icon name="left" size={14} />
+        {TL.otherPhone}
+      </button>
+    ) : null;
+
+  const qrScreen = step === "loading" || step === "qr";
+  useStepFocus(qrScreen ? "qr" : step);
 
   return (
-    <div className="w-card">
-      <div className="w-card-main">
-        <div className="w-card-head">
-          <span className="w-card-icon">
-            <Icon name="send" size={18} />
-          </span>
-          <h2>{mode === "qr" ? L.qrTitle : L.phoneTitle}</h2>
-        </div>
-
-        {step === "loading" && <p className="hint">{TL.checking}</p>}
-
-        {step === "noApi" && (
-          <div className="w-quiet">
-            <Icon name="lock" size={18} />
-            <div>
-              <p>{TL.noApi}</p>
-              <button className="secondary" onClick={props.onSettings}>
-                {TL.openSettings}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {step === "qr" && (
-          <div className="w-qr-row">
-            <div className="w-qr-tile">
-              {qrFresh ? <QrImage url={qrFresh.url} /> : <span className="w-qr-wait">{qrStalled ? "" : L.qrLoading}</span>}
-              {qrStalled && (
+    <section className="w-col" aria-labelledby="w-title">
+      <div className="w-back-slot">{back}</div>
+      <StepIn id={qrScreen ? "qr" : step}>
+        {qrScreen && (
+          <>
+            <h1 className="w-h1" id="w-title" tabIndex={-1}>
+              {L.qrTitle}
+            </h1>
+            <div className="w-qr-tile" aria-busy={!qrFresh}>
+              {qrFresh ? (
+                <QrImage url={qrFresh.url} />
+              ) : qrStalled ? (
                 <button className="secondary w-qr-retry" onClick={() => setQrAttempt((n) => n + 1)}>
                   {L.qrRetry}
                 </button>
+              ) : (
+                <span className="w-qr-wait" role="status">
+                  <span className="w-sr">{L.qrLoading}</span>
+                </span>
               )}
             </div>
-            <RiseList className="w-qr-steps" delay={0.5}>
-              {L.qrSteps.map((s, i) => (
-                <Fragment key={i}>
-                  <span className="w-num soft">{i + 1}</span>
-                  <span>{rich(s, () => undefined)}</span>
-                </Fragment>
-              ))}
-            </RiseList>
-          </div>
+            <p className="w-route">{rich(L.qrRoute)}</p>
+            {errorLine}
+            {links([{ label: L.byPhone, run: () => switchMode("phone") }, ...fileAndDemo])}
+          </>
         )}
 
-        {showPhoneSteps && (
-          <div className="w-stepper" aria-hidden>
-            {[L.stepPhone, L.stepCode, L.stepPassword].map((s, i) => (
-              <div key={i} className={i <= phoneIdx ? "on" : ""}>
-                <StepBar on={i <= phoneIdx} />
-                <span>
-                  {s}
-                  {i === 2 && <small> · {L.stepOptional}</small>}
-                </span>
+        {step === "noApi" && (
+          <>
+            <h1 className="w-h1" id="w-title" tabIndex={-1}>
+              {L.qrTitle}
+            </h1>
+            <div className="w-quiet">
+              <Icon name="lock" size={18} />
+              <div>
+                <p>{TL.noApi}</p>
+                <button className="secondary" onClick={props.onSettings}>
+                  {TL.openSettings}
+                </button>
               </div>
-            ))}
-          </div>
+            </div>
+            {errorLine}
+            {links(fileAndDemo)}
+          </>
         )}
 
         {step === "phone" && (
-          <form className="w-form" onSubmit={(e) => (e.preventDefault(), void run(async () => (await tg.requestCode(phone), setStep("code"))))}>
-            <label htmlFor="w-phone">{TL.phone}</label>
-            <div className="w-inline">
-              <input id="w-phone" type="tel" autoFocus value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={TL.phonePlaceholder} />
-              <button disabled={busy || !phone.trim()}>{TL.getCode}</button>
-            </div>
+          <form className="w-form" onSubmit={(e) => (e.preventDefault(), void run(async () => (await tg.requestCode(phone), setCode(""), setStep("code"))))}>
+            <h1 className="w-h1" id="w-title" tabIndex={-1}>
+              {L.phoneTitle}
+            </h1>
+            {/* The step title already says it; the label stays for screen readers. */}
+            <label htmlFor="w-phone" className="w-sr">
+              {L.phoneLabel}
+            </label>
+            <input id="w-phone" type="tel" autoComplete="tel" autoFocus value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={TL.phonePlaceholder} />
+            {errorLine}
+            <button className="w-primary" disabled={busy || !phone.trim()}>
+              {TL.getCode}
+            </button>
+            {links([{ label: L.useQr, run: () => switchMode("qr") }])}
           </form>
         )}
 
         {step === "code" && (
-          <form
-            className="w-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void run(async () => {
-                const r = await tg.signIn(code);
-                if (r.status === "password") {
-                  setHint(r.hint ?? null);
-                  setStep("password");
-                } else {
-                  setName(r.name);
-                  setStep("done");
-                }
-              });
-            }}
-          >
-            <label htmlFor="w-code">{TL.code}</label>
-            <div className="w-inline">
-              <input id="w-code" inputMode="numeric" autoFocus value={code} onChange={(e) => setCode(e.target.value)} placeholder="12345" />
-              <button disabled={busy || !code.trim()}>{TL.signIn}</button>
-            </div>
-            <button type="button" className="link-btn w-small-link" onClick={() => (setCode(""), setStep("phone"))}>
-              {TL.otherPhone}
+          <form className="w-form" onSubmit={(e) => (e.preventDefault(), void run(async () => signedIn(await tg.signIn(code))))}>
+            <h1 className="w-h1" id="w-title" tabIndex={-1}>
+              {L.codeTitle}
+            </h1>
+            <p className="w-lead">{L.codeSent(phone.trim())}</p>
+            <CodeCells value={code} onChange={setCode} />
+            {errorLine}
+            <button className="w-primary" disabled={busy || !code}>
+              {TL.signIn}
             </button>
           </form>
         )}
@@ -397,35 +390,41 @@ function SignInCard(props: { tg: TelegramApi; active: boolean; onSettings: () =>
               });
             }}
           >
-            <label htmlFor="w-pass">
-              {TL.password}
-              {hint ? TL.passwordHint(hint) : ""}
+            <h1 className="w-h1" id="w-title" tabIndex={-1}>
+              {L.passwordTitle}
+            </h1>
+            <p className="w-lead">
+              {L.passwordLead}
+              {hint ? ` ${L.passwordHint(hint)}` : ""}
+            </p>
+            <label htmlFor="w-pass" className="w-sr">
+              {L.passwordLabel}
             </label>
-            <div className="w-inline">
-              <input id="w-pass" type="password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
-              <button disabled={busy || !password}>{TL.signIn}</button>
-            </div>
+            <PasswordInput value={password} onChange={setPassword} />
+            {errorLine}
+            <button className="w-primary" disabled={busy || !password}>
+              {TL.signIn}
+            </button>
           </form>
         )}
 
         {step === "done" && (
-          <div className="w-done">
-            <p>
+          <>
+            <h1 className="w-h1" id="w-title" tabIndex={-1}>
               <Done label={L.signedIn(name)} />
-            </p>
-            <p className="hint">{props.onLoadSaved ? L.signedInLoad : L.signedInNext}</p>
-            <div className="w-inline">
-              {props.onLoadSaved ? (
-                <>
-                  <button onClick={props.onLoadSaved}>{L.loadSaved}</button>
-                  <button className="link-btn w-small-link" onClick={props.onExport}>
-                    {L.orExport}
-                  </button>
-                </>
-              ) : (
-                <button onClick={props.onExport}>{L.toExport}</button>
-              )}
-              <button className="link-btn w-small-link" onClick={() =>
+            </h1>
+            <p className="w-lead">{props.onLoadSaved ? L.signedInLoad : L.signedInNext}</p>
+            <Spark>
+              <button className="w-primary" onClick={props.onLoadSaved ?? props.onFile}>
+                {props.onLoadSaved ? L.loadSaved : L.toExport}
+              </button>
+            </Spark>
+            {errorLine}
+            {links([
+              ...(props.onLoadSaved ? [{ label: L.fromFile, run: props.onFile }] : []),
+              {
+                label: L.signOut,
+                run: () =>
                   void run(async () => {
                     // Signed out here even if Telegram didn't answer; the error (if any) still shows.
                     try {
@@ -433,26 +432,103 @@ function SignInCard(props: { tg: TelegramApi; active: boolean; onSettings: () =>
                     } finally {
                       switchMode("qr");
                     }
-                  })
-                }>
-                {L.signOut}
-              </button>
-            </div>
-          </div>
+                  }),
+              },
+            ])}
+          </>
         )}
+      </StepIn>
+    </section>
+  );
+}
 
-        {error && <p className="error">{error}</p>}
-
-        {(step === "qr" || showPhoneSteps) && (
-          <button className="w-switch" onClick={() => switchMode(mode === "qr" ? "phone" : "qr")}>
-            {mode === "qr" ? L.usePhone : L.useQr}
-          </button>
+/**
+ * The cloud password field: a show/hide button, and two quiet hints under it (the keyboard layout
+ * that types now, a warning while Caps Lock is on), since the field hides what is typed.
+ */
+function PasswordInput(props: { value: string; onChange: (password: string) => void }) {
+  const [caps, setCaps] = useState(false);
+  // Shown on request, also after "wrong password": the typed text stays, so it can be checked.
+  const [show, setShow] = useState(false);
+  const [layout, setLayout] = useState<Layout | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void currentLayout().then((l) => alive && l && setLayout((cur) => cur ?? l));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    setCaps(e.getModifierState("CapsLock"));
+    const l = layoutFromKey(e.key);
+    if (l) setLayout(l);
+  };
+  const W = T.welcome;
+  return (
+    <>
+      <div className="w-pass">
+        <input
+          id="w-pass"
+          type={show ? "text" : "password"}
+          autoComplete="current-password"
+          autoFocus
+          spellCheck={false}
+          autoCapitalize="off"
+          autoCorrect="off"
+          value={props.value}
+          onChange={(e) => props.onChange(e.target.value)}
+          onKeyDown={onKey}
+          onKeyUp={onKey}
+          onBlur={() => setCaps(false)}
+          aria-describedby={caps ? "w-caps" : undefined}
+        />
+        <button
+          type="button"
+          className="w-eye"
+          aria-label={show ? W.hidePassword : W.showPassword}
+          title={show ? W.hidePassword : W.showPassword}
+          aria-pressed={show}
+          onClick={() => setShow((v) => !v)}
+        >
+          <Icon name={show ? "eyeOff" : "eye"} size={18} />
+        </button>
+      </div>
+      <p className="w-keys">
+        {layout && <span>{W.keyboardLayout(layout)}</span>}
+        {caps && (
+          <span className="w-caps" id="w-caps" role="status">
+            {W.capsLock}
+          </span>
         )}
-      </div>
-      <div className="w-card-foot">
-        <Icon name="lock" size={13} />
-        {L.privacy}
-      </div>
+      </p>
+    </>
+  );
+}
+
+/**
+ * The login code as cells. One real input lies over them, so typing, pasting, Backspace and the
+ * OS's one-time-code autofill all work as in any text field; the cells only draw its value.
+ */
+function CodeCells(props: { value: string; onChange: (code: string) => void }) {
+  const [focused, setFocused] = useState(true);
+  const { digits, active } = codeCells(props.value);
+  return (
+    <div className="w-code">
+      <input
+        aria-label={T.welcome.codeLabel}
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        autoFocus
+        value={props.value}
+        onChange={(e) => props.onChange(cleanCode(e.target.value))}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+      />
+      {digits.map((d, i) => (
+        <span key={i} className={`w-cell${focused && i === active ? " on" : ""}`} aria-hidden>
+          {d}
+        </span>
+      ))}
     </div>
   );
 }
@@ -466,146 +542,6 @@ function QrImage({ url }: { url: string }) {
         <path d={d} style={{ fill: "var(--fixed-qr)" }} />
       </svg>
       <img src={mascot} alt="" className="w-qr-logo" />
-    </div>
-  );
-}
-
-/** The mascot's face, drawn over the faceless body so it can blink, talk or get angry. */
-function Face({ angry, talking }: { angry?: boolean; talking?: boolean }) {
-  const ink = "#23211E";
-  return (
-    <svg viewBox="0 0 100 100" className="kp-face" aria-hidden>
-      {angry ? (
-        <g fill="none" stroke={ink} strokeLinecap="round">
-          <path d="M31 37.5 L43.5 42.5" strokeWidth="4" />
-          <path d="M69 37.5 L56.5 42.5" strokeWidth="4" />
-          <circle cx="38.5" cy="47.5" r="2.8" fill={ink} stroke="none" />
-          <circle cx="61.5" cy="47.5" r="2.8" fill={ink} stroke="none" />
-          <path d="M45 56.5 Q50 52 55 56.5" strokeWidth="3.2" />
-          <path d="M74 20 l4 -4 M80 24 l5 -2 M77 29 l5 1" strokeWidth="2.4" className="kp-steam" />
-        </g>
-      ) : (
-        <g fill="none" stroke={ink} strokeLinecap="round">
-          <path className="kp-eye" d="M32.5 46 Q38 38.5 43.5 46" strokeWidth="4.6" />
-          <path className="kp-eye" d="M56.5 46 Q62 38.5 67.5 46" strokeWidth="4.6" />
-          {talking ? <ellipse className="kp-mouth" cx="50" cy="54.5" rx="3.6" ry="3" fill={ink} stroke="none" /> : <path d="M46 53 Q50 56.5 54 53" strokeWidth="3.2" />}
-        </g>
-      )}
-    </svg>
-  );
-}
-
-function Mascot() {
-  const taps = useRef(INITIAL_TAPS);
-  const [flip, setFlip] = useState(0);
-  const [angry, setAngry] = useState(false);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  useEffect(() => () => timers.current.forEach(clearTimeout), []);
-
-  function onClick() {
-    const { state, effect } = tapMascot(taps.current, Date.now());
-    taps.current = state;
-    if (effect === "salto") {
-      setFlip((n) => n + 1);
-      timers.current.push(setTimeout(() => setFlip(0), SALTO_MS));
-    } else if (effect === "angry") {
-      setFlip(0);
-      setAngry(true);
-      timers.current.push(setTimeout(() => setAngry(false), ANGRY_MS));
-    }
-  }
-
-  const cls = angry ? "kp-angry" : flip ? "kp-flip" : "";
-  return (
-    <button className="kp-mascot kp-tap kp-bob" aria-label="Kipple" onClick={onClick}>
-      <div>
-        <Spark style={{ width: "100%", height: "100%" }}>
-          <div key={flip} className={`kp-body ${cls}`}>
-            <img src={mascotNoFace} alt="" draggable={false} />
-            <Face angry={angry} />
-          </div>
-        </Spark>
-      </div>
-    </button>
-  );
-}
-
-function Collage() {
-  const L = T.welcome;
-  return (
-    <div className="w-collage">
-      <div className="w-soft" aria-hidden />
-      <BounceIn index={0} className="w-cc-pos" style={{ left: 0, top: 70, width: 170 }}>
-        <div className="w-cc card kp-f kp-f1" style={{ ["--r" as string]: "-5deg" }} aria-hidden>
-          <div className="cover">
-            <img src={containerQueries} alt="" style={{ height: 72, objectFit: "cover" }} />
-          </div>
-          <div className="card-body">
-            <h3>{L.cardCq}</h3>
-            <div className="tags">
-              <span className="pill action-read_later">{L.readLater}</span>
-            </div>
-          </div>
-        </div>
-      </BounceIn>
-      <BounceIn index={1} className="w-cc-pos" style={{ right: 0, top: 30, width: 160 }}>
-        <div className="w-cc card kp-f kp-f2" style={{ ["--r" as string]: "4deg" }} aria-hidden>
-          <div className="card-body">
-            <h3>{L.cardBot}</h3>
-            <div className="tags">
-              <span className="pill action-idea">{L.idea}</span>
-            </div>
-          </div>
-        </div>
-      </BounceIn>
-      <BounceIn index={2} className="w-cc-pos" style={{ left: 242, top: 344, width: 178 }}>
-        <div className="w-cc card kp-f kp-f3" style={{ ["--r" as string]: "-3deg" }} aria-hidden>
-          <div className="cover">
-            <img src={shakshuka} alt="" style={{ height: 84, objectFit: "cover" }} />
-          </div>
-          <div className="card-body">
-            <h3>{L.cardShakshuka}</h3>
-            <div className="tags">
-              <span className="tag">{L.tagRecipes}</span>
-            </div>
-          </div>
-        </div>
-      </BounceIn>
-      <BounceIn index={3} className="w-cc-pos" style={{ left: 0, top: 384, width: 214 }}>
-        <div className="w-cc card kp-f kp-f4" style={{ ["--r" as string]: "3deg" }} aria-hidden>
-          <div className="cover w-video">
-            <div className="w-video-mascot kp-hop">
-              <img src={mascotNoFace} alt="" />
-              <Face talking />
-            </div>
-            <div className="w-bubble">
-              {L.speech.map((s, i) => (
-                <span key={i} className="kp-cap" style={{ animationDelay: `${i * 3}s` }}>
-                  {s}
-                </span>
-              ))}
-            </div>
-            <div className="w-player">
-              <span className="w-play" />
-              <span className="w-bar">
-                <i className="kp-prog" />
-              </span>
-            </div>
-            <span className="badge-corner">0:30</span>
-          </div>
-          <div className="card-body">
-            <h3>{L.cardVideo}</h3>
-            <div className="tags">
-              <span className="pill action-read_later">{L.watchLater}</span>
-              <span className="tag">{L.tagVideo}</span>
-            </div>
-            <div className="meta-row">
-              <span className="site">youtube.com</span>
-            </div>
-          </div>
-        </div>
-      </BounceIn>
-      <Mascot />
     </div>
   );
 }

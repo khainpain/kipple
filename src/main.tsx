@@ -1,6 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { TitleBar } from "./components/TitleBar";
+import { platform } from "@platform";
 import "./lib/theme";
 
 // Page views of the browser demo on the site (/app/): Vercel Web Analytics, no cookies.
@@ -20,8 +22,22 @@ const stray = (e: DragEvent) => {
 window.addEventListener("dragover", stray);
 window.addEventListener("drop", stray);
 
+// The desktop window has no system title bar (tauri.conf.json): the app draws its own above everything.
+const win = platform.windowControls;
+// On <html>, so overlays portaled to <body> start under the bar too (TitleBar.css).
+if (win) document.documentElement.classList.add("has-titlebar");
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <App />
+    {win ? (
+      <div className="shell">
+        <TitleBar win={win} />
+        <div className="shell-body">
+          <App />
+        </div>
+      </div>
+    ) : (
+      <App />
+    )}
   </React.StrictMode>,
 );

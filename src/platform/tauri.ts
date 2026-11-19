@@ -133,6 +133,13 @@ export const platform: Platform = {
   telegram,
   appVersion: () => getVersion(),
   setWindowTheme: (theme) => getCurrentWindow().setTheme(theme),
+  windowControls: {
+    minimize: () => getCurrentWindow().minimize(),
+    toggleMaximize: () => getCurrentWindow().toggleMaximize(),
+    close: () => getCurrentWindow().close(),
+    isMaximized: () => getCurrentWindow().isMaximized(),
+    onResized: (cb) => getCurrentWindow().onResized(() => cb()),
+  },
   async checkUpdate() {
     const update = await check();
     if (!update) return null;
