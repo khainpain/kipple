@@ -281,6 +281,12 @@ function SignIn(props: { counted: Counted; tg: TelegramApi; showDemo?: boolean; 
         <Icon name="left" size={14} />
         {L.back}
       </button>
+    ) : step === "password" && mode === "qr" ? (
+      // After a QR scan no number was typed: back to the code, not to a "different number".
+      <button className="w-back" onClick={() => switchMode("qr")}>
+        <Icon name="left" size={14} />
+        {L.back}
+      </button>
     ) : step === "code" || step === "password" ? (
       <button className="w-back" onClick={() => switchMode("phone")}>
         <Icon name="left" size={14} />
@@ -343,7 +349,10 @@ function SignIn(props: { counted: Counted; tg: TelegramApi; showDemo?: boolean; 
             <h1 className="w-h1" id="w-title" tabIndex={-1}>
               {L.phoneTitle}
             </h1>
-            <label htmlFor="w-phone">{L.phoneLabel}</label>
+            {/* The step title already says it; the label stays for screen readers. */}
+            <label htmlFor="w-phone" className="w-sr">
+              {L.phoneLabel}
+            </label>
             <input id="w-phone" type="tel" autoComplete="tel" autoFocus value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={TL.phonePlaceholder} />
             {errorLine}
             <button className="w-primary" disabled={busy || !phone.trim()}>
@@ -387,7 +396,9 @@ function SignIn(props: { counted: Counted; tg: TelegramApi; showDemo?: boolean; 
               {L.passwordLead}
               {hint ? ` ${L.passwordHint(hint)}` : ""}
             </p>
-            <label htmlFor="w-pass">{L.passwordLabel}</label>
+            <label htmlFor="w-pass" className="w-sr">
+              {L.passwordLabel}
+            </label>
             <input id="w-pass" type="password" autoComplete="current-password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} />
             {errorLine}
             <button className="w-primary" disabled={busy || !password}>
