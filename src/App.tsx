@@ -256,7 +256,8 @@ export default function App() {
     setJob({ label: T.app.jobLinks, done, total: todo.length });
     let next = 0;
     const worker = async () => {
-      while (next < todo.length && !signal.aborted) {
+      // Turning previews off in Settings stops the run too, not only the Stop button.
+      while (next < todo.length && !signal.aborted && settingsRef.current.fetchLinks) {
         const c = todo[next++];
         // A refreshed preview keeps what the last "Check links" found, unless the page opened now.
         const fresh = await fetchLinkMeta(c.urls[0]);
@@ -449,12 +450,11 @@ export default function App() {
     }
   }
 
-  /** The "Tag N" button (and re-tagging from Settings): previews, then AI. Only ever started by the user. */
+  /** The "Tag N" button (and re-tagging from Settings): AI only; previews have their own button. Only ever started by the user. */
   async function processAll(l: Library) {
     const ctl = startJob();
     if (!ctl) return;
     try {
-      if (settingsRef.current.fetchLinks && platform.canFetchLinks) await enrichLinks(l, ctl.signal);
       if (FEATURES.ai && !ctl.signal.aborted && !demoRef.current && !aiAllowed(settingsRef.current) && pendingForAi(l.cards).length) {
         // Pressing the button without consent asks for it; "No AI" is remembered and hides the button.
         setJob(null);
@@ -525,6 +525,7 @@ export default function App() {
       setRev((r) => r + 1);
     }
     let added = 0;
+    let failed = false;
     try {
       const res = await syncSaved(l, {
         tg,
@@ -546,6 +547,7 @@ export default function App() {
         if (!ctl.signal.aborted) setCleanupFor(l);
       }
     } catch (e) {
+      failed = true;
       if (fresh) track("import_failed", "direct");
       notify(T.app.tgLoadFailed(telegramErrorText(e)));
       if (e instanceof TelegramAuthError && !fresh) setShowTelegram(true); // the account dialog signs in again
@@ -557,7 +559,7 @@ export default function App() {
     }
     void runBackup();
     if (ctl.signal.aborted || abortRef.current !== ctl) return;
-    if (!fresh && !added) notify(T.app.tgNothingNew);
+    if (!fresh && !added && !failed) notify(T.app.tgNothingNew); // a failure keeps its own notice
   }
 
   async function openDemo() {
@@ -1050,7 +1052,8 @@ export default function App() {
         tgAccount={tgAccount}
         job={job}
         needAi={demo ? 0 : needAi}
-        needPreviews={demo ? 0 : previewsToLoad(lib.cards, settings.fetchLinks && platform.canFetchLinks)}
+        // Counted only when the button can show: no job running (that scan covers every card).
+        needPreviews={demo || job ? 0 : previewsToLoad(lib.cards, settings.fetchLinks && platform.canFetchLinks)}
         onLoadPreviews={() => void fetchPreviews(lib)}
         offerAi={FEATURES.ai && (aiAllowed(settings) || !settings.aiAsked)}
         onImport={demo ? undefined : doImport}
