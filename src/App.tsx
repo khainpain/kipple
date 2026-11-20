@@ -15,7 +15,7 @@ import { NoPremiumError, syncTags, type TagMode } from "./lib/tgTags";
 import { applyToTelegram, type ApplyOptions, type ApplyProgress } from "./lib/tgApply";
 import { TelegramDialog } from "./components/TelegramDialog";
 import { importFolder, pickExportFolder } from "./lib/importer";
-import { fetchLinkMeta, needsPreview, probeLink } from "./lib/linkmeta";
+import { fetchLinkMeta, needsPreview, previewsToLoad, probeLink } from "./lib/linkmeta";
 import { healthOf, keepHealth } from "./lib/linkcheck";
 import { AiStop, aiModelOf, type AiAuth, classifyCards, retagCount, nameImages, pendingForAi, pendingImages, suggestSynonyms, groupCards } from "./lib/ai";
 import { displayTitle } from "./components/CardView";
@@ -185,19 +185,7 @@ export default function App() {
           history.replaceState(null, "", location.pathname); // "Exit demo" then leads to the normal start
           return openDemo();
         }
-        if (!l) return;
-        // Libraries imported before previews worked here (or by an older version) catch up in the background.
-        const catchUp = () => {
-          if (!s.fetchLinks || !platform.canFetchLinks || !l.cards.some(needsPreview)) return;
-          const ctl = startJob("previews");
-          if (!ctl) return;
-          void enrichLinks(l, ctl.signal).finally(() => {
-            endJob(ctl);
-            setRev((r) => r + 1);
-          });
-        };
-        // Nothing is loaded from Telegram and nothing goes to AI on start: both wait for the user's button.
-        catchUp();
+        // Nothing is loaded from Telegram or other sites and nothing goes to AI on start: each waits for its button.
       } catch (e) {
         notify(T.app.loadFailed(String(e)));
       } finally {
@@ -337,22 +325,22 @@ export default function App() {
     }
   }
 
-  // One job at a time. Link previews give way to anything the user starts; a job the user started
-  // isn't stopped by another button: that one says the app is busy instead.
-  const runningJob = useRef<{ kind: "previews" | "work"; ctl: AbortController } | null>(null);
+  // One job at a time, each started by its button: a running job isn't stopped by another button,
+  // that one says the app is busy instead.
+  const runningJob = useRef<{ ctl: AbortController } | null>(null);
   function jobRunning(): boolean {
     const cur = runningJob.current;
-    return !!cur && cur.kind === "work" && !cur.ctl.signal.aborted;
+    return !!cur && !cur.ctl.signal.aborted;
   }
-  function startJob(kind: "previews" | "work"): AbortController | null {
+  function startJob(): AbortController | null {
     if (jobRunning()) {
-      if (kind === "work") notify(T.app.busy);
+      notify(T.app.busy);
       return null;
     }
     abortRef.current?.abort();
     const ctl = new AbortController();
     abortRef.current = ctl;
-    runningJob.current = { kind, ctl };
+    runningJob.current = { ctl };
     return ctl;
   }
   /** Clears the progress bar, unless a newer job already owns it. */
@@ -365,7 +353,7 @@ export default function App() {
   async function nameOne(card: Card) {
     if (!lib || !aiAllowed(settingsRef.current)) return;
     const auth = await getAiAuth();
-    const ctl = startJob("work");
+    const ctl = startJob();
     if (!ctl) return;
     const saved = card.ai;
     card.ai = undefined;
@@ -415,7 +403,7 @@ export default function App() {
    * it still opens. The preview itself is left as it was, so a page that is gone keeps its card.
    */
   async function checkLinks(l: Library) {
-    const ctl = startJob("work");
+    const ctl = startJob();
     if (!ctl) return;
     const todo = l.cards.filter((c) => !c.removed && c.kind === "link" && c.urls[0] && matchesFilter(c, "all"));
     let done = 0;
@@ -446,9 +434,12 @@ export default function App() {
     }
   }
 
-  /** Link previews for new cards, after an import or a load from Telegram. No AI here. */
+  /**
+   * The "Load previews" button: page title, picture and description for the links still without
+   * them. Only ever started by the user; import and loading from Telegram don't touch other sites.
+   */
   async function fetchPreviews(l: Library) {
-    const ctl = startJob("previews");
+    const ctl = startJob();
     if (!ctl) return;
     try {
       if (settingsRef.current.fetchLinks && platform.canFetchLinks) await enrichLinks(l, ctl.signal);
@@ -460,7 +451,7 @@ export default function App() {
 
   /** The "Tag N" button (and re-tagging from Settings): previews, then AI. Only ever started by the user. */
   async function processAll(l: Library) {
-    const ctl = startJob("work");
+    const ctl = startJob();
     if (!ctl) return;
     try {
       if (settingsRef.current.fetchLinks && platform.canFetchLinks) await enrichLinks(l, ctl.signal);
@@ -488,7 +479,7 @@ export default function App() {
       if (lib) retired.current.add(lib);
       await saveLibrary(next);
       if (first) setCleanupFor(next);
-      demoRef.current = false; // before fetchPreviews below, which saves as it goes
+      demoRef.current = false;
       setTelemetrySuspended(false);
       setDemo(false);
       setLib(next);
@@ -496,7 +487,6 @@ export default function App() {
       notify(warning ?? T.app.imported(next.cards.length, added));
       track("import_completed", "export_json");
       markImported();
-      void fetchPreviews(next);
     } catch (e) {
       track("import_failed", "export_json");
       notify(e instanceof Error ? e.message : String(e));
@@ -522,13 +512,13 @@ export default function App() {
 
   /**
    * Loads Saved Messages straight from Telegram into `l` (a fresh library after sign-in, or the
-   * current one to fetch what's new), then downloads photos and link previews. Started only by the
-   * user's button; AI waits for its own button. Stopping it keeps what was loaded; the next load carries on.
+   * current one to fetch what's new), then downloads photos. Started only by the user's button;
+   * link previews and AI wait for their own buttons. Stopping it keeps what was loaded; the next load carries on.
    */
   async function syncTelegram(l: Library, fresh: boolean) {
     const tg = platform.telegram;
     if (!tg || demoRef.current) return;
-    const ctl = startJob("work");
+    const ctl = startJob();
     if (!ctl) return;
     if (fresh) {
       setLib(l);
@@ -567,8 +557,7 @@ export default function App() {
     }
     void runBackup();
     if (ctl.signal.aborted || abortRef.current !== ctl) return;
-    if (fresh || added) await fetchPreviews(l);
-    else notify(T.app.tgNothingNew);
+    if (!fresh && !added) notify(T.app.tgNothingNew);
   }
 
   async function openDemo() {
@@ -627,7 +616,7 @@ export default function App() {
   async function sendTelegram(opts: SendOptions) {
     const tg = platform.telegram;
     if (!lib || !tg) return;
-    const ctl = startJob("work"); // busy: the dialog stays open with the notice
+    const ctl = startJob(); // busy: the dialog stays open with the notice
     if (!ctl) return;
     setShowTelegram(false);
     setSendingTg(true);
@@ -1061,6 +1050,8 @@ export default function App() {
         tgAccount={tgAccount}
         job={job}
         needAi={demo ? 0 : needAi}
+        needPreviews={demo ? 0 : previewsToLoad(lib.cards, settings.fetchLinks && platform.canFetchLinks)}
+        onLoadPreviews={() => void fetchPreviews(lib)}
         offerAi={FEATURES.ai && (aiAllowed(settings) || !settings.aiAsked)}
         onImport={demo ? undefined : doImport}
         onSettings={() => setShowSettings(true)}

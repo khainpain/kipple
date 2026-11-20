@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { needsPreview, PARSE_VERSION, previewResponse } from "./linkmeta";
+import { previewsToLoad } from "./linkmeta";
 import type { Card, LinkMeta } from "./types";
 
 const card = (link?: Partial<LinkMeta>, url = "https://example.com/a"): Card => ({
@@ -72,5 +73,18 @@ describe("previewResponse (desktop link previews)", () => {
     expect(new Uint8Array(await res.arrayBuffer())).toEqual(bytes);
     expect(previewResponse({ status: 304, url: "https://a.example/", contentType: "", body: "" }).status).toBe(304);
     expect(previewResponse({ status: 404, url: "https://a.example/", contentType: "text/html", body: "" }).ok).toBe(false);
+  });
+});
+
+describe("previewsToLoad (the count on the \"Load previews\" button)", () => {
+  const card = (id: number, url: string, extra: Partial<Card> = {}): Card => ({ id, date: "2026-01-01", kind: "link", text: url, urls: [url], hashtags: [], ...extra });
+  const cards = [card(1, "https://example.com/a"), card(2, "https://example.com/b"), card(3, "https://example.com/c", { removed: true })];
+
+  it("counts the link cards still waiting for a preview", () => {
+    expect(previewsToLoad(cards, true)).toBe(2);
+  });
+
+  it("is zero while link previews are off in Settings, so no button shows", () => {
+    expect(previewsToLoad(cards, false)).toBe(0);
   });
 });

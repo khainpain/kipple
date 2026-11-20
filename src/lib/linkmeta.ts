@@ -268,3 +268,8 @@ export function needsPreview(c: Card): boolean {
   if (!wantsImage(tiktokShort(c.urls[0]) ? c.link.url || c.urls[0] : c.urls[0])) return false;
   return Date.now() - Date.parse(c.link.fetchedAt || "0") > DAY;
 }
+
+/** How many cards the "Load previews" button would fetch; none while previews are off in Settings. */
+export function previewsToLoad(cards: Card[], on: boolean): number {
+  return on ? cards.filter(needsPreview).length : 0;
+}
