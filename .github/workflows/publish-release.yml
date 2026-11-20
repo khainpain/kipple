@@ -1,0 +1,94 @@
+name: publish-release
+run-name: "Publish v${{ inputs.version }} to ${{ inputs.repo }}"
+
+# Runs only on demand: Actions -> publish-release -> Run workflow.
+# Copies a release that already exists here to the public repository, without building anything and
+# without a new version number: the source of its tag (minus .publicignore, scripts/publish-source.sh)
+# becomes the public commit "Kipple vX.Y.Z" tagged vX.Y.Z, and the same signed files are attached to a
+# release there. latest.json is rewritten to download from the public repository; the .sig signatures
+# cover the installers, not latest.json, so they stay valid. Safe to re-run: files are replaced.
+# Needs the secret PUBLIC_REPO_TOKEN (Contents read and write on that repository).
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Existing release here, e.g. 0.1.18"
+        required: true
+      repo:
+        description: "Public repository"
+        required: true
+        default: "getkipple/kipple"
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check inputs
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_REPO: ${{ inputs.repo }}
+        run: |
+          VERSION="${INPUT_VERSION#v}"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Version must look like 1.2.3"; exit 1; }
+          [[ "$INPUT_REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || { echo "::error::Repo must look like owner/name"; exit 1; }
+          [ "$INPUT_REPO" != "$GITHUB_REPOSITORY" ] || { echo "::error::That is this repository"; exit 1; }
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "TARGET=$INPUT_REPO" >> "$GITHUB_ENV"
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/v${{ env.VERSION }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Set version
+        run: |
+          node -e "const f='src-tauri/tauri.conf.json',fs=require('fs'),c=JSON.parse(fs.readFileSync(f));c.version=process.argv[1];fs.writeFileSync(f,JSON.stringify(c,null,2))" "$VERSION"
+      - name: Publish the source
+        id: source
+        env:
+          PUBLIC_REPO_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+        run: |
+          [ -n "$PUBLIC_REPO_TOKEN" ] || { echo "::error::The PUBLIC_REPO_TOKEN secret is missing"; exit 1; }
+          sha="$(scripts/publish-source.sh "$TARGET" "$VERSION")"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "::notice title=Source::https://github.com/$TARGET/commit/$sha"
+      - name: Download the release files
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir files
+          gh release download "v$VERSION" --repo "$GITHUB_REPOSITORY" --dir files
+          ls -l files
+          [ -f files/latest.json ] || { echo "::error::v$VERSION has no latest.json"; exit 1; }
+          from="https://github.com/$GITHUB_REPOSITORY/releases/download/"
+          to="https://github.com/$TARGET/releases/download/"
+          node -e "
+            const fs=require('fs'),[f,from,to]=process.argv.slice(1);
+            const j=JSON.parse(fs.readFileSync(f));
+            for (const p of Object.values(j.platforms??{})) {
+              if (!p.url.startsWith(from)) throw new Error('unexpected url '+p.url);
+              p.url=to+p.url.slice(from.length);
+            }
+            fs.writeFileSync(f,JSON.stringify(j,null,2));
+          " files/latest.json "$from" "$to"
+          cat files/latest.json
+      - name: Make the public release
+        env:
+          GH_TOKEN: ${{ secrets.PUBLIC_REPO_TOKEN }}
+          SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          node scripts/release-notes.mjs body "$VERSION" main "$SHA" > notes.md
+          if gh release view "v$VERSION" --repo "$TARGET" >/dev/null 2>&1; then
+            gh release edit "v$VERSION" --repo "$TARGET" --title "Kipple v$VERSION" --notes-file notes.md --latest
+          else
+            gh release create "v$VERSION" --repo "$TARGET" --verify-tag --title "Kipple v$VERSION" --notes-file notes.md --latest
+          fi
+          gh release upload "v$VERSION" --repo "$TARGET" --clobber files/*
+          echo "::notice title=Release::https://github.com/$TARGET/releases/tag/v$VERSION"
