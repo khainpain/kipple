@@ -269,7 +269,12 @@ export function needsPreview(c: Card): boolean {
   return Date.now() - Date.parse(c.link.fetchedAt || "0") > DAY;
 }
 
-/** How many cards the "Load previews" button would fetch; none while previews are off in Settings. */
+/**
+ * The count on the "Load previews" button: links that never got a preview (or got one from an older
+ * parser); none while previews are off in Settings. Daily retries aren't counted, so the button
+ * doesn't come back every day for pages that can't give a picture; they ride along with the next run.
+ */
 export function previewsToLoad(cards: Card[], on: boolean): number {
-  return on ? cards.filter(needsPreview).length : 0;
+  if (!on) return 0;
+  return cards.filter((c) => needsPreview(c) && (!c.link || (c.link.v ?? 1) < PARSE_VERSION)).length;
 }

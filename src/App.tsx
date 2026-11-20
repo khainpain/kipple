@@ -412,7 +412,8 @@ export default function App() {
     setJob({ label: T.linkCheck.job, done, total: todo.length });
     try {
       const worker = async () => {
-        while (next < todo.length && !ctl.signal.aborted) {
+        // Turning previews off in Settings stops the check as well: no more requests to other sites.
+        while (next < todo.length && !ctl.signal.aborted && settingsRef.current.fetchLinks) {
           const c = todo[next++];
           let health = healthOf(await probeLink(c.urls[0]));
           // "Gone" is only believed when the site says so twice: a one-off 404 stays "can't tell".
