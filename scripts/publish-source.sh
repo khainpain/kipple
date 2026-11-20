@@ -20,7 +20,7 @@ trap 'rm -rf "$WORK"' EXIT
 URL="${PUBLIC_REPO_URL:-https://github.com/${REPO}.git}"
 # The token goes in a header for this script's git calls only, never into a URL or .git/config.
 AUTH="$(printf 'x-access-token:%s' "$PUBLIC_REPO_TOKEN" | base64 -w0)"
-[ -n "${GITHUB_ACTIONS:-}" ] && echo "::add-mask::$AUTH"
+[ -n "${GITHUB_ACTIONS:-}" ] && echo "::add-mask::$AUTH" >&2  # stdout carries only the sha
 pgit() { git -c http.extraheader="AUTHORIZATION: basic $AUTH" "$@"; }
 
 # The tree to publish: every tracked file at HEAD except the .publicignore paths.
