@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { needsPreview, PARSE_VERSION, previewResponse } from "./linkmeta";
+import { needsPreview, PARSE_VERSION, previewResponse, previewsToLoad } from "./linkmeta";
 import type { Card, LinkMeta } from "./types";
 
 const card = (link?: Partial<LinkMeta>, url = "https://example.com/a"): Card => ({
@@ -72,5 +72,25 @@ describe("previewResponse (desktop link previews)", () => {
     expect(new Uint8Array(await res.arrayBuffer())).toEqual(bytes);
     expect(previewResponse({ status: 304, url: "https://a.example/", contentType: "", body: "" }).status).toBe(304);
     expect(previewResponse({ status: 404, url: "https://a.example/", contentType: "text/html", body: "" }).ok).toBe(false);
+  });
+});
+
+describe("previewsToLoad (the count on the \"Load previews\" button)", () => {
+  const linkCard = (id: number, url: string, extra: Partial<Card> = {}): Card => ({ id, date: "2026-01-01", kind: "link", text: url, urls: [url], hashtags: [], ...extra });
+  const cards = [linkCard(1, "https://example.com/a"), linkCard(2, "https://example.com/b"), linkCard(3, "https://example.com/c", { removed: true })];
+
+  it("counts the link cards still waiting for a preview", () => {
+    expect(previewsToLoad(cards, true)).toBe(2);
+  });
+
+  it("doesn't count a daily retry (a server error two days ago), so the button doesn't come back every day", () => {
+    const old = new Date(Date.now() - 2 * 86_400_000).toISOString();
+    const retry = linkCard(4, "https://example.com/d", { link: { url: "https://example.com/d", error: "HTTP 503", fetchedAt: old, v: PARSE_VERSION } });
+    expect(needsPreview(retry)).toBe(true);
+    expect(previewsToLoad([retry], true)).toBe(0);
+  });
+
+  it("is zero while link previews are off in Settings, so no button shows", () => {
+    expect(previewsToLoad(cards, false)).toBe(0);
   });
 });

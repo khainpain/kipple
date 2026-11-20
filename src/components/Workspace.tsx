@@ -91,6 +91,9 @@ export function Workspace(props: {
   /** The signed-in Telegram account, shown at the top of the sidebar. */
   tgAccount?: TelegramAccount | null;
   onRunAi: () => void;
+  /** Links still without a preview; 0 hides the button (previews off in Settings, or nothing to load). */
+  needPreviews: number;
+  onLoadPreviews: () => void;
   /** Ask the AI to name one photo from its content (sends that picture). */
   onNameImage?: (card: Card) => void;
   /** Signed in to Telegram: jump to the card's message in Saved Messages. */
@@ -641,12 +644,18 @@ export function Workspace(props: {
                 </button>
               </span>
             ) : (
-              props.needAi > 0 &&
-              props.offerAi && (
-                <button className="secondary small-btn" onClick={props.onRunAi} title={T.toolbar.runAiHint}>
-                  <Icon name="sparkle" size={14} /> {T.toolbar.runAi(props.needAi)}
-                </button>
-              )
+              <>
+                {props.needPreviews > 0 && (
+                  <button className="secondary small-btn" onClick={props.onLoadPreviews} title={T.toolbar.loadPreviewsHint}>
+                    <Icon name="link" size={14} /> {T.toolbar.loadPreviews(props.needPreviews)}
+                  </button>
+                )}
+                {props.needAi > 0 && props.offerAi && (
+                  <button className="secondary small-btn" onClick={props.onRunAi} title={T.toolbar.runAiHint}>
+                    <Icon name="sparkle" size={14} /> {T.toolbar.runAi(props.needAi)}
+                  </button>
+                )}
+              </>
             )}
             {props.onLoadTelegram && (
               <button className="icon-btn" onClick={props.onLoadTelegram} disabled={!!props.job} title={T.toolbar.loadTelegram}>
